@@ -1,0 +1,9 @@
+# Sem compile_commands.json, o clangd compila a partir da pasta do arquivo:
+# src/*.c enxerga ../include e src/tests/*.c enxerga ../../include.
+CompileFlags:
+  Add: [-std=c99, -Wall, -Wextra, -I../include, -I../../include]
+---
+If:
+  PathMatch: .*\.h
+CompileFlags:
+  Add: [-xc-header]
