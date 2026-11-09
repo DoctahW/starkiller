@@ -1,0 +1,19 @@
+# Plano local: o plano oficial vive nas Issues e Milestones do GitHub
+PLANO.md
+
+# Build
+/build/
+/starkiller
+/starkiller.exe
+*.o
+*.d
+
+# Dados gerados em tempo de execução (pasta criada no primeiro salvamento)
+/dados/
+
+# Editores e sistema
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
