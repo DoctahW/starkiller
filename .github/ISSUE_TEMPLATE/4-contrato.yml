@@ -1,0 +1,48 @@
+name: Mudança de contrato
+description: Proposta de alteração em include/tipos.h ou em uma API pública de módulo (include/*.h).
+title: "[CONTRATO] "
+labels: ["tipo:contrato"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Mudanças em `include/tipos.h` ou em assinaturas de `include/*.h` só entram depois que esta issue for aprovada pelo responsável da integração.
+  - type: input
+    id: arquivo
+    attributes:
+      label: Arquivo e símbolo
+      placeholder: include/tipos.h — struct Inimigo
+    validations:
+      required: true
+  - type: textarea
+    id: mudanca
+    attributes:
+      label: Mudança proposta
+      description: Código antes e depois.
+      render: c
+    validations:
+      required: true
+  - type: textarea
+    id: motivo
+    attributes:
+      label: Motivo
+    validations:
+      required: true
+  - type: checkboxes
+    id: modulos
+    attributes:
+      label: Módulos afetados
+      options:
+        - label: jogo / entrada
+        - label: nave / combate
+        - label: inimigos
+        - label: reforcos / ia
+        - label: render / hud
+        - label: placar / pontuacao / telas / audio
+  - type: textarea
+    id: migracao
+    attributes:
+      label: Plano de migração
+      description: Quem atualiza cada módulo afetado e em qual PR.
+    validations:
+      required: true

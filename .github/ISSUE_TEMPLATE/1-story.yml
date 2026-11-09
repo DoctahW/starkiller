@@ -1,0 +1,69 @@
+name: Story
+description: Unidade de trabalho do backlog (uma story = uma issue).
+title: "[XXX-00] "
+labels: ["tipo:story"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Título no formato `[ID] Título`, ex.: `[LST-03] removerInimigo O(1) com invariante do alvo`.
+        Na barra lateral, defina **responsável**, **milestone**, as labels `epic:*`, `prioridade:*` e `tam:*`, e vincule a issue ao epic como sub-issue.
+  - type: input
+    id: id
+    attributes:
+      label: ID
+      placeholder: LST-03
+    validations:
+      required: true
+  - type: dropdown
+    id: epic
+    attributes:
+      label: Epic
+      options:
+        - INF — Infraestrutura e Integração
+        - INP — Entrada e Controle
+        - VOO — Voo e Câmera
+        - CMB — Combate
+        - LST — Inimigos e Computador de Mira
+        - REF/IA — Reforços e IA
+        - VIS — Visual 3D e HUD
+        - PLC — Placar, Pontuação, Telas e Áudio
+        - ENT — Entrega
+    validations:
+      required: true
+  - type: input
+    id: data-alvo
+    attributes:
+      label: Data alvo
+      placeholder: 10/11
+    validations:
+      required: true
+  - type: input
+    id: dependencias
+    attributes:
+      label: Depende de
+      description: Issues que precisam estar concluídas antes (ou "—").
+      placeholder: "#12, #15"
+    validations:
+      required: true
+  - type: textarea
+    id: descricao
+    attributes:
+      label: Descrição
+      value: "Como <jogador/dev>, quero <ação>, para <resultado>."
+    validations:
+      required: true
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Critérios de aceite
+      description: Cada item precisa ser verificável. A story só fecha com todos marcados.
+      value: |
+        - [ ] 
+    validations:
+      required: true
+  - type: textarea
+    id: notas
+    attributes:
+      label: Notas técnicas
+      description: Funções, arquivos, invariantes e referências.

@@ -1,0 +1,59 @@
+name: Bug
+description: Comportamento errado, crash ou vazamento de memória.
+title: "[BUG] "
+labels: ["tipo:bug"]
+body:
+  - type: input
+    id: story
+    attributes:
+      label: Story relacionada
+      placeholder: "#23 (LST-03)"
+  - type: textarea
+    id: passos
+    attributes:
+      label: Passos para reproduzir
+      value: |
+        1. 
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Esperado
+    validations:
+      required: true
+  - type: textarea
+    id: obtido
+    attributes:
+      label: Obtido
+      description: Inclua mensagem de erro, saída do valgrind/gdb ou captura de tela.
+    validations:
+      required: true
+  - type: dropdown
+    id: sistema
+    attributes:
+      label: Sistema
+      multiple: true
+      options:
+        - Linux
+        - Windows
+    validations:
+      required: true
+  - type: dropdown
+    id: entrada
+    attributes:
+      label: Dispositivo de entrada
+      options:
+        - Teclado
+        - Controle Xbox
+        - Os dois
+        - Não se aplica
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit ou tag
+      placeholder: v0.1-alpha ou hash do commit
+    validations:
+      required: true

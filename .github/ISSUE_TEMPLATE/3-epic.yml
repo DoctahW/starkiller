@@ -1,0 +1,26 @@
+name: Epic
+description: Agrupador de stories de um módulo; as stories entram como sub-issues.
+title: "[EPIC] "
+labels: ["tipo:epic"]
+body:
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: Objetivo
+      description: O que este epic entrega no jogo quando estiver concluído.
+    validations:
+      required: true
+  - type: input
+    id: arquivos
+    attributes:
+      label: Arquivos
+      placeholder: src/inimigos.c, include/inimigos.h, src/tests/test_lista.c
+    validations:
+      required: true
+  - type: textarea
+    id: conclusao
+    attributes:
+      label: Critério de conclusão
+      description: Normalmente, todas as sub-issues fechadas e o módulo funcionando na main.
+    validations:
+      required: true
