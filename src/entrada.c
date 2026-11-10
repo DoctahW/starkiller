@@ -218,3 +218,10 @@ Comandos lerComandos(const ConfigEntrada *cfg)
     c.controleConectado = conectado;
     return c;
 }
+
+/* SetGamepadVibration (SDL_RumbleGamepad) já limita intensidade a [0, 1] e duração a 2 s. */
+void vibrar(const ConfigEntrada *cfg, float intensidade, float duracao)
+{
+    if (cfg->vibracao && IsGamepadAvailable(CONTROLE))
+        SetGamepadVibration(CONTROLE, intensidade, intensidade, duracao);
+}
