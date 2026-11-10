@@ -75,7 +75,7 @@ O `.clangd` já configura o clangd para encontrar os headers em `include/`.
 | Próximo / anterior alvo | T / Y        | D-pad → / ←              |
 | Alvo mais próximo       | R            | LT                       |
 | Pausa                   | Esc          | Start                    |
-| Confirmar / voltar      | Enter / Esc  | A / B                    |
+| Confirmar / voltar      | Enter / Esc ou Backspace | A / B           |
 
 
 ## Estrutura
