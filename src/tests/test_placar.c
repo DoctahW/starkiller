@@ -3,6 +3,10 @@
 #include "placar.h"
 #include "teste.h"
 
+#define PASTA       "build/tests/dados_placar"
+#define ARQUIVO     PASTA "/placar.dat"
+#define ARQUIVO_TMP PASTA "/placar.tmp"
+
 /* Preenche um vetor e verifica se ele está em ordem decrescente. */
 static int estaDecrescente(const NoPlacar *v, int n)
 {
@@ -26,6 +30,25 @@ static NoPlacar *construir(const int *pontos, int n)
         raiz = inserirPontuacao(raiz, nome, pontos[i]);
     }
     return raiz;
+}
+
+/* Compara forma, nomes e pontos: o round-trip tem que recriar a mesma árvore. */
+static int mesmaArvore(const NoPlacar *a, const NoPlacar *b)
+{
+    if (a == NULL || b == NULL)
+        return a == b;
+    return a->pontos == b->pontos && strcmp(a->nome, b->nome) == 0 &&
+           mesmaArvore(a->esq, b->esq) && mesmaArvore(a->dir, b->dir);
+}
+
+static void escreverArquivo(const char *caminho, const char *conteudo)
+{
+    FILE *arquivo = fopen(caminho, "w");
+
+    if (arquivo != NULL) {
+        fputs(conteudo, arquivo);
+        fclose(arquivo);
+    }
 }
 
 int main(void)
@@ -142,6 +165,86 @@ int main(void)
     raiz = inserirPontuacao(NULL, NULL, 1);
     VERIFICA(raiz != NULL && raiz->nome[0] == '\0');
     liberarPlacar(raiz);
+
+    /* Persistência: árvore vazia grava arquivo vazio e carrega NULL */
+    remove(ARQUIVO);
+    remove(ARQUIVO_TMP);
+    VERIFICA(salvarPlacar(NULL, ARQUIVO) == 1);
+    VERIFICA(FileExists(ARQUIVO));
+    raiz = carregarPlacar(ARQUIVO);
+    VERIFICA(raiz == NULL);
+
+    /* Round-trip: recria a mesma forma, inclusive os empates à esquerda */
+    {
+        const int pontos[12] = { 100, 100, 100, 250, 50, 400,
+                                 180, 300, 300, 20, 220, 90 };
+        NoPlacar *carregada;
+
+        raiz = construir(pontos, 12);
+        VERIFICA(salvarPlacar(raiz, ARQUIVO) == 1);
+        VERIFICA(!FileExists(ARQUIVO_TMP)); /* o temporário foi renomeado */
+        carregada = carregarPlacar(ARQUIVO);
+        VERIFICA(carregada != NULL);
+        VERIFICA(mesmaArvore(raiz, carregada));
+        liberarPlacar(raiz);
+        liberarPlacar(carregada);
+    }
+
+    /* Salvar de novo sobrescreve em vez de acumular */
+    raiz = inserirPontuacao(NULL, "Nova", 777);
+    VERIFICA(salvarPlacar(raiz, ARQUIVO) == 1);
+    liberarPlacar(raiz);
+    raiz = carregarPlacar(ARQUIVO);
+    VERIFICA(raiz != NULL && raiz->pontos == 777);
+    VERIFICA(strcmp(raiz->nome, "Nova") == 0);
+    VERIFICA(raiz->esq == NULL && raiz->dir == NULL);
+    liberarPlacar(raiz);
+
+    /* Arquivo inexistente: árvore vazia, sem travar */
+    VERIFICA(carregarPlacar(PASTA "/nao_existe.dat") == NULL);
+
+    /* Salvar cria a pasta que ainda não existe */
+    raiz = inserirPontuacao(NULL, "Dir", 1);
+    VERIFICA(salvarPlacar(raiz, PASTA "/nova_pasta/placar.dat") == 1);
+    VERIFICA(DirectoryExists(PASTA "/nova_pasta"));
+    liberarPlacar(raiz);
+    raiz = carregarPlacar(PASTA "/nova_pasta/placar.dat");
+    VERIFICA(raiz != NULL && raiz->pontos == 1);
+    liberarPlacar(raiz);
+
+    /* Linhas inválidas são ignoradas; válidas continuam valendo */
+    escreverArquivo(ARQUIVO,
+                    "Ana;100\n"
+                    "sem separador\n"
+                    "Bia;abc\n"
+                    ";500\n"
+                    "Carla;200\n"
+                    "Dirceu;99999999999999999999\n"
+                    "Edu;300\r\n"
+                    "Fabi;250");
+    raiz = carregarPlacar(ARQUIVO);
+    VERIFICA(raiz != NULL);
+    VERIFICA(exibirRankingEmOrdem(raiz, ranking, 10) == 4);
+    VERIFICA(ranking[0].pontos == 300 && strcmp(ranking[0].nome, "Edu") == 0);
+    VERIFICA(ranking[1].pontos == 250 && strcmp(ranking[1].nome, "Fabi") == 0);
+    VERIFICA(ranking[3].pontos == 100 && strcmp(ranking[3].nome, "Ana") == 0);
+    liberarPlacar(raiz);
+
+    /* ';' e nome longo vindos de um arquivo editado à mão */
+    escreverArquivo(ARQUIVO, "COM;PONTO;123\n");
+    raiz = carregarPlacar(ARQUIVO);
+    VERIFICA(raiz != NULL && raiz->pontos == 123);
+    VERIFICA(strcmp(raiz->nome, "COM_PONTO") == 0);
+    liberarPlacar(raiz);
+
+    escreverArquivo(ARQUIVO, "ABCDEFGHIJKLMNOPQRST;42\n");
+    raiz = carregarPlacar(ARQUIVO);
+    VERIFICA(raiz != NULL && strlen(raiz->nome) == PLACAR_MAX_NOME);
+    liberarPlacar(raiz);
+
+    remove(ARQUIVO);
+    remove(ARQUIVO_TMP);
+    remove(PASTA "/nova_pasta/placar.dat");
 
     return RESULTADO_TESTES();
 }
