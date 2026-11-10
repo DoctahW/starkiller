@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Versão mínima suportada (README). Compilar contra ela garante compatibilidade.
+  RAYLIB_VERSION: "5.5"
+
+jobs:
+  build:
+    name: build e testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependências do sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config \
+            libasound2-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev
+
+      - name: Cache da raylib
+        id: cache-raylib
+        uses: actions/cache@v4
+        with:
+          path: ~/raylib
+          key: raylib-${{ env.RAYLIB_VERSION }}-shared-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Compilar raylib
+        if: steps.cache-raylib.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL "https://github.com/raysan5/raylib/archive/refs/tags/${RAYLIB_VERSION}.tar.gz" \
+            | tar xz -C "$RUNNER_TEMP"
+          cmake -S "$RUNNER_TEMP/raylib-${RAYLIB_VERSION}" -B "$RUNNER_TEMP/raylib-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBUILD_EXAMPLES=OFF \
+            -DCMAKE_INSTALL_PREFIX="$HOME/raylib" \
+            -DCMAKE_INSTALL_LIBDIR=lib
+          cmake --build "$RUNNER_TEMP/raylib-build" -j"$(nproc)"
+          cmake --install "$RUNNER_TEMP/raylib-build"
+
+      - name: Expor raylib ao pkg-config e ao loader
+        run: |
+          echo "PKG_CONFIG_PATH=$HOME/raylib/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$HOME/raylib/lib" >> "$GITHUB_ENV"
+
+      - name: Conferir raylib
+        run: pkg-config --modversion raylib
+
+      - name: make
+        run: make
+
+      - name: make test
+        run: make test
