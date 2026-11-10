@@ -5,6 +5,7 @@ PLANO.md
 /build/
 /starkiller
 /starkiller.exe
+/SDL3.dll
 *.o
 *.d
 
