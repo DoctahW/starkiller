@@ -1,6 +1,8 @@
 #include "entrada.h"
 
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 
 #define CONTROLE          0       /* índice do gamepad lido */
 #define LIMIAR_DIGITAL    0.5f    /* gatilho/analógico acima disso conta como pressionado */
@@ -60,6 +62,68 @@ void iniciarEntrada(ConfigEntrada *cfg)
     cfg->zonaMorta = 0.15f;
     cfg->inverterArfagem = 0;
     cfg->vibracao = 1;
+    carregarConfigEntrada(cfg, CAMINHO_CONFIG);
+}
+
+static int lerFaixa(const char *texto, float min, float max, float *saida)
+{
+    float v;
+    char resto;
+    if (sscanf(texto, "%f %c", &v, &resto) != 1 || !(v >= min && v <= max))
+        return 0;
+    *saida = v;
+    return 1;
+}
+
+static int lerBooleano(const char *texto, int *saida)
+{
+    int v;
+    char resto;
+    if (sscanf(texto, "%d %c", &v, &resto) != 1 || (v != 0 && v != 1))
+        return 0;
+    *saida = v;
+    return 1;
+}
+
+/* Formato: uma linha `chave=valor` por campo; linhas desconhecidas são ignoradas. */
+int carregarConfigEntrada(ConfigEntrada *cfg, const char *caminho)
+{
+    FILE *f = fopen(caminho, "r");
+    if (!f)
+        return 0;
+
+    char linha[128];
+    while (fgets(linha, sizeof linha, f)) {
+        char *igual = strchr(linha, '=');
+        if (!igual)
+            continue;
+        *igual = '\0';
+        const char *chave = linha, *valor = igual + 1;
+        if (strcmp(chave, "sensibilidade") == 0)
+            lerFaixa(valor, SENSIBILIDADE_MIN, SENSIBILIDADE_MAX, &cfg->sensibilidade);
+        else if (strcmp(chave, "zonaMorta") == 0)
+            lerFaixa(valor, ZONA_MORTA_MIN, ZONA_MORTA_MAX, &cfg->zonaMorta);
+        else if (strcmp(chave, "inverterArfagem") == 0)
+            lerBooleano(valor, &cfg->inverterArfagem);
+        else if (strcmp(chave, "vibracao") == 0)
+            lerBooleano(valor, &cfg->vibracao);
+    }
+    fclose(f);
+    return 1;
+}
+
+int salvarConfigEntrada(const ConfigEntrada *cfg, const char *caminho)
+{
+    const char *pasta = GetDirectoryPath(caminho);
+    if (pasta[0] != '\0' && !DirectoryExists(pasta) && MakeDirectory(pasta) != 0)
+        return 0;
+
+    FILE *f = fopen(caminho, "w");
+    if (!f)
+        return 0;
+    fprintf(f, "sensibilidade=%.2f\nzonaMorta=%.2f\ninverterArfagem=%d\nvibracao=%d\n",
+            cfg->sensibilidade, cfg->zonaMorta, cfg->inverterArfagem, cfg->vibracao);
+    return fclose(f) == 0;
 }
 
 static int teclaSegurada(Acao a)
@@ -198,10 +262,11 @@ Comandos lerComandos(const ConfigEntrada *cfg)
     else if (doTeclado && !doControle)
         usandoControle = 0;
 
+    float inverter = cfg->inverterArfagem ? -1.0f : 1.0f;
     Comandos c;
-    c.arfagem = limitar(t.arfagem + g.arfagem);
-    c.guinada = limitar(t.guinada + g.guinada);
-    c.rolagem = limitar(t.rolagem + g.rolagem);
+    c.arfagem = limitar((t.arfagem + g.arfagem) * cfg->sensibilidade * inverter);
+    c.guinada = limitar((t.guinada + g.guinada) * cfg->sensibilidade);
+    c.rolagem = limitar((t.rolagem + g.rolagem) * cfg->sensibilidade);
     c.aceleracao = limitar(t.aceleracao + g.aceleracao);
     c.disparar = t.disparar | g.disparar;
     c.proximoAlvo = t.proximoAlvo | g.proximoAlvo;
