@@ -34,6 +34,8 @@ O planejamento (stories, epics, milestones e responsáveis) está nas **Issues**
 
 O `.clangd` já configura o clangd para encontrar os headers em `include/`.
 
+A CI (`.github/workflows/ci.yml`) roda `make` e `make test` em `ubuntu-latest` contra a raylib 5.5 em cada PR e push na `main`. O check `build e testes` é obrigatório para o merge na `main`.
+
 ## Controles
 
 
