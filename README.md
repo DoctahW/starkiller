@@ -62,6 +62,8 @@ O `Makefile` procura a raylib em `RAYLIB_PATH` (a pasta `raylib/src`, com `rayli
 
 O `.clangd` já configura o clangd para encontrar os headers em `include/`.
 
+A CI (`.github/workflows/ci.yml`) roda `make` e `make test` em `ubuntu-latest` contra a raylib 6.2 com SDL3 (as duas compiladas na CI e guardadas em cache) em cada PR e push na `main`. O check `build e testes` é obrigatório para o merge na `main`.
+
 ## Controles
 
 

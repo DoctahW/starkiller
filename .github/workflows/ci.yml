@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Mesmas versões do README: raylib estática com backend SDL3.
+  RAYLIB_VERSION: "6.2"
+  SDL3_VERSION: "3.4.20"
+
+jobs:
+  build:
+    name: build e testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Definir pasta das dependências
+        run: echo "DEPS=$HOME/deps" >> "$GITHUB_ENV"
+
+      # SDL3 e raylib compiladas ficam no cache; só são recompiladas quando a versão muda (ou o cache expira).
+      - name: Restaurar SDL3 e raylib do cache
+        id: cache-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/deps
+          key: deps-sdl3-${{ env.SDL3_VERSION }}-raylib-${{ env.RAYLIB_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
+      # Sempre necessário: a libSDL3.so só depende da libc (o resto ela carrega em tempo de execução).
+      - name: Instalar dependências do sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgl1-mesa-dev
+
+      # Só no cache miss: dependências de build da SDL3 (wiki.libsdl.org/SDL3/README-linux).
+      - name: Instalar dependências de build da SDL3
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            libasound2-dev libpulse-dev libpipewire-0.3-dev \
+            libglu1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libdrm-dev libgbm-dev \
+            libx11-dev libxext-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev \
+            libxfixes-dev libxss-dev libxtst-dev libxkbcommon-dev \
+            libwayland-dev libdecor-0-dev libdbus-1-dev libibus-1.0-dev libudev-dev
+
+      # O Ubuntu 24.04 (ubuntu-latest) não empacota a SDL3.
+      - name: Compilar SDL3
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL "https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_VERSION}/SDL3-${SDL3_VERSION}.tar.gz" \
+            | tar xz -C "$RUNNER_TEMP"
+          cmake -S "$RUNNER_TEMP/SDL3-${SDL3_VERSION}" -B "$RUNNER_TEMP/sdl3-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSDL_TESTS=OFF \
+            -DSDL_TEST_LIBRARY=OFF \
+            -DCMAKE_INSTALL_PREFIX="$DEPS/sdl3" \
+            -DCMAKE_INSTALL_LIBDIR=lib
+          cmake --build "$RUNNER_TEMP/sdl3-build" -j"$(nproc)"
+          cmake --install "$RUNNER_TEMP/sdl3-build"
+
+      # Guarda só os headers e a libraylib.a, não o código-fonte inteiro.
+      - name: Compilar raylib
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL "https://github.com/raysan5/raylib/archive/refs/tags/${RAYLIB_VERSION}.tar.gz" \
+            | tar xz -C "$RUNNER_TEMP"
+          src="$RUNNER_TEMP/raylib-${RAYLIB_VERSION}/src"
+          make -C "$src" -j"$(nproc)" PLATFORM=PLATFORM_DESKTOP_SDL \
+            SDL_INCLUDE_PATH="$DEPS/sdl3/include" \
+            SDL_LIBRARY_PATH="$DEPS/sdl3/lib" \
+            SDL_LIBRARIES=-lSDL3 CUSTOM_CFLAGS=-DUSING_SDL3_PROJECT
+          mkdir -p "$DEPS/raylib/src"
+          cp "$src"/*.h "$src"/libraylib.a "$DEPS/raylib/src/"
+
+      # Salva logo após compilar, para o cache valer mesmo se o build do jogo falhar depois.
+      - name: Salvar SDL3 e raylib no cache
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/deps
+          key: ${{ steps.cache-deps.outputs.cache-primary-key }}
+
+      - name: Expor SDL3 ao pkg-config e ao loader
+        run: |
+          echo "PKG_CONFIG_PATH=$DEPS/sdl3/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$DEPS/sdl3/lib" >> "$GITHUB_ENV"
+          echo "RAYLIB_PATH=$DEPS/raylib/src" >> "$GITHUB_ENV"
+
+      - name: Conferir dependências
+        run: |
+          pkg-config --modversion sdl3
+          grep -m1 'define RAYLIB_VERSION ' "$RAYLIB_PATH/raylib.h"
+
+      - name: make
+        run: make
+
+      - name: make test
+        run: make test
