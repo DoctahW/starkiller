@@ -6,19 +6,47 @@ O planejamento (stories, epics, milestones e responsáveis) está nas **Issues**
 
 ## Requisitos
 
-- Compilador C (gcc ou clang)
-- raylib 5.5 ou superior
+- Compilador C (gcc ou clang) e `make`
+- SDL3
+- raylib 6.2 compilada como biblioteca estática com o backend SDL3 (`PLATFORM_DESKTOP_SDL`). Os pacotes e o instalador oficial da raylib usam GLFW, que não suporta vibração do controle.
+
+O `Makefile` procura a raylib em `RAYLIB_PATH` (a pasta `raylib/src`, com `raylib.h` e `libraylib.a`); padrão `~/raylib/src` no Linux e `C:/raylib/raylib/src` no Windows.
 
 ### Linux
 
-- Arch: `sudo pacman -S raylib`
-- Debian/Ubuntu: compilar a raylib a partir do código-fonte, conforme o [guia oficial](https://github.com/raysan5/raylib/wiki/Working-on-GNU-Linux), e rodar `sudo make install`.
+1. SDL3:
+   - Arch: `sudo pacman -S sdl3`
+   - Debian 13 / Ubuntu 25.04 ou mais novo: `sudo apt install libsdl3-dev`
+   - Versões sem o pacote: compilar a SDL3 a partir do código-fonte, conforme o [guia oficial](https://wiki.libsdl.org/SDL3/README-cmake), e rodar `sudo cmake --install`.
+2. raylib:
+
+   ```sh
+   curl -fsSL https://github.com/raysan5/raylib/archive/refs/tags/6.2.tar.gz | tar xz -C ~
+   mv ~/raylib-6.2 ~/raylib
+   make -C ~/raylib/src PLATFORM=PLATFORM_DESKTOP_SDL \
+     SDL_INCLUDE_PATH="$(pkg-config --variable=includedir sdl3)" \
+     SDL_LIBRARY_PATH="$(pkg-config --variable=libdir sdl3)" \
+     SDL_LIBRARIES=-lSDL3 CUSTOM_CFLAGS=-DUSING_SDL3_PROJECT
+   ```
+
+   O pacote `raylib` do sistema (GLFW) pode continuar instalado; o jogo usa a de `RAYLIB_PATH`.
 
 ### Windows
 
 1. Instalar a raylib pelo instalador oficial ([raylib.com](https://www.raylib.com/)), que inclui o w64devkit (gcc e make) em `C:\raylib`.
-2. Usar o terminal do w64devkit (`C:\raylib\w64devkit\w64devkit.exe`) e rodar os mesmos comandos `make` abaixo.
-3. Se a raylib estiver em outro lugar, definir `RAYLIB_PATH` apontando para a pasta `raylib\src`.
+2. Substituir `C:\raylib\raylib` pelo código-fonte da [raylib 6.2](https://github.com/raysan5/raylib/archive/refs/tags/6.2.zip).
+3. Baixar o `SDL3-devel-<versão>-mingw` nos [releases da SDL](https://github.com/libsdl-org/SDL/releases) e extrair de forma que exista `C:\SDL3\x86_64-w64-mingw32`. Se ficar em outro lugar, definir `SDL3_PATH` apontando para essa pasta `x86_64-w64-mingw32`.
+4. No terminal do w64devkit (`C:\raylib\w64devkit\w64devkit.exe`):
+
+   ```sh
+   cd C:/raylib/raylib/src
+   make PLATFORM=PLATFORM_DESKTOP_SDL \
+     SDL_INCLUDE_PATH=C:/SDL3/x86_64-w64-mingw32/include \
+     SDL_LIBRARY_PATH=C:/SDL3/x86_64-w64-mingw32/lib \
+     SDL_LIBRARIES=-lSDL3 CUSTOM_CFLAGS=-DUSING_SDL3_PROJECT
+   ```
+
+5. Rodar os mesmos comandos `make` abaixo; o `make` copia a `SDL3.dll` para a raiz do projeto. Se a raylib estiver em outro lugar, definir `RAYLIB_PATH` apontando para a pasta `raylib\src`.
 
 ## Compilar e rodar
 
