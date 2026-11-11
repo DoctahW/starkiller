@@ -1,7 +1,14 @@
+#include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "placar.h"
+
+#define TAM_CAMINHO 512
+#define TAM_LINHA   128
+#define ARQUIVO_TMP "placar.tmp"
+#define TAM_TMP     (TAM_CAMINHO + sizeof ARQUIVO_TMP)
 
 /* Copia o nome com limite de PLACAR_MAX_NOME caracteres e neutraliza os
  * caracteres que quebrariam o formato do arquivo. */
@@ -84,4 +91,117 @@ void liberarPlacar(NoPlacar *raiz)
     liberarPlacar(raiz->esq);
     liberarPlacar(raiz->dir);
     free(raiz);
+}
+
+/* GetDirectoryPath devolve buffer estático; copia antes de outras chamadas. */
+static void copiarPasta(const char *caminho, char *destino, size_t tam)
+{
+    snprintf(destino, tam, "%s", GetDirectoryPath(caminho));
+}
+
+static int garantirPasta(const char *caminho)
+{
+    char pasta[TAM_CAMINHO];
+
+    copiarPasta(caminho, pasta, sizeof pasta);
+    if (pasta[0] == '\0' || strcmp(pasta, ".") == 0)
+        return 1; 
+    if (DirectoryExists(pasta))
+        return 1;
+    return MakeDirectory(pasta) == 0;
+}
+
+static void caminhoTemporario(const char *caminho, char destino[TAM_TMP])
+{
+    char pasta[TAM_CAMINHO];
+
+    copiarPasta(caminho, pasta, sizeof pasta);
+    if (pasta[0] == '\0' || strcmp(pasta, ".") == 0)
+        snprintf(destino, TAM_TMP, "%s", ARQUIVO_TMP);
+    else
+        snprintf(destino, TAM_TMP, "%s/%s", pasta, ARQUIVO_TMP);
+}
+
+/* Pré-ordem: o nó antes das subárvores. Reinserir nessa ordem recria a árvore. */
+static void gravarNo(FILE *arquivo, const NoPlacar *no)
+{
+    if (no == NULL)
+        return;
+    fprintf(arquivo, "%s;%d\n", no->nome, no->pontos);
+    gravarNo(arquivo, no->esq);
+    gravarNo(arquivo, no->dir);
+}
+
+int salvarPlacar(const NoPlacar *raiz, const char *caminho)
+{
+    char tmp[TAM_TMP];
+    FILE *arquivo;
+
+    if (caminho == NULL)
+        caminho = CAMINHO_PLACAR;
+    if (!garantirPasta(caminho))
+        return 0;
+
+    caminhoTemporario(caminho, tmp);
+    arquivo = fopen(tmp, "w");
+    if (arquivo == NULL)
+        return 0;
+
+    gravarNo(arquivo, raiz);
+    if (ferror(arquivo) || fflush(arquivo) != 0) {
+        fclose(arquivo);
+        remove(tmp);
+        return 0;
+    }
+    if (fclose(arquivo) != 0) {
+        remove(tmp);
+        return 0;
+    }
+
+    /* rename() não sobrescreve no Windows; remove o destino e tenta de novo. */
+    if (rename(tmp, caminho) != 0) {
+        remove(caminho);
+        if (rename(tmp, caminho) != 0) {
+            remove(tmp);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+NoPlacar *carregarPlacar(const char *caminho)
+{
+    NoPlacar *raiz = NULL;
+    char linha[TAM_LINHA];
+    FILE *arquivo;
+
+    if (caminho == NULL)
+        caminho = CAMINHO_PLACAR;
+
+    arquivo = fopen(caminho, "r");
+    if (arquivo == NULL)
+        return NULL;
+
+    while (fgets(linha, sizeof linha, arquivo) != NULL) {
+        char *separador = strrchr(linha, ';');
+        char *fim;
+        long valor;
+
+        if (separador == NULL || separador == linha)
+            continue; 
+        *separador = '\0';
+
+        valor = strtol(separador + 1, &fim, 10);
+        if (fim == separador + 1)
+            continue; 
+        while (*fim == ' ' || *fim == '\t' || *fim == '\r' || *fim == '\n')
+            fim++;
+        if (*fim != '\0' || valor < INT_MIN || valor > INT_MAX)
+            continue;
+
+        raiz = inserirPontuacao(raiz, linha, (int)valor);
+    }
+
+    fclose(arquivo);
+    return raiz;
 }
