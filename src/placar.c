@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "placar.h"
 
@@ -43,6 +44,36 @@ NoPlacar *inserirPontuacao(NoPlacar *raiz, const char *nome, int pontos)
     *link = novo;
 
     return raiz;
+}
+
+/* Reverso do percurso em ordem: maior primeiro. Para assim que `qtd == max`. */
+static void percorrerRanking(const NoPlacar *no, NoPlacar *saida, int max, int *qtd)
+{
+    if (no == NULL || *qtd >= max)
+        return;
+
+    percorrerRanking(no->dir, saida, max, qtd);
+
+    if (*qtd < max) {
+        memcpy(saida[*qtd].nome, no->nome, sizeof saida[*qtd].nome);
+        saida[*qtd].pontos = no->pontos;
+        saida[*qtd].esq = NULL;
+        saida[*qtd].dir = NULL;
+        (*qtd)++;
+    }
+
+    percorrerRanking(no->esq, saida, max, qtd);
+}
+
+int exibirRankingEmOrdem(const NoPlacar *raiz, NoPlacar *saida, int max)
+{
+    int qtd = 0;
+
+    if (saida == NULL || max <= 0)
+        return 0;
+
+    percorrerRanking(raiz, saida, max, &qtd);
+    return qtd;
 }
 
 /* Pós-ordem: os filhos são liberados antes do pai. */
