@@ -1,8 +1,11 @@
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "combate.h"
 #include "nave.h"
+#include "pontuacao.h"
+#include "inimigos.h"
 #include "teste.h"
 
 #define EPS 1e-4f
@@ -439,6 +442,107 @@ static void testarExplosoes(void)
     VERIFICA(contarExplosoes(&jogo) == MAX_EXPLOSOES);
 }
 
+/* Lista de n inimigos em heap (removerInimigo libera o nó), x = 0, z = 100, 200, ... */
+static void listaHeap(int n, float escudo, float casco)
+{
+    int i;
+    NoInimigo *ant = NULL;
+
+    memset(&jogo.inimigos, 0, sizeof jogo.inimigos);
+    for (i = 0; i < n; i++) {
+        NoInimigo *no = calloc(1, sizeof *no);
+
+        no->dado.tipo = XWING;
+        no->dado.id = i;
+        no->dado.pos = (Vector3){ 0.0f, 0.0f, 100.0f * (i + 1) };
+        no->dado.escudo = no->dado.escudoMax = escudo;
+        no->dado.casco = no->dado.cascoMax = casco;
+        no->ant = ant;
+        if (ant) ant->prox = no; else jogo.inimigos.inicio = no;
+        jogo.inimigos.fim = no;
+        ant = no;
+    }
+    jogo.inimigos.tamanho = n;
+}
+
+static void limparHeap(void)
+{
+    while (jogo.inimigos.inicio)
+        removerInimigo(&jogo.inimigos, jogo.inimigos.inicio);
+}
+
+static void laserEm(int slot, float z, float dano)
+{
+    jogo.lasers[slot] = (Laser){ .pos = { 0.0f, 0.0f, z }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = 1.0f,
+                                 .ativo = 1, .doJogador = 1, .dano = dano };
+}
+
+static void testarAbate(void)
+{
+    const float dt = 1.0f / 60.0f;
+
+    /* Escudo absorve: não abate, não pontua, não explode. */
+    novoJogo();
+    listaHeap(1, 50.0f, 30.0f);
+    laserEm(0, 100.0f, 10.0f);
+    VERIFICA(resolverLasers(&jogo, dt) == 1);
+    VERIFICA(!jogo.lasers[0].ativo);
+    VERIFICA(jogo.inimigos.tamanho == 1 && proximo(jogo.inimigos.inicio->dado.escudo, 40.0f));
+    VERIFICA(jogo.abates == 0 && jogo.pontos == 0 && contarExplosoes(&jogo) == 0);
+    limparHeap();
+
+    /* Casco zera: pontua, explode na posição, sai da lista. */
+    novoJogo();
+    listaHeap(1, 0.0f, 10.0f);
+    laserEm(0, 100.0f, 10.0f);
+    VERIFICA(resolverLasers(&jogo, dt) == 1);
+    VERIFICA(jogo.inimigos.tamanho == 0 && jogo.inimigos.inicio == NULL && jogo.inimigos.fim == NULL);
+    VERIFICA(jogo.abates == 1 && jogo.pontos == PONTOS_XWING);
+    VERIFICA(contarExplosoes(&jogo) == 1 && proximo(jogo.explosoes[0].pos.z, 100.0f));
+
+    /* O alvo da mira continua válido após o abate do próprio alvo (meio, ponta, único). */
+    novoJogo();
+    listaHeap(3, 0.0f, 10.0f);
+    jogo.inimigos.alvo = jogo.inimigos.inicio->prox;       /* o do meio (z = 200) */
+    laserEm(0, 200.0f, 10.0f);
+    VERIFICA(resolverLasers(&jogo, dt) == 1);
+    VERIFICA(jogo.inimigos.tamanho == 2);
+    VERIFICA(jogo.inimigos.alvo != NULL && jogo.inimigos.alvo->dado.id != 1);
+    VERIFICA(jogo.inimigos.alvo == jogo.inimigos.inicio || jogo.inimigos.alvo == jogo.inimigos.fim);
+    jogo.inimigos.alvo = jogo.inimigos.fim;                /* ponta (z = 300) */
+    laserEm(1, 300.0f, 10.0f);
+    VERIFICA(resolverLasers(&jogo, dt) == 1);
+    VERIFICA(jogo.inimigos.alvo == jogo.inimigos.inicio && jogo.inimigos.tamanho == 1);
+    laserEm(2, 100.0f, 10.0f);                             /* único */
+    VERIFICA(resolverLasers(&jogo, dt) == 1);
+    VERIFICA(jogo.inimigos.alvo == NULL && jogo.inimigos.tamanho == 0);
+    VERIFICA(jogo.abates == 3);
+
+    /* Dois lasers no mesmo frame, dois inimigos: nenhum acesso a nó removido. */
+    novoJogo();
+    listaHeap(2, 0.0f, 10.0f);
+    laserEm(0, 100.0f, 10.0f);
+    laserEm(1, 200.0f, 10.0f);
+    VERIFICA(resolverLasers(&jogo, dt) == 2);
+    VERIFICA(jogo.inimigos.tamanho == 0 && jogo.abates == 2 && contarExplosoes(&jogo) == 2);
+
+    /* Dois lasers no mesmo inimigo, o primeiro abate: o segundo não acha mais nada. */
+    novoJogo();
+    listaHeap(1, 0.0f, 10.0f);
+    laserEm(0, 100.0f, 10.0f);
+    laserEm(1, 100.0f, 10.0f);
+    VERIFICA(resolverLasers(&jogo, dt) == 1);
+    VERIFICA(jogo.abates == 1 && jogo.lasers[1].ativo == 1);
+
+    /* Lasers inimigos não ferem os caças. */
+    novoJogo();
+    listaHeap(1, 0.0f, 10.0f);
+    laserEm(0, 100.0f, 10.0f);
+    jogo.lasers[0].doJogador = 0;
+    VERIFICA(resolverLasers(&jogo, dt) == 0 && jogo.inimigos.tamanho == 1);
+    limparHeap();
+}
+
 int main(void)
 {
     testarDisparo();
@@ -454,6 +558,7 @@ int main(void)
     testarAcertoNoUltimoPasso();
     testarAplicarDano();
     testarExplosoes();
+    testarAbate();
 
     return RESULTADO_TESTES();
 }

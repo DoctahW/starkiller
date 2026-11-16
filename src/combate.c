@@ -3,6 +3,8 @@
 #include <stddef.h>
 
 #include "raymath.h"
+#include "pontuacao.h"
+#include "inimigos.h"
 
 /* Índice do primeiro slot livre a partir de `de`, ou -1. */
 static int proximoLivre(const Jogo *g, int de)
@@ -110,33 +112,70 @@ int segmentoAcertaEsfera(Vector3 a, Vector3 b, Vector3 centro, float raio, float
     return 1;
 }
 
+/* Inimigo de menor t que o segmento do laser (pos - vel * dt → pos) atravessa, ou NULL. */
+static NoInimigo *primeiroAtingido(const Jogo *g, const Laser *l, float dt)
+{
+    Vector3 anterior = Vector3Subtract(l->pos, Vector3Scale(l->vel, dt));
+    NoInimigo *no, *primeiro = NULL;
+    float melhor = 2.0f;
+
+    for (no = g->inimigos.inicio; no; no = no->prox) {
+        float t;
+
+        if (segmentoAcertaEsfera(anterior, l->pos, no->dado.pos, raioInimigo(no->dado.tipo), &t)
+            && t < melhor) {
+            melhor = t;
+            primeiro = no;
+        }
+    }
+    return primeiro;
+}
+
 int colidirLasers(Jogo *g, float dt)
 {
     int i, acertos = 0;
 
     for (i = 0; i < MAX_LASERS; i++) {
         Laser *l = &g->lasers[i];
-        Vector3 anterior;
-        NoInimigo *no, *primeiro = NULL;
-        float melhor = 2.0f;
 
         if (!l->ativo || !l->doJogador)
             continue;
-
-        anterior = Vector3Subtract(l->pos, Vector3Scale(l->vel, dt));
-        for (no = g->inimigos.inicio; no; no = no->prox) {
-            float t;
-
-            if (segmentoAcertaEsfera(anterior, l->pos, no->dado.pos, raioInimigo(no->dado.tipo), &t)
-                && t < melhor) {
-                melhor = t;
-                primeiro = no;
-            }
-        }
-        if (primeiro) {
+        if (primeiroAtingido(g, l, dt)) {
             l->ativo = 0;
             acertos++;
         }
+    }
+    return acertos;
+}
+
+/* Abate: pontua, cria a explosão na posição do caça e o tira da lista (que mantém o alvo válido). */
+static void abaterInimigo(Jogo *g, NoInimigo *no)
+{
+    TipoNave tipo = no->dado.tipo;
+    Vector3 pos = no->dado.pos;
+
+    registrarAbate(g, tipo);
+    criarExplosao(g, pos, RAIO_EXPLOSAO);
+    removerInimigo(&g->inimigos, no);
+}
+
+int resolverLasers(Jogo *g, float dt)
+{
+    int i, acertos = 0;
+
+    for (i = 0; i < MAX_LASERS; i++) {
+        Laser *l = &g->lasers[i];
+        NoInimigo *no;
+
+        if (!l->ativo || !l->doJogador)
+            continue;
+        no = primeiroAtingido(g, l, dt);
+        if (!no)
+            continue;
+        l->ativo = 0;
+        acertos++;
+        if (aplicarDano(&no->dado, l->dano))
+            abaterInimigo(g, no);
     }
     return acertos;
 }
