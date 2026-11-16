@@ -8,8 +8,6 @@
 #include "reforcos.h"
 #include "telas.h"
 
-#define CASCO_DESTROIER  100.0f
-
 static RelogioCombate relogio;
 
 /* Libera as estruturas da partida em andamento; seguro de chamar mais de uma vez. */
@@ -28,7 +26,7 @@ static void iniciarPartida(Jogo *g)
     memset(g, 0, sizeof *g);
     g->placar = placar;
     g->tempoRestante = DURACAO_PARTIDA;
-    g->cascoDestroier = CASCO_DESTROIER;
+    g->cascoDestroier = CASCO_MAX_DESTROIER;
     g->proximoId = 1;
     gerarReforcos(&g->reforcos, DURACAO_PARTIDA);
     iniciarJogador(&g->jogador);
