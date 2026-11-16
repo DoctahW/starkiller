@@ -28,6 +28,7 @@ static int contarAtivos(const Jogo *g)
 
 static void novoJogo(void)
 {
+    liberarListaInimigos(&jogo.inimigos);
     memset(&jogo, 0, sizeof jogo);
     iniciarJogador(&jogo.jogador);
     jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 0.0f };   /* origem, para contas simples */
@@ -235,30 +236,18 @@ static void testarRaios(void)
     VERIFICA(proximo(raioInimigo(AWING), RAIO_AWING));
 }
 
-/* Coloca um inimigo de teste numa lista encadeada montada à mão (sem depender de inserirInimigo). */
-static void ligar(NoInimigo *nos, int n)
+/* Insere um inimigo de teste na lista pela API do módulo (inserirInimigo). */
+static void adicionar(TipoNave tipo, Vector3 pos)
 {
-    int i;
-
-    jogo.inimigos.inicio = n > 0 ? &nos[0] : NULL;
-    jogo.inimigos.fim = n > 0 ? &nos[n - 1] : NULL;
-    jogo.inimigos.tamanho = n;
-    for (i = 0; i < n; i++) {
-        nos[i].ant = i > 0 ? &nos[i - 1] : NULL;
-        nos[i].prox = i + 1 < n ? &nos[i + 1] : NULL;
-    }
+    VERIFICA(inserirInimigo(&jogo.inimigos, criarInimigo(tipo, pos, jogo.proximoId++)) == 1);
 }
 
 static void testarColisaoLasers(void)
 {
-    NoInimigo nos[2];
     float dt = 1.0f / 60.0f;
 
-    memset(nos, 0, sizeof nos);
     novoJogo();
-    nos[0].dado.tipo = XWING;
-    nos[0].dado.pos = (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 100.0f };
-    ligar(nos, 1);
+    adicionar(XWING, (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 100.0f });
 
     /* O X-Wing fica em x = -9: só o laser do canhão em x = -3 o atinge (distância 6 < raio 8); o outro (x = +3) passa a 12. */
     dispararLaser(&jogo);
@@ -274,8 +263,7 @@ static void testarColisaoLasers(void)
 
     /* Mesmo cenário com um passo grande: o segmento evita o túnel. */
     novoJogo();
-    ligar(nos, 1);
-    nos[0].dado.pos = (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 300.0f };
+    adicionar(XWING, (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 300.0f });
     dispararLaser(&jogo);
     atualizarLasers(&jogo, 1.0f);                     /* pos.z ~ 605, anterior ~ 5 */
     VERIFICA(colidirLasers(&jogo, 1.0f) == 1);
@@ -283,8 +271,7 @@ static void testarColisaoLasers(void)
 
     /* Inimigo fora do alcance: ninguém acerta e os lasers continuam ativos. */
     novoJogo();
-    ligar(nos, 1);
-    nos[0].dado.pos = (Vector3){ 200.0f, 200.0f, 100.0f };
+    adicionar(XWING, (Vector3){ 200.0f, 200.0f, 100.0f });
     dispararLaser(&jogo);
     atualizarLasers(&jogo, 0.2f);
     VERIFICA(colidirLasers(&jogo, 0.2f) == 0);
@@ -301,13 +288,10 @@ static void testarColisaoLasers(void)
 static void testarAcertoNoUltimoPasso(void)
 {
     const float dt = 1.0f / 60.0f;   /* o laser anda 10 u por passo */
-    NoInimigo no = { 0 };
 
     /* A vida acaba no mesmo passo em que o segmento cruza a esfera: o acerto não pode se perder. */
     novoJogo();
-    no.dado.tipo = XWING;
-    no.dado.pos = (Vector3){ 0.0f, 0.0f, 105.0f };
-    ligar(&no, 1);
+    adicionar(XWING, (Vector3){ 0.0f, 0.0f, 105.0f });
     jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 90.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = dt * 0.5f,
                               .ativo = 1, .doJogador = 1 };
     atualizarLasers(&jogo, dt);                        /* z = 100, vida < 0 */
@@ -317,7 +301,6 @@ static void testarAcertoNoUltimoPasso(void)
 
     /* Sem acerto, o laser expirado some no passo seguinte. */
     novoJogo();
-    ligar(&no, 0);
     jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 90.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = dt * 0.5f,
                               .ativo = 1, .doJogador = 1 };
     atualizarLasers(&jogo, dt);
@@ -328,18 +311,13 @@ static void testarAcertoNoUltimoPasso(void)
 
 static void testarUmAcertoPorLaser(void)
 {
-    NoInimigo nos[2];
     float dt = 0.2f;
 
     /* Dois inimigos em fila no caminho do laser do canhão em x = -3 (fora do alcance do outro): só o mais próximo é atingido,
      * e o laser some (não passa a acertar o segundo). */
-    memset(nos, 0, sizeof nos);
     novoJogo();
-    nos[0].dado.tipo = XWING;
-    nos[0].dado.pos = (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 100.0f };
-    nos[1].dado.tipo = XWING;
-    nos[1].dado.pos = (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 60.0f };   /* mais perto, mas depois na lista */
-    ligar(nos, 2);
+    adicionar(XWING, (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 100.0f });
+    adicionar(XWING, (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 60.0f });   /* mais perto, mas depois na lista */
     dispararLaser(&jogo);
     atualizarLasers(&jogo, dt);
     VERIFICA(colidirLasers(&jogo, dt) == 1);
@@ -347,9 +325,7 @@ static void testarUmAcertoPorLaser(void)
 
     /* Lasers já inativos e lasers inimigos são ignorados. */
     novoJogo();
-    ligar(nos, 1);
-    nos[0].dado.tipo = YWING;
-    nos[0].dado.pos = (Vector3){ 0.0f, 0.0f, 100.0f };
+    adicionar(YWING, (Vector3){ 0.0f, 0.0f, 100.0f });
     jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 100.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = 1.0f, .ativo = 0, .doJogador = 1 };
     jogo.lasers[1] = (Laser){ .pos = { 0.0f, 0.0f, 100.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = 1.0f, .ativo = 1, .doJogador = 0 };
     VERIFICA(colidirLasers(&jogo, dt) == 0);
@@ -357,9 +333,7 @@ static void testarUmAcertoPorLaser(void)
 
     /* Dois lasers do jogador no mesmo inimigo: dois acertos, os dois somem. */
     novoJogo();
-    ligar(nos, 1);
-    nos[0].dado.tipo = AWING;
-    nos[0].dado.pos = (Vector3){ 0.0f, 0.0f, 100.0f };
+    adicionar(AWING, (Vector3){ 0.0f, 0.0f, 100.0f });
     jogo.lasers[3] = (Laser){ .pos = { 0.0f, 0.0f, 100.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = 1.0f, .ativo = 1, .doJogador = 1 };
     jogo.lasers[7] = jogo.lasers[3];
     VERIFICA(colidirLasers(&jogo, dt) == 2);
@@ -559,6 +533,7 @@ int main(void)
     testarAplicarDano();
     testarExplosoes();
     testarAbate();
+    liberarListaInimigos(&jogo.inimigos);
 
     return RESULTADO_TESTES();
 }
