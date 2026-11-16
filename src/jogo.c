@@ -35,8 +35,13 @@ static void iniciarPartida(Jogo *g)
     acumulador = 0.0f;
 }
 
+/* Derrota tem precedência sobre o tempo esgotado. */
 static int verificarFim(Jogo *g)
 {
+    if (g->jogador.casco <= 0.0f || g->cascoDestroier <= 0.0f) {
+        g->vitoria = 0;
+        return 1;
+    }
     if (g->tempoRestante <= 0.0f) {
         g->tempoRestante = 0.0f;
         g->vitoria = 1;
