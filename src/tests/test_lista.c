@@ -160,6 +160,8 @@ static void testarInsercaoEmListaVazia(){
     VERIFICA(proximo(lista.inicio->dado.escudo, 50.0f)); //copiou o struct inteiro
 
     conferirLista(&lista, 1);
+
+    liberarListaInimigos(&lista);
 }
 
 //insere no fim sem andar na lista, e nunca mexe no alvo
@@ -182,6 +184,8 @@ static void testarInsercaoSempreNoFim(){
     VERIFICA(lista.inicio->dado.id == 1);
     VERIFICA(lista.inicio->prox->dado.id == 2);
     VERIFICA(lista.fim->ant->dado.id == 2);
+
+    liberarListaInimigos(&lista);
 }
 
 static void testarLiberarListaVazia(){
@@ -240,6 +244,8 @@ static void testarRemoverInicio(){
     conferirLista(&lista, 2);
     VERIFICA(lista.inicio->dado.id == 2);
     VERIFICA(lista.fim->dado.id == 3);
+
+    liberarListaInimigos(&lista);
 }
 
 static void testarRemoverMeio(){
@@ -254,6 +260,8 @@ static void testarRemoverMeio(){
     VERIFICA(lista.fim->dado.id == 3);
     VERIFICA(lista.inicio->prox == lista.fim); //1 cola direto no 3
     VERIFICA(lista.fim->ant == lista.inicio);
+
+    liberarListaInimigos(&lista);
 }
 
 static void testarRemoverFim(){
@@ -266,6 +274,8 @@ static void testarRemoverFim(){
     conferirLista(&lista, 2);
     VERIFICA(lista.inicio->dado.id == 1);
     VERIFICA(lista.fim->dado.id == 2);
+
+    liberarListaInimigos(&lista);
 }
 
 //alvo era o inicio: passa pro prox
@@ -280,6 +290,8 @@ static void testarAlvoMudaProProx(){
 
     conferirLista(&lista, 2);
     VERIFICA(lista.alvo->dado.id == 2);
+
+    liberarListaInimigos(&lista);
 }
 
 //alvo era o fim: nao tem prox, cai no ant
@@ -297,6 +309,8 @@ static void testarAlvoNoFimVaiProAnt(){
     VERIFICA(lista.alvo == esperado);
     VERIFICA(lista.alvo->dado.id == 2);
     VERIFICA(lista.alvo == lista.fim);
+
+    liberarListaInimigos(&lista);
 }
 
 //remove o alvo do meio, depois sobra ele mesmo sem vizinhos
@@ -331,6 +345,8 @@ static void testarRemoverNullNaoFazNada(){
     VERIFICA(lista.tamanho == 3);
     VERIFICA(lista.alvo == alvoAntes);
     conferirLista(&lista, 3);
+
+    liberarListaInimigos(&lista);
 }
 
 //padrao da secao 3.5: guarda o prox antes de processar o no
@@ -350,6 +366,124 @@ static void testarRemocaoComIteracaoSegura(){
 
     VERIFICA(removidos == 5);
     conferirLista(&lista, 0);
+}
+
+static void testarMiraEmListaVazia(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+
+    proximoAlvo(&lista);
+    VERIFICA(lista.alvo == NULL);
+
+    alvoAnterior(&lista);
+    VERIFICA(lista.alvo == NULL);
+    VERIFICA(lista.tamanho == 0);
+}
+
+static void testarCicloProximo(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 3);
+
+    VERIFICA(lista.alvo->dado.id == 1);
+
+    proximoAlvo(&lista);
+    VERIFICA(lista.alvo->dado.id == 2);
+
+    proximoAlvo(&lista);
+    VERIFICA(lista.alvo->dado.id == 3);
+
+    proximoAlvo(&lista);
+    VERIFICA(lista.alvo->dado.id == 1); //tava no fim, deu a volta
+
+    NoInimigo *antes = lista.alvo;
+    proximoAlvo(&lista);
+    proximoAlvo(&lista);
+    proximoAlvo(&lista);
+    VERIFICA(lista.alvo == antes);
+
+    liberarListaInimigos(&lista);
+}
+
+static void testarCicloAnterior(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 3);
+
+    alvoAnterior(&lista);
+    VERIFICA(lista.alvo->dado.id == 3); //tava no comeco, voltou pro fim
+
+    alvoAnterior(&lista);
+    VERIFICA(lista.alvo->dado.id == 2);
+
+    alvoAnterior(&lista);
+    VERIFICA(lista.alvo->dado.id == 1);
+
+    alvoAnterior(&lista);
+    VERIFICA(lista.alvo->dado.id == 3);
+
+    liberarListaInimigos(&lista);
+}
+
+static void testarUmNoFicaNeleMesmo(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 1);
+    NoInimigo *unico = lista.alvo;
+
+    proximoAlvo(&lista);
+    VERIFICA(lista.alvo == unico);
+
+    alvoAnterior(&lista);
+    VERIFICA(lista.alvo == unico);
+
+    liberarListaInimigos(&lista);
+}
+
+static void testarIdaEVolta(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 5);
+    NoInimigo *antes = lista.alvo;
+
+    for(int i = 0; i < 5; i++){
+        proximoAlvo(&lista);
+    }
+    VERIFICA(lista.alvo == antes);
+
+    for(int i = 0; i < 5; i++){
+        alvoAnterior(&lista);
+    }
+    VERIFICA(lista.alvo == antes);
+
+    liberarListaInimigos(&lista);
+}
+
+static void testarMiraAposInsercaoERemocao(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 3);
+
+    proximoAlvo(&lista);
+    NoInimigo *alvo = lista.alvo;
+    VERIFICA(alvo->dado.id == 2);
+
+    //spawn de reforco nao rouba a mira
+    inserirInimigo(&lista, criarInimigo(XWING, (Vector3){0.0f, 0.0f, 9.0f}, 4));
+    VERIFICA(lista.alvo == alvo);
+    conferirLista(&lista, 4);
+
+    //abater outro no tambem nao
+    removerInimigo(&lista, buscarPorId(&lista, 3));
+    VERIFICA(lista.alvo == alvo);
+    conferirLista(&lista, 3);
+
+    //abater o proprio alvo segue a secao 3.5
+    removerInimigo(&lista, alvo);
+    VERIFICA(lista.alvo->dado.id == 4);
+    conferirLista(&lista, 2);
+
+    liberarListaInimigos(&lista);
 }
 
 int main(void){
@@ -372,6 +506,13 @@ int main(void){
     testarAlvoAteSobrarSoEle();
     testarRemoverNullNaoFazNada();
     testarRemocaoComIteracaoSegura();
+    
+    testarMiraEmListaVazia();
+    testarCicloProximo();
+    testarCicloAnterior();
+    testarUmNoFicaNeleMesmo();
+    testarIdaEVolta();
+    testarMiraAposInsercaoERemocao();
 
     return RESULTADO_TESTES();
 }
