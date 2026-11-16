@@ -16,7 +16,7 @@ static void novaPartida(int passos)
 {
     memset(&jogo, 0, sizeof jogo);
     iniciarJogador(&jogo.jogador);
-    jogo.cascoDestroier = 100.0f;
+    jogo.cascoDestroier = CASCO_MAX_DESTROIER;
     jogo.tempoDecorrido = passos * PASSO_FIXO;
     jogo.tempoRestante = (PASSOS_PARTIDA - passos) * PASSO_FIXO;
     jogo.vitoria = -1;
