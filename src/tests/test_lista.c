@@ -88,12 +88,61 @@ static void testarIdsDoJogo(void)
     VERIFICA(jogo.proximoId == 3);
 }
 
+static void testarInsercaoEmListaVazia(void)
+{
+    ListaInimigos l = { 0 };
+
+    inserirInimigo(&l, criarInimigo(XWING, (Vector3){ 1.0f, 2.0f, 3.0f }, 1));
+
+    VERIFICA(l.tamanho == 1);
+    VERIFICA(l.inicio != NULL && l.inicio == l.fim);
+    VERIFICA(l.alvo == l.inicio); // estava vazia: novo nó vira alvo
+    VERIFICA(l.inicio->ant == NULL && l.inicio->prox == NULL);
+    VERIFICA(l.inicio->dado.id == 1 && l.inicio->dado.tipo == XWING);
+    VERIFICA(proximo(l.inicio->dado.escudo, 50.0f));
+
+    liberarListaInimigos(&l); // primeiro malloc do módulo
+    VERIFICA(l.inicio == NULL && l.fim == NULL && l.alvo == NULL);
+    VERIFICA(l.tamanho == 0);
+}
+
+static void testarInsercaoSempreNoFim(void)
+{
+    ListaInimigos l = { 0 };
+    NoInimigo *n, *primeiro;
+    int ids[3], i;
+
+    inserirInimigo(&l, criarInimigo(XWING, (Vector3){ 0.0f, 0.0f, 1.0f }, 1));
+    primeiro = l.inicio;
+    inserirInimigo(&l, criarInimigo(YWING, (Vector3){ 0.0f, 0.0f, 2.0f }, 2));
+    inserirInimigo(&l, criarInimigo(AWING, (Vector3){ 0.0f, 0.0f, 3.0f }, 3));
+
+    VERIFICA(l.tamanho == 3);
+    VERIFICA(l.inicio == primeiro); // entra no FIM, nunca no início
+    VERIFICA(l.fim != NULL && l.fim->dado.id == 3);
+    VERIFICA(l.alvo == primeiro); // alvo NÃO muda em lista não vazia
+
+    for (n = l.inicio, i = 0; n != NULL && i < 3; n = n->prox, i++)
+        ids[i] = n->dado.id;
+    VERIFICA(ids[0] == 1 && ids[1] == 2 && ids[2] == 3);
+
+    VERIFICA(l.inicio->ant == NULL);
+    VERIFICA(l.fim->prox == NULL);
+    VERIFICA(l.fim->ant != NULL && l.fim->ant->dado.id == 2);
+    VERIFICA(l.inicio->prox != NULL && l.inicio->prox->ant == l.inicio); // duplo sentido
+
+    liberarListaInimigos(&l);
+    VERIFICA(l.tamanho == 0 && l.inicio == NULL && l.fim == NULL && l.alvo == NULL);
+}
+
 int main(void)
 {
     testarXWing();
     testarYWing();
     testarAWing();
     testarIdsDoJogo();
+    testarInsercaoEmListaVazia();
+    testarInsercaoSempreNoFim();
 
     return RESULTADO_TESTES();
 }
