@@ -8,8 +8,9 @@
 #include "reforcos.h"
 #include "telas.h"
 
-#define DURACAO_PARTIDA  300.0f
 #define CASCO_DESTROIER  100.0f
+
+static float acumulador;
 
 /* Libera as estruturas da partida em andamento; seguro de chamar mais de uma vez. */
 static void encerrarPartida(Jogo *g)
@@ -31,26 +32,48 @@ static void iniciarPartida(Jogo *g)
     g->proximoId = 1;
     gerarReforcos(&g->reforcos, DURACAO_PARTIDA);
     iniciarJogador(&g->jogador);
+    acumulador = 0.0f;
 }
 
-/* Loop de combate: simulação e render completos entram em INF-06; vitória/derrota em INF-07. */
+static int verificarFim(Jogo *g)
+{
+    if (g->tempoRestante <= 0.0f) {
+        g->tempoRestante = 0.0f;
+        g->vitoria = 1;
+        return 1;
+    }
+    return 0;
+}
+
+/* Seção 3.4: atualizarNave, processarReforcos, atualizarInimigos e atualizarCombate entram antes do timer. */
+static void passoCombate(Jogo *g, float dt)
+{
+    g->tempoDecorrido += dt;
+    g->tempoRestante = DURACAO_PARTIDA - g->tempoDecorrido;
+}
+
+EstadoJogo simularCombate(Jogo *g, float *acum, float dtFrame)
+{
+    *acum += dtFrame < DT_MAXIMO ? dtFrame : DT_MAXIMO;
+    while (*acum >= PASSO_FIXO) {
+        *acum -= PASSO_FIXO;
+        passoCombate(g, PASSO_FIXO);
+        if (verificarFim(g))
+            return EST_FIM;
+    }
+    return EST_COMBATE;
+}
+
 static EstadoJogo combate(Jogo *g, const Comandos *cmd)
 {
     if (cmd->pausa)
         return EST_PAUSA;
 
-    g->tempoDecorrido += GetFrameTime();
-    g->tempoRestante = DURACAO_PARTIDA - g->tempoDecorrido;
+    EstadoJogo proximo = simularCombate(g, &acumulador, GetFrameTime());
 
     DrawText(TextFormat("COMBATE  %3.0f s", g->tempoRestante), 20, 20, 20, RAYWHITE);
     DrawText("Esc: pausa", 20, 50, 20, GRAY);
-
-    if (g->tempoRestante <= 0.0f) {
-        g->tempoRestante = 0.0f;
-        g->vitoria = 1;
-        return EST_FIM;
-    }
-    return EST_COMBATE;
+    return proximo;
 }
 
 static EstadoJogo pausa(const Comandos *cmd)
