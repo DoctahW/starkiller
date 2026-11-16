@@ -91,6 +91,49 @@ void removerInimigo(ListaInimigos *l, NoInimigo *no){
     l->tamanho--;
 }
 
+void ordenarPorDistancia(ListaInimigos *l){
+    NoInimigo *restante = l->inicio;
+    NoInimigo *ordenada = NULL;
+
+    //tira o da frente da pilha e encaixa na parcela ja ordenada
+    while(restante != NULL){
+        NoInimigo *no = restante;
+        NoInimigo *ant = NULL;
+        NoInimigo *p = ordenada;
+
+        restante = no->prox; //guarda antes de descolar o no
+
+        //<= pra manter a ordem de chegada entre empatados
+        while(p != NULL && p->dado.distancia <= no->dado.distancia){
+            ant = p;
+            p = p->prox;
+        }
+
+        no->ant = ant;
+        no->prox = p;
+
+        if(ant != NULL){
+            ant->prox = no;
+        } else {
+            ordenada = no; //virou o mais proximo
+        }
+
+        if(p != NULL){
+            p->ant = no;
+        }
+    }
+
+    l->inicio = ordenada;
+
+    NoInimigo *ultimo = ordenada;
+    while(ultimo != NULL && ultimo->prox != NULL){
+        ultimo = ultimo->prox;
+    }
+    l->fim = ultimo;
+
+    //alvo nao muda: so religuei ponteiro, o no continua o mesmo
+}
+
 void proximoAlvo(ListaInimigos *l){
     if(l->alvo == NULL){
         return; //lista vazia
