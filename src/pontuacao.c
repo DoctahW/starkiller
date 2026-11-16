@@ -1,5 +1,6 @@
 #include <math.h>
 
+#include "jogo.h"
 #include "pontuacao.h"
 
 static int pontosDoTipo(TipoNave tipo)
@@ -11,24 +12,28 @@ static int pontosDoTipo(TipoNave tipo)
         return PONTOS_YWING;
     case AWING:
         return PONTOS_AWING;
+    default:
+        return 0;
     }
-    return 0;
 }
 
-static float multiplicadorSequencia(int sequenciaSemDano)
+float multiplicadorAtual(int sequenciaSemDano)
 {
     if (sequenciaSemDano >= SEQUENCIA_X2)
-        return 2.0f;
+        return MULTIPLICADOR_X2;
     if (sequenciaSemDano >= SEQUENCIA_X1_5)
-        return 1.5f;
-    return 1.0f;
+        return MULTIPLICADOR_X1_5;
+    return MULTIPLICADOR_X1;
 }
 
 void registrarAbate(Jogo *g, TipoNave tipo)
 {
     int base = pontosDoTipo(tipo);
 
-    g->pontos += (int)lroundf((float)base * multiplicadorSequencia(g->sequenciaSemDano));
+    if (base <= 0)
+        return; /* tipo desconhecido não conta como abate */
+
+    g->pontos += (int)lroundf((float)base * multiplicadorAtual(g->sequenciaSemDano));
     g->sequenciaSemDano++;
     g->abates++;
 }
@@ -38,18 +43,23 @@ void registrarDanoJogador(Jogo *g)
     g->sequenciaSemDano = 0;
 }
 
+int bonusCasco(const Jogo *g)
+{
+    float porcentagem;
+
+    if (g->vitoria != 1)
+        return 0;
+
+    porcentagem = PORCENTAGEM_MAX * g->cascoDestroier / CASCO_MAX_DESTROIER;
+    if (porcentagem < PORCENTAGEM_MIN)
+        porcentagem = PORCENTAGEM_MIN;
+    if (porcentagem > PORCENTAGEM_MAX)
+        porcentagem = PORCENTAGEM_MAX;
+
+    return (int)lroundf(porcentagem * BONUS_POR_PORCENTO);
+}
+
 int calcularPontuacao(const Jogo *g)
 {
-    int total = g->pontos;
-
-    if (g->vitoria) {
-        float porcentagem = 100.0f * g->cascoDestroier / CASCO_MAX_DESTROIER;
-
-        if (porcentagem < 0.0f)
-            porcentagem = 0.0f;
-        if (porcentagem > 100.0f)
-            porcentagem = 100.0f;
-        total += (int)lroundf(porcentagem * BONUS_POR_PORCENTO);
-    }
-    return total;
+    return g->pontos + bonusCasco(g);
 }
