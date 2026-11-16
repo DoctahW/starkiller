@@ -24,7 +24,7 @@ static void derivarEixos(Jogador *j)
     j->direita = Vector3RotateByQuaternion((Vector3){ -1.0f, 0.0f, 0.0f }, j->rot);
 }
 
-void atualizarJogador(Jogador *j, const Comandos *cmd, float dt)
+int atualizarJogador(Jogador *j, const Comandos *cmd, float dt)
 {
     /* Rotação incremental no espaço local: rot * delta gira em torno dos eixos da própria nave. */
     Quaternion arf = QuaternionFromAxisAngle((Vector3){ -1.0f, 0.0f, 0.0f }, cmd->arfagem * VEL_ARFAGEM * dt);
@@ -37,6 +37,17 @@ void atualizarJogador(Jogador *j, const Comandos *cmd, float dt)
 
     j->velocidade = Clamp(j->velocidade + cmd->aceleracao * ACELERACAO * dt, VEL_MIN, VEL_MAX);
     j->pos = Vector3Add(j->pos, Vector3Scale(j->frente, j->velocidade * dt));
+
+    /* Arena: fora da esfera, empurra de volta para a borda e avisa. */
+    {
+        float dist = Vector3Length(j->pos);
+
+        if (dist > RAIO_ARENA) {
+            j->pos = Vector3Scale(j->pos, RAIO_ARENA / dist);
+            return 1;
+        }
+    }
+    return 0;
 }
 
 Camera3D cameraDoJogador(const Jogador *j)

@@ -168,6 +168,43 @@ static void testarAceleracao(void)
     VERIFICA(fabsf(j.pos.x + j.velocidade) < 1e-2f && fabsf(j.pos.z) < 1e-2f);
 }
 
+static void testarArena(void)
+{
+    Jogador j;
+    Comandos c = { 0 };
+    int i, avisou = 0, saiu = 0;
+
+    /* Dentro da arena: sem aviso. */
+    iniciarJogador(&j);
+    VERIFICA(atualizarJogador(&j, &c, 1.0f / 60.0f) == 0);
+
+    /* Voando para fora na velocidade máxima: nunca passa do raio, e o aviso dispara. */
+    c.aceleracao = 1.0f;
+    for (i = 0; i < 6000; i++) {
+        avisou |= atualizarJogador(&j, &c, 1.0f / 60.0f);
+        if (tam(j.pos) > RAIO_ARENA + 1e-2f)
+            saiu = 1;
+    }
+    VERIFICA(avisou == 1);
+    VERIFICA(saiu == 0);
+    VERIFICA(atualizarJogador(&j, &c, 1.0f / 60.0f) == 1);
+    VERIFICA(fabsf(tam(j.pos) - RAIO_ARENA) < 1e-2f);
+
+    /* Passo grande (dt exagerado) também fica dentro. */
+    iniciarJogador(&j);
+    j.velocidade = VEL_MAX;
+    VERIFICA(atualizarJogador(&j, &c, 100.0f) == 1);
+    VERIFICA(tam(j.pos) <= RAIO_ARENA + 1e-2f);
+
+    /* Virando 180° na borda, a nave volta para dentro e o aviso some. */
+    c = (Comandos){ .arfagem = 1.0f };
+    girar(&j, c, VEL_ARFAGEM, PI_F);
+    c = (Comandos){ 0 };
+    atualizarJogador(&j, &c, 1.0f);
+    VERIFICA(tam(j.pos) < RAIO_ARENA - 1.0f);
+    VERIFICA(atualizarJogador(&j, &c, 1.0f / 60.0f) == 0);
+}
+
 int main(void)
 {
     Jogador j;
@@ -200,6 +237,7 @@ int main(void)
     testarSemGimbalLock();
     testarRenormalizacao();
     testarAceleracao();
+    testarArena();
 
     return RESULTADO_TESTES();
 }
