@@ -14,3 +14,15 @@ void iniciarJogador(Jogador *j)
     j->casco = CASCO_JOGADOR;
     j->cooldownLaser = 0.0f;
 }
+
+Camera3D cameraDoJogador(const Jogador *j)
+{
+    Camera3D cam = { 0 };
+
+    cam.position = j->pos;
+    cam.target = (Vector3){ j->pos.x + j->frente.x, j->pos.y + j->frente.y, j->pos.z + j->frente.z };
+    cam.up = j->cima;
+    cam.fovy = FOV_JOGADOR;
+    cam.projection = CAMERA_PERSPECTIVE;
+    return cam;
+}
