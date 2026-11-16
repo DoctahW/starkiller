@@ -124,6 +124,50 @@ static void testarRenormalizacao(void)
     }
 }
 
+static void testarAceleracao(void)
+{
+    Jogador j;
+    Comandos c = { 0 };
+    int i;
+
+    /* Sem comando, mantém a velocidade e avança frente * v * dt. */
+    iniciarJogador(&j);
+    j.pos = (Vector3){ 0.0f, 0.0f, 0.0f };
+    atualizarJogador(&j, &c, 0.5f);
+    VERIFICA(proximo(j.velocidade, VEL_MIN));
+    VERIFICA(proximo(j.pos.z, VEL_MIN * 0.5f) && proximo(j.pos.x, 0.0f) && proximo(j.pos.y, 0.0f));
+
+    /* Acelerar: sobe a ACELERACAO u/s² e para em VEL_MAX. */
+    c.aceleracao = 1.0f;
+    atualizarJogador(&j, &c, 1.0f);
+    VERIFICA(proximo(j.velocidade, VEL_MIN + ACELERACAO));
+    for (i = 0; i < 1000; i++)
+        atualizarJogador(&j, &c, 1.0f / 60.0f);
+    VERIFICA(proximo(j.velocidade, VEL_MAX));
+
+    /* Frear: desce e para em VEL_MIN, sem ficar parada nem andar de ré. */
+    c.aceleracao = -1.0f;
+    for (i = 0; i < 1000; i++)
+        atualizarJogador(&j, &c, 1.0f / 60.0f);
+    VERIFICA(proximo(j.velocidade, VEL_MIN));
+
+    /* Proporcional ao analógico. */
+    iniciarJogador(&j);
+    c.aceleracao = 0.5f;
+    atualizarJogador(&j, &c, 1.0f);
+    VERIFICA(proximo(j.velocidade, VEL_MIN + 0.5f * ACELERACAO));
+
+    /* O avanço segue a frente atual: depois de guinar 90° à direita, anda para -X. */
+    iniciarJogador(&j);
+    j.pos = (Vector3){ 0.0f, 0.0f, 0.0f };
+    c = (Comandos){ .guinada = 1.0f };
+    girar(&j, c, VEL_GUINADA, PI_F / 2.0f);
+    j.pos = (Vector3){ 0.0f, 0.0f, 0.0f };
+    c = (Comandos){ 0 };
+    atualizarJogador(&j, &c, 1.0f);
+    VERIFICA(fabsf(j.pos.x + j.velocidade) < 1e-2f && fabsf(j.pos.z) < 1e-2f);
+}
+
 int main(void)
 {
     Jogador j;
@@ -155,6 +199,7 @@ int main(void)
     testarRotacao();
     testarSemGimbalLock();
     testarRenormalizacao();
+    testarAceleracao();
 
     return RESULTADO_TESTES();
 }
