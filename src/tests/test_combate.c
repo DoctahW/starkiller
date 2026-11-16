@@ -101,6 +101,8 @@ static void testarMovimentoEVida(void)
     atualizarLasers(&jogo, 1.4f);
     VERIFICA(contarAtivos(&jogo) == 2);
     atualizarLasers(&jogo, 0.2f);
+    VERIFICA(contarAtivos(&jogo) == 2);                /* expirou neste passo: ainda colide */
+    atualizarLasers(&jogo, 0.0f);
     VERIFICA(contarAtivos(&jogo) == 0);
 
     /* O slot liberado é reaproveitado. */
@@ -165,8 +167,18 @@ static void testarCadenciaContinua(void)
         disparos += dispararLaser(&jogo);
         atualizarLasers(&jogo, 1.0f / 60.0f);
     }
-    VERIFICA(disparos >= 18 && disparos <= 20);
+    VERIFICA(disparos >= 19 && disparos <= 21);        /* 0,15 s = 9 frames: 20 disparos em 180 frames */
     VERIFICA(contarAtivos(&jogo) <= 2 * 14);
+
+    /* O erro de float de 9 passos de 1/60 s não pode empurrar o disparo para o 10º frame. */
+    novoJogo();
+    VERIFICA(dispararLaser(&jogo) == 1);
+    for (i = 0; i < 8; i++) {
+        atualizarLasers(&jogo, 1.0f / 60.0f);
+        VERIFICA(dispararLaser(&jogo) == 0);
+    }
+    atualizarLasers(&jogo, 1.0f / 60.0f);
+    VERIFICA(dispararLaser(&jogo) == 1);
 }
 
 static int acerta(Vector3 a, Vector3 b, Vector3 c, float r, float *t)
@@ -283,6 +295,34 @@ static void testarColisaoLasers(void)
     VERIFICA(contarAtivos(&jogo) == 2);
 }
 
+static void testarAcertoNoUltimoPasso(void)
+{
+    const float dt = 1.0f / 60.0f;   /* o laser anda 10 u por passo */
+    NoInimigo no = { 0 };
+
+    /* A vida acaba no mesmo passo em que o segmento cruza a esfera: o acerto não pode se perder. */
+    novoJogo();
+    no.dado.tipo = XWING;
+    no.dado.pos = (Vector3){ 0.0f, 0.0f, 105.0f };
+    ligar(&no, 1);
+    jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 90.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = dt * 0.5f,
+                              .ativo = 1, .doJogador = 1 };
+    atualizarLasers(&jogo, dt);                        /* z = 100, vida < 0 */
+    VERIFICA(jogo.lasers[0].vida <= 0.0f);
+    VERIFICA(colidirLasers(&jogo, dt) == 1);
+    VERIFICA(!jogo.lasers[0].ativo);
+
+    /* Sem acerto, o laser expirado some no passo seguinte. */
+    novoJogo();
+    ligar(&no, 0);
+    jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 90.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = dt * 0.5f,
+                              .ativo = 1, .doJogador = 1 };
+    atualizarLasers(&jogo, dt);
+    VERIFICA(colidirLasers(&jogo, dt) == 0 && jogo.lasers[0].ativo);
+    atualizarLasers(&jogo, dt);
+    VERIFICA(!jogo.lasers[0].ativo);
+}
+
 static void testarUmAcertoPorLaser(void)
 {
     NoInimigo nos[2];
@@ -335,6 +375,7 @@ int main(void)
     testarRaios();
     testarColisaoLasers();
     testarUmAcertoPorLaser();
+    testarAcertoNoUltimoPasso();
 
     return RESULTADO_TESTES();
 }
