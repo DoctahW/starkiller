@@ -43,4 +43,11 @@ int segmentoAcertaEsfera(Vector3 a, Vector3 b, Vector3 centro, float raio, float
  */
 int colidirLasers(Jogo *g, float dt);
 
+/*
+ * Aplica `dano` ao inimigo: consome o escudo primeiro e o que sobrar vai para o casco. Escudo e casco
+ * nunca ficam negativos. Dano <= 0 não faz nada. Devolve 1 se o casco chegou a 0 (inimigo abatido).
+ * Não mexe na lista nem na pontuação: quem chama decide o abate.
+ */
+int aplicarDano(Inimigo *in, float dano);
+
 #endif

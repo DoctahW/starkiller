@@ -140,3 +140,18 @@ int colidirLasers(Jogo *g, float dt)
     }
     return acertos;
 }
+
+int aplicarDano(Inimigo *in, float dano)
+{
+    if (dano > 0.0f) {
+        if (dano <= in->escudo) {
+            in->escudo -= dano;
+        } else {
+            in->casco -= dano - in->escudo;
+            in->escudo = 0.0f;
+        }
+        if (in->casco < 0.0f)
+            in->casco = 0.0f;
+    }
+    return in->casco <= 0.0f;
+}
