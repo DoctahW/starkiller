@@ -10,7 +10,7 @@
 
 #define CASCO_DESTROIER  100.0f
 
-static float acumulador;
+static RelogioCombate relogio;
 
 /* Libera as estruturas da partida em andamento; seguro de chamar mais de uma vez. */
 static void encerrarPartida(Jogo *g)
@@ -32,7 +32,7 @@ static void iniciarPartida(Jogo *g)
     g->proximoId = 1;
     gerarReforcos(&g->reforcos, DURACAO_PARTIDA);
     iniciarJogador(&g->jogador);
-    acumulador = 0.0f;
+    relogio = (RelogioCombate){ 0 };
 }
 
 /* Derrota tem precedência sobre o tempo esgotado. */
@@ -43,7 +43,6 @@ static int verificarFim(Jogo *g)
         return 1;
     }
     if (g->tempoRestante <= 0.0f) {
-        g->tempoRestante = 0.0f;
         g->vitoria = 1;
         return 1;
     }
@@ -51,18 +50,19 @@ static int verificarFim(Jogo *g)
 }
 
 /* Seção 3.4: atualizarNave, processarReforcos, atualizarInimigos e atualizarCombate entram antes do timer. */
-static void passoCombate(Jogo *g, float dt)
+static void passoCombate(Jogo *g, RelogioCombate *r)
 {
-    g->tempoDecorrido += dt;
-    g->tempoRestante = DURACAO_PARTIDA - g->tempoDecorrido;
+    r->passos++;
+    g->tempoDecorrido = r->passos * PASSO_FIXO;
+    g->tempoRestante = (PASSOS_PARTIDA - r->passos) * PASSO_FIXO;
 }
 
-EstadoJogo simularCombate(Jogo *g, float *acum, float dtFrame)
+EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, float dtFrame)
 {
-    *acum += dtFrame < DT_MAXIMO ? dtFrame : DT_MAXIMO;
-    while (*acum >= PASSO_FIXO) {
-        *acum -= PASSO_FIXO;
-        passoCombate(g, PASSO_FIXO);
+    r->acumulador += dtFrame < DT_MAXIMO ? dtFrame : DT_MAXIMO;
+    while (r->acumulador >= PASSO_FIXO) {
+        r->acumulador -= PASSO_FIXO;
+        passoCombate(g, r);
         if (verificarFim(g))
             return EST_FIM;
     }
@@ -74,7 +74,7 @@ static EstadoJogo combate(Jogo *g, const Comandos *cmd, int controleCaiu)
     if (cmd->pausa || controleCaiu)
         return EST_PAUSA;
 
-    EstadoJogo proximo = simularCombate(g, &acumulador, GetFrameTime());
+    EstadoJogo proximo = simularCombate(g, &relogio, GetFrameTime());
 
     DrawText(TextFormat("COMBATE  %3.0f s", g->tempoRestante), 20, 20, 20, RAYWHITE);
     DrawText("Esc/Start: pausa", 20, 50, 20, GRAY);
