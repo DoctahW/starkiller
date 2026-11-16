@@ -1,7 +1,7 @@
 #include "nave.h"
 #include "raymath.h"
 
-#define VELOCIDADE_INICIAL 40.0f
+#define VELOCIDADE_INICIAL VEL_MIN
 #define CASCO_JOGADOR      100.0f
 
 void iniciarJogador(Jogador *j)
@@ -34,6 +34,9 @@ void atualizarJogador(Jogador *j, const Comandos *cmd, float dt)
 
     j->rot = QuaternionNormalize(QuaternionMultiply(j->rot, delta));
     derivarEixos(j);
+
+    j->velocidade = Clamp(j->velocidade + cmd->aceleracao * ACELERACAO * dt, VEL_MIN, VEL_MAX);
+    j->pos = Vector3Add(j->pos, Vector3Scale(j->frente, j->velocidade * dt));
 }
 
 Camera3D cameraDoJogador(const Jogador *j)
