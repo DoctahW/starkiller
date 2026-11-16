@@ -24,11 +24,16 @@ Inimigo criarInimigo(TipoNave tipo, Vector3 pos, int id);
 //Se a lista estava vazia, o novo nó vira o alvo
 void inserirInimigo(ListaInimigos *l, Inimigo in);
 
-//Libera todos os nós e zera a lista
-void liberarListaInimigos(ListaInimigos *l);
-
 //Remove o no dado em O(1) e libera a memoria dele
 //Se era o alvo: passa pro prox, senao pro ant, senao NULL
 void removerInimigo(ListaInimigos *l, NoInimigo *no);
+
+//Computador de mira: circula o alvo pela lista nos dois sentidos
+//No fim vai pro inicio; no inicio vai pro fim; lista vazia nao faz nada
+void proximoAlvo(ListaInimigos *l);
+void alvoAnterior(ListaInimigos *l);
+
+//Libera todos os nós e zera a lista
+void liberarListaInimigos(ListaInimigos *l);
 
 #endif
