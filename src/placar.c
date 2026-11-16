@@ -5,25 +5,31 @@
 
 #include "placar.h"
 
-#define TAM_CAMINHO 512
-#define TAM_LINHA   128
-#define ARQUIVO_TMP "placar.tmp"
-#define TAM_TMP     (TAM_CAMINHO + sizeof ARQUIVO_TMP)
+#define TAM_CAMINHO  512
+#define TAM_LINHA    128
+#define ARQUIVO_TMP  "placar.tmp"
+#define TAM_TMP      (TAM_CAMINHO + sizeof ARQUIVO_TMP)
+#define NOME_ANONIMO "anonimo"
 
-/* Copia o nome com limite de PLACAR_MAX_NOME caracteres e neutraliza os
- * caracteres que quebrariam o formato do arquivo. */
-static void copiarNome(char destino[PLACAR_MAX_NOME + 1], const char *origem)
+/* Copia o nome para o nó, remove caracteres que prejudicam o formato nome;pontos
+ * e usa "anonimo" caso o nome seja NULL ou vazio. */
+static void copiarNome(NoPlacar *destino, const char *origem)
 {
+    const int limite = (int)sizeof destino->nome - 1;
     int i = 0;
 
     if (origem != NULL) {
-        while (origem[i] != '\0' && i < PLACAR_MAX_NOME) {
+        while (origem[i] != '\0' && i < limite) {
             char c = origem[i];
-            destino[i] = (c == ';' || c == '\n' || c == '\r') ? '_' : c;
+            destino->nome[i] = (c == ';' || c == '\n' || c == '\r') ? '_' : c;
             i++;
         }
     }
-    destino[i] = '\0';
+
+    if (i == 0)
+        memcpy(destino->nome, NOME_ANONIMO, sizeof NOME_ANONIMO);
+    else
+        destino->nome[i] = '\0';
 }
 
 NoPlacar *inserirPontuacao(NoPlacar *raiz, const char *nome, int pontos)
@@ -44,7 +50,7 @@ NoPlacar *inserirPontuacao(NoPlacar *raiz, const char *nome, int pontos)
     if (novo == NULL)
         return raiz;
 
-    copiarNome(novo->nome, nome);
+    copiarNome(novo, nome);
     novo->pontos = pontos;
     novo->esq = NULL;
     novo->dir = NULL;
@@ -53,7 +59,8 @@ NoPlacar *inserirPontuacao(NoPlacar *raiz, const char *nome, int pontos)
     return raiz;
 }
 
-/* Reverso do percurso em ordem: maior primeiro. Para assim que `qtd == max`. */
+/* Percorre a árvore do maior para o menor até atingir a quantidade máxima.
+ * Em árvores degeneradas, a recursão pode chegar a O(n), mas isso é aceitável devido ao pequeno tamanho do placar.*/
 static void percorrerRanking(const NoPlacar *no, NoPlacar *saida, int max, int *qtd)
 {
     if (no == NULL || *qtd >= max)
@@ -105,7 +112,7 @@ static int garantirPasta(const char *caminho)
 
     copiarPasta(caminho, pasta, sizeof pasta);
     if (pasta[0] == '\0' || strcmp(pasta, ".") == 0)
-        return 1; 
+        return 1;
     if (DirectoryExists(pasta))
         return 1;
     return MakeDirectory(pasta) == 0;
@@ -188,12 +195,12 @@ NoPlacar *carregarPlacar(const char *caminho)
         long valor;
 
         if (separador == NULL || separador == linha)
-            continue; 
+            continue;
         *separador = '\0';
 
         valor = strtol(separador + 1, &fim, 10);
         if (fim == separador + 1)
-            continue; 
+            continue;
         while (*fim == ' ' || *fim == '\t' || *fim == '\r' || *fim == '\n')
             fim++;
         if (*fim != '\0' || valor < INT_MIN || valor > INT_MAX)

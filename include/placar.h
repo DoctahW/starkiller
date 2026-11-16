@@ -3,7 +3,8 @@
 
 #include "tipos.h"
 
-#define PLACAR_MAX_NOME 15
+/* Derivado de NoPlacar.nome: acompanha qualquer mudança em tipos.h. */
+#define PLACAR_MAX_NOME ((int)(sizeof(((NoPlacar *)0)->nome) - 1))
 #define CAMINHO_PLACAR "dados/placar.dat" /* a pasta dados/ é criada no primeiro salvamento */
 
 NoPlacar *inserirPontuacao(NoPlacar *raiz, const char *nome, int pontos);
