@@ -28,6 +28,10 @@ void inserirInimigo(ListaInimigos *l, Inimigo in);
 //Se era o alvo: passa pro prox, senao pro ant, senao NULL
 void removerInimigo(ListaInimigos *l, NoInimigo *no);
 
+//Insertion sort que so religa ponteiro de no, sem copiar Inimigo
+//Fica do mais perto pro mais longe; alvo e tamanho nao mudam
+void ordenarPorDistancia(ListaInimigos *l);
+
 //Computador de mira: circula o alvo pela lista nos dois sentidos
 //No fim vai pro inicio; no inicio vai pro fim; lista vazia nao faz nada
 void proximoAlvo(ListaInimigos *l);
