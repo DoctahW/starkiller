@@ -21,7 +21,10 @@ typedef struct {
 /* Abre a janela, roda o jogo até o jogador sair e libera tudo. */
 void jogo_executar(void);
 
-/* Roda os passos fixos que cabem no acumulador; devolve EST_FIM com g->vitoria preenchido ao fim da partida. */
-EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, float dtFrame);
+/*
+ * Roda os passos fixos que cabem no acumulador; devolve EST_FIM com g->vitoria preenchido ao fim da partida.
+ * Os campos de borda de cmd (pausa, mira) são tratados uma vez por frame, fora daqui.
+ */
+EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd, float dtFrame);
 
 #endif
