@@ -3,7 +3,7 @@
 
 #include "tipos.h"
 
-/* Atributos iniciais por tipo (tabela 2.2; BAL-01 ajusta os valores). */
+// Atributos iniciais por tipo
 #define ESCUDO_XWING 50.0f
 #define CASCO_XWING  100.0f
 #define VEL_XWING    60.0f
@@ -16,14 +16,15 @@
 #define CASCO_AWING  60.0f
 #define VEL_AWING    110.0f
 
-/*
- * Monta um inimigo do tipo `tipo` na posição `pos`, com escudo e casco cheios
- * (escudo = escudoMax, casco = cascoMax) e velocidade inicial zero; a IA-01
- * assume o movimento. `distancia` é zerada e recalculada em LST-07.
- * `id` deve ser único: o chamador passa `Jogo.proximoId++`.
- */
+//Monta um inimigo com os atributos do tipo, escudo e casco cheios
+//O id vem de quem chama: Jogo.proximoId++
 Inimigo criarInimigo(TipoNave tipo, Vector3 pos, int id);
 
+//Insere no FIM em O(1), atualizando inicio, fim e tamanho
+//Se a lista estava vazia, o novo nó vira o alvo
+void inserirInimigo(ListaInimigos *l, Inimigo in);
+
+//Libera todos os nós e zera a lista
 void liberarListaInimigos(ListaInimigos *l);
 
 #endif
