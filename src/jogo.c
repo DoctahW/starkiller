@@ -69,22 +69,22 @@ EstadoJogo simularCombate(Jogo *g, float *acum, float dtFrame)
     return EST_COMBATE;
 }
 
-static EstadoJogo combate(Jogo *g, const Comandos *cmd)
+static EstadoJogo combate(Jogo *g, const Comandos *cmd, int controleCaiu)
 {
-    if (cmd->pausa)
+    if (cmd->pausa || controleCaiu)
         return EST_PAUSA;
 
     EstadoJogo proximo = simularCombate(g, &acumulador, GetFrameTime());
 
     DrawText(TextFormat("COMBATE  %3.0f s", g->tempoRestante), 20, 20, 20, RAYWHITE);
-    DrawText("Esc: pausa", 20, 50, 20, GRAY);
+    DrawText("Esc/Start: pausa", 20, 50, 20, GRAY);
     return proximo;
 }
 
 static EstadoJogo pausa(const Comandos *cmd)
 {
     DrawText("PAUSA", 20, 20, 40, RAYWHITE);
-    DrawText("Esc: continuar   Enter: voltar ao menu", 20, 70, 20, GRAY);
+    DrawText("Esc/Start: continuar   Enter/A: voltar ao menu", 20, 70, 20, GRAY);
 
     if (cmd->pausa)
         return EST_COMBATE;
@@ -96,17 +96,17 @@ static EstadoJogo pausa(const Comandos *cmd)
 /*
  * Transições:
  *   MENU      -> COMBATE (inicia partida) | PLACAR | CONTROLES | SAIR
- *   COMBATE   -> PAUSA | FIM
+ *   COMBATE   -> PAUSA (Esc/Start ou controle desconectado) | FIM
  *   PAUSA     -> COMBATE | MENU (libera a partida)
  *   FIM       -> PLACAR
  *   PLACAR    -> MENU
  *   CONTROLES -> MENU
  */
-static EstadoJogo atualizarEstado(Jogo *g, ConfigEntrada *cfg, const Comandos *cmd)
+static EstadoJogo atualizarEstado(Jogo *g, ConfigEntrada *cfg, const Comandos *cmd, int controleCaiu)
 {
     switch (g->estado) {
     case EST_MENU:      return telaMenu(g, cmd);
-    case EST_COMBATE:   return combate(g, cmd);
+    case EST_COMBATE:   return combate(g, cmd, controleCaiu);
     case EST_PAUSA:     return pausa(cmd);
     case EST_FIM:       return telaFim(g, cmd);
     case EST_PLACAR:    return telaPlacar(g, cmd);
@@ -129,6 +129,7 @@ void jogo_executar(void)
 {
     static Jogo jogo;
     ConfigEntrada cfg;
+    int controleAntes = 0;
 
     InitWindow(LARGURA_TELA, ALTURA_TELA, "TIE Fighter: Esquadrão Imperial");
     ChangeDirectory(GetApplicationDirectory());
@@ -140,10 +141,12 @@ void jogo_executar(void)
 
     while (jogo.estado != EST_SAIR && !WindowShouldClose()) {
         Comandos cmd = lerComandos(&cfg);
+        int controleCaiu = controleAntes && !cmd.controleConectado;
+        controleAntes = cmd.controleConectado;
 
         BeginDrawing();
         ClearBackground(BLACK);
-        EstadoJogo proximo = atualizarEstado(&jogo, &cfg, &cmd);
+        EstadoJogo proximo = atualizarEstado(&jogo, &cfg, &cmd, controleCaiu);
         EndDrawing();
 
         if (proximo != jogo.estado)
