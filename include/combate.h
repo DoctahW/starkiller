@@ -6,6 +6,7 @@
 #define COOLDOWN_LASER   0.15f   /* s entre disparos do jogador */
 #define VEL_LASER        600.0f  /* u/s */
 #define VIDA_LASER       2.0f    /* s até o laser desativar */
+#define TOLERANCIA_COOLDOWN 1e-6f /* s; absorve o erro de float de 9 passos de 1/60 s */
 #define DANO_LASER       10.0f
 #define CANHAO_LATERAL   3.0f    /* distância de cada canhão ao eixo da nave */
 #define CANHAO_FRENTE    5.0f    /* canhões à frente do centro da nave */
@@ -21,7 +22,10 @@
  * estava em cooldown ou o pool não tem 2 slots livres (nesse caso o cooldown não é gasto).
  */
 int dispararLaser(Jogo *g);
-/* Diminui o cooldown, move os lasers ativos e desativa os que esgotaram a vida. */
+/*
+ * Diminui o cooldown e move os lasers ativos. Um laser que esgota a vida neste passo continua ativo
+ * até o próximo atualizarLasers, para colidirLasers ainda testar o último segmento dele.
+ */
 void atualizarLasers(Jogo *g, float dt);
 
 /* Raio da esfera de colisão do caça rebelde de tipo `t`. */

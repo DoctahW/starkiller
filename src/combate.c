@@ -31,7 +31,7 @@ int dispararLaser(Jogo *g)
     int a, b;
     Vector3 base, deslocamento, vel;
 
-    if (j->cooldownLaser > 0.0f)
+    if (j->cooldownLaser > TOLERANCIA_COOLDOWN)   /* sobra de float (~1e-8) não pode custar um frame */
         return 0;
 
     a = proximoLivre(g, 0);
@@ -62,10 +62,13 @@ void atualizarLasers(Jogo *g, float dt)
 
         if (!l->ativo)
             continue;
+        /* Expirado no passo anterior: só agora é desativado, para colidirLasers testar o último passo. */
+        if (l->vida <= 0.0f) {
+            l->ativo = 0;
+            continue;
+        }
         l->pos = Vector3Add(l->pos, Vector3Scale(l->vel, dt));
         l->vida -= dt;
-        if (l->vida <= 0.0f)
-            l->ativo = 0;
     }
 }
 
