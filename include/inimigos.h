@@ -3,7 +3,7 @@
 
 #include "tipos.h"
 
-// Atributos iniciais por tipo
+//Atributos da tabela 2.2; o VEL_* e lido pela IA-01 (#49)
 #define ESCUDO_XWING 50.0f
 #define CASCO_XWING  100.0f
 #define VEL_XWING    60.0f
@@ -22,10 +22,12 @@ Inimigo criarInimigo(TipoNave tipo, Vector3 pos, int id);
 
 //Insere no FIM em O(1), atualizando inicio, fim e tamanho
 //Se a lista estava vazia, o novo nó vira o alvo
-void inserirInimigo(ListaInimigos *l, Inimigo in);
+//Devolve 1 se inseriu; 0 se faltou memoria (mesma convencao de dispararLaser)
+int inserirInimigo(ListaInimigos *l, Inimigo in);
 
 //Remove o no dado em O(1) e libera a memoria dele
 //Se era o alvo: passa pro prox, senao pro ant, senao NULL
+//Pre-condicao: o no tem que pertencer a l; nao confere porque custaria O(n)
 void removerInimigo(ListaInimigos *l, NoInimigo *no);
 
 //Insertion sort que so religa ponteiro de no, sem copiar Inimigo

@@ -26,6 +26,7 @@ Inimigo criarInimigo(TipoNave tipo, Vector3 pos, int id)
         break;
     case XWING:
     default:
+        in.tipo = XWING;
         in.escudoMax = ESCUDO_XWING;
         in.cascoMax = CASCO_XWING;
         in.estadoIA = IA_ATACAR_DESTROIER;   // alterna em IA-03
@@ -37,11 +38,11 @@ Inimigo criarInimigo(TipoNave tipo, Vector3 pos, int id)
     return in;
 }
 
-void inserirInimigo(ListaInimigos *l, Inimigo in)
+int inserirInimigo(ListaInimigos *l, Inimigo in)
 {
     NoInimigo *no = malloc(sizeof *no);
     if (no == NULL)
-        return;
+        return 0;
 
     no->dado = in;
     no->prox = NULL;
@@ -55,6 +56,7 @@ void inserirInimigo(ListaInimigos *l, Inimigo in)
         l->fim = no;
     }
     l->tamanho++;
+    return 1;
 }
 
 void removerInimigo(ListaInimigos *l, NoInimigo *no){

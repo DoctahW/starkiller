@@ -98,7 +98,7 @@ static int estaCrescente(const ListaInimigos *l){
 
 // ==================== LST-01: criarInimigo ====================
 
-static void testarXWing(){
+static void testarXWing(void){
     Inimigo in = criarInimigo(XWING, (Vector3){1.0f, 2.0f, 3.0f}, 7);
 
     VERIFICA(in.id == 7);
@@ -120,10 +120,9 @@ static void testarXWing(){
     VERIFICA(proximo(in.distancia, 0.0f));
     VERIFICA(proximo(in.cooldownTiro, 0.0f));
     VERIFICA(in.estadoIA == IA_ATACAR_DESTROIER);
-    VERIFICA(proximo(VEL_XWING, 60.0f));
 }
 
-static void testarYWing(){
+static void testarYWing(void){
     Inimigo in = criarInimigo(YWING, (Vector3){0.0f, 0.0f, 1800.0f}, 8);
 
     VERIFICA(in.id == 8);
@@ -133,10 +132,9 @@ static void testarYWing(){
     VERIFICA(proximo(in.escudo, in.escudoMax));
     VERIFICA(proximo(in.casco, in.cascoMax));
     VERIFICA(in.estadoIA == IA_ATACAR_DESTROIER); //vai direto no Destróier
-    VERIFICA(proximo(VEL_YWING, 35.0f));
 }
 
-static void testarAWing(){
+static void testarAWing(void){
     Inimigo in = criarInimigo(AWING, (Vector3){-1800.0f, 0.0f, 0.0f}, 9);
 
     VERIFICA(in.id == 9);
@@ -146,11 +144,21 @@ static void testarAWing(){
     VERIFICA(proximo(in.escudo, in.escudoMax));
     VERIFICA(proximo(in.casco, in.cascoMax));
     VERIFICA(in.estadoIA == IA_ATACAR_JOGADOR); //persegue o jogador
+}
+
+//velocidade da tabela 2.2; quem consome esses valores e a IA-01 (#49)
+static void testarVelocidadesDaTabela(void){
+    VERIFICA(proximo(VEL_XWING, 60.0f));
+    VERIFICA(proximo(VEL_YWING, 35.0f));
     VERIFICA(proximo(VEL_AWING, 110.0f));
+
+    //A-Wing e o mais rapido, Y-Wing o mais lento
+    VERIFICA(VEL_AWING > VEL_XWING);
+    VERIFICA(VEL_XWING > VEL_YWING);
 }
 
 //o id vem do chamador, via Jogo.proximoId++
-static void testarIdsDoJogo(){
+static void testarIdsDoJogo(void){
     memset(&jogo, 0, sizeof(jogo));
     jogo.proximoId = 1;
 
@@ -165,11 +173,11 @@ static void testarIdsDoJogo(){
 
 // ==================== LST-02: inserirInimigo ====================
 
-static void testarInsercaoEmListaVazia(){
+static void testarInsercaoEmListaVazia(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
 
-    inserirInimigo(&lista, criarInimigo(XWING, (Vector3){1.0f, 2.0f, 3.0f}, 1));
+    VERIFICA(inserirInimigo(&lista, criarInimigo(XWING, (Vector3){1.0f, 2.0f, 3.0f}, 1)) == 1);
 
     VERIFICA(lista.tamanho == 1);
     VERIFICA(lista.inicio == lista.fim);
@@ -183,7 +191,7 @@ static void testarInsercaoEmListaVazia(){
 }
 
 //insere no fim sem andar na lista, e nunca mexe no alvo
-static void testarInsercaoSempreNoFim(){
+static void testarInsercaoSempreNoFim(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
 
@@ -206,7 +214,7 @@ static void testarInsercaoSempreNoFim(){
     liberarListaInimigos(&lista);
 }
 
-static void testarLiberarListaVazia(){
+static void testarLiberarListaVazia(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
 
@@ -218,7 +226,7 @@ static void testarLiberarListaVazia(){
     VERIFICA(lista.tamanho == 0);
 }
 
-static void testarLiberarComNos(){
+static void testarLiberarComNos(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 4);
@@ -239,7 +247,7 @@ static void testarLiberarComNos(){
 
 // ==================== LST-03: removerInimigo ====================
 
-static void testarRemoverNoUnico(){
+static void testarRemoverNoUnico(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 1);
@@ -252,7 +260,7 @@ static void testarRemoverNoUnico(){
     VERIFICA(lista.alvo == NULL); //sem vizinho, alvo vira NULL
 }
 
-static void testarRemoverInicio(){
+static void testarRemoverInicio(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -266,7 +274,7 @@ static void testarRemoverInicio(){
     liberarListaInimigos(&lista);
 }
 
-static void testarRemoverMeio(){
+static void testarRemoverMeio(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -282,7 +290,7 @@ static void testarRemoverMeio(){
     liberarListaInimigos(&lista);
 }
 
-static void testarRemoverFim(){
+static void testarRemoverFim(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -297,7 +305,7 @@ static void testarRemoverFim(){
 }
 
 //alvo era o inicio: passa pro prox
-static void testarAlvoMudaProProx(){
+static void testarAlvoMudaProProx(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -313,7 +321,7 @@ static void testarAlvoMudaProProx(){
 }
 
 //alvo era o fim: nao tem prox, cai no ant
-static void testarAlvoNoFimVaiProAnt(){
+static void testarAlvoNoFimVaiProAnt(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -332,7 +340,7 @@ static void testarAlvoNoFimVaiProAnt(){
 }
 
 //remove o alvo do meio, depois sobra ele mesmo sem vizinhos
-static void testarAlvoAteSobrarSoEle(){
+static void testarAlvoAteSobrarSoEle(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -352,7 +360,7 @@ static void testarAlvoAteSobrarSoEle(){
     conferirLista(&lista, 0);
 }
 
-static void testarRemoverNullNaoFazNada(){
+static void testarRemoverNullNaoFazNada(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -368,7 +376,7 @@ static void testarRemoverNullNaoFazNada(){
 }
 
 //padrao da secao 3.5: guarda o prox antes de processar o no
-static void testarRemocaoComIteracaoSegura(){
+static void testarRemocaoComIteracaoSegura(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 5);
@@ -386,7 +394,7 @@ static void testarRemocaoComIteracaoSegura(){
     conferirLista(&lista, 0);
 }
 
-static void testarMiraEmListaVazia(){
+static void testarMiraEmListaVazia(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
 
@@ -398,7 +406,7 @@ static void testarMiraEmListaVazia(){
     VERIFICA(lista.tamanho == 0);
 }
 
-static void testarCicloProximo(){
+static void testarCicloProximo(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -423,7 +431,7 @@ static void testarCicloProximo(){
     liberarListaInimigos(&lista);
 }
 
-static void testarCicloAnterior(){
+static void testarCicloAnterior(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -443,7 +451,7 @@ static void testarCicloAnterior(){
     liberarListaInimigos(&lista);
 }
 
-static void testarUmNoFicaNeleMesmo(){
+static void testarUmNoFicaNeleMesmo(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 1);
@@ -458,7 +466,7 @@ static void testarUmNoFicaNeleMesmo(){
     liberarListaInimigos(&lista);
 }
 
-static void testarIdaEVolta(){
+static void testarIdaEVolta(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 5);
@@ -477,7 +485,7 @@ static void testarIdaEVolta(){
     liberarListaInimigos(&lista);
 }
 
-static void testarMiraAposInsercaoERemocao(){
+static void testarMiraAposInsercaoERemocao(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -504,7 +512,7 @@ static void testarMiraAposInsercaoERemocao(){
     liberarListaInimigos(&lista);
 }
 
-static void testarOrdenarListaVazia(){
+static void testarOrdenarListaVazia(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
 
@@ -516,7 +524,7 @@ static void testarOrdenarListaVazia(){
     VERIFICA(lista.tamanho == 0);
 }
 
-static void testarOrdenarUmNo(){
+static void testarOrdenarUmNo(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 1);
@@ -534,7 +542,7 @@ static void testarOrdenarUmNo(){
     liberarListaInimigos(&lista);
 }
 
-static void testarOrdenarDesordenada(){
+static void testarOrdenarDesordenada(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -554,7 +562,7 @@ static void testarOrdenarDesordenada(){
     liberarListaInimigos(&lista);
 }
 
-static void testarOrdenarJaOrdenada(){
+static void testarOrdenarJaOrdenada(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -572,7 +580,7 @@ static void testarOrdenarJaOrdenada(){
     liberarListaInimigos(&lista);
 }
 
-static void testarOrdenarInvertida(){
+static void testarOrdenarInvertida(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 4);
@@ -591,7 +599,7 @@ static void testarOrdenarInvertida(){
 }
 
 //o criterio 2: alvo continua sendo o mesmo no, nao o mais proximo
-static void testarAlvoContinuaOMesmoNo(){
+static void testarAlvoContinuaOMesmoNo(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 3);
@@ -613,7 +621,7 @@ static void testarAlvoContinuaOMesmoNo(){
 }
 
 //empatados mantem a ordem de chegada
-static void testarOrdenacaoEstavel(){
+static void testarOrdenacaoEstavel(void){
     ListaInimigos lista;
     memset(&lista, 0, sizeof(lista));
     montarLista(&lista, 4);
@@ -637,6 +645,7 @@ int main(void){
     testarYWing();
     testarAWing();
     testarIdsDoJogo();
+    testarVelocidadesDaTabela();
 
     testarInsercaoEmListaVazia();
     testarInsercaoSempreNoFim();
@@ -652,14 +661,13 @@ int main(void){
     testarAlvoAteSobrarSoEle();
     testarRemoverNullNaoFazNada();
     testarRemocaoComIteracaoSegura();
-    
+
     testarMiraEmListaVazia();
     testarCicloProximo();
     testarCicloAnterior();
     testarUmNoFicaNeleMesmo();
     testarIdaEVolta();
     testarMiraAposInsercaoERemocao();
-
 
     testarOrdenarListaVazia();
     testarOrdenarUmNo();
