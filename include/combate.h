@@ -50,4 +50,15 @@ int colidirLasers(Jogo *g, float dt);
  */
 int aplicarDano(Inimigo *in, float dano);
 
+#define DURACAO_EXPLOSAO 0.6f    /* s de vida de uma explosão */
+#define RAIO_EXPLOSAO    20.0f   /* raio máximo (chute; ajustar com o visual) */
+
+/*
+ * Ativa uma explosão em `pos` no primeiro slot livre de g->explosoes (tempo = 0). `tempo` é o tempo
+ * decorrido desde o início, até DURACAO_EXPLOSAO. Com o pool cheio, ignora. Devolve 1 se criou.
+ */
+int criarExplosao(Jogo *g, Vector3 pos, float raioMax);
+/* Avança o tempo das explosões ativas e desativa as que passaram de DURACAO_EXPLOSAO. */
+void atualizarExplosoes(Jogo *g, float dt);
+
 #endif
