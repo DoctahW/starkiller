@@ -12,15 +12,21 @@ static int proximo(float a, float b)
 
 #define PI_F 3.14159265358979f
 
-/* Aplica cmd por `angulo / vel` segundos em 600 passos, para girar exatamente `angulo` rad. */
+/*
+ * Aplica cmd por `angulo / vel` segundos e depois solta o comando até a velocidade angular
+ * zerar. Com a suavização o ganho em regime é 1, então o ângulo total é exatamente `angulo`.
+ */
 static void girar(Jogador *j, Comandos cmd, float vel, float angulo)
 {
-    int n = 600;
+    int n = 600, i;
     float dt = (angulo / vel) / (float)n;
-    int i;
+    Comandos parado = { 0 };
+    int resto = (int)(30.0f * TAU_GIRO / dt) + 1;
 
     for (i = 0; i < n; i++)
         atualizarJogador(j, &cmd, dt);
+    for (i = 0; i < resto; i++)
+        atualizarJogador(j, &parado, dt);
 }
 
 static float tam(Vector3 v)
@@ -115,8 +121,10 @@ static void testarRenormalizacao(void)
         atualizarJogador(&j, &c, 1.0f / 60.0f);
     VERIFICA(baseValida(&j));
 
-    /* Sem comandos, a orientação não muda. */
+    /* Sem comandos, a rotação amortece até parar e a orientação deixa de mudar. */
     c = (Comandos){ 0 };
+    for (i = 0; i < 600; i++)
+        atualizarJogador(&j, &c, 1.0f / 60.0f);
     {
         Vector3 antes = j.frente;
         atualizarJogador(&j, &c, 1.0f / 60.0f);
@@ -205,6 +213,76 @@ static void testarArena(void)
     VERIFICA(atualizarJogador(&j, &c, 1.0f / 60.0f) == 0);
 }
 
+/* Ângulo de arfagem (rad) girado em um passo, medido pela subida da frente a partir do plano. */
+static float passoArfagem(Jogador *j, const Comandos *c, float dt)
+{
+    Vector3 antes = j->frente;
+
+    atualizarJogador(j, c, dt);
+    return asinf(j->frente.y) - asinf(antes.y);
+}
+
+static void testarSuavizacao(void)
+{
+    Jogador j;
+    Comandos c = { .arfagem = 1.0f };
+    Comandos parado = { 0 };
+    float dt = 1.0f / 60.0f, ang;
+    int i;
+
+    /* Sem giro instantâneo: no primeiro frame gira bem menos que VEL_ARFAGEM * dt. */
+    iniciarJogador(&j);
+    ang = passoArfagem(&j, &c, dt);
+    VERIFICA(ang > 0.0f && ang < 0.25f * VEL_ARFAGEM * dt);
+
+    /* Acelera passo a passo: cada frame gira mais que o anterior. */
+    {
+        float anterior = ang, atual = passoArfagem(&j, &c, dt);
+
+        VERIFICA(atual > anterior);
+    }
+
+    /* Em regime atinge a velocidade alvo. */
+    for (i = 0; i < 120; i++)
+        atualizarJogador(&j, &c, dt);
+    j.rot = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f };
+    j.frente = (Vector3){ 0.0f, 0.0f, 1.0f };
+    ang = passoArfagem(&j, &c, dt);
+    VERIFICA(fabsf(ang - VEL_ARFAGEM * dt) < 0.01f * VEL_ARFAGEM * dt);
+
+    /* Soltar o comando também é gradual: ainda gira no frame seguinte, e termina parando. */
+    j.rot = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f };
+    j.frente = (Vector3){ 0.0f, 0.0f, 1.0f };
+    ang = passoArfagem(&j, &parado, dt);
+    VERIFICA(ang > 0.5f * VEL_ARFAGEM * dt && ang < VEL_ARFAGEM * dt);
+    for (i = 0; i < 300; i++)
+        atualizarJogador(&j, &parado, dt);
+    j.rot = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f };
+    j.frente = (Vector3){ 0.0f, 0.0f, 1.0f };
+    VERIFICA(fabsf(passoArfagem(&j, &parado, dt)) < 1e-6f);
+
+    /* iniciarJogador zera a velocidade angular acumulada. */
+    iniciarJogador(&j);
+    for (i = 0; i < 60; i++)
+        atualizarJogador(&j, &c, dt);
+    iniciarJogador(&j);
+    VERIFICA(fabsf(passoArfagem(&j, &parado, dt)) < 1e-9f);
+
+    /* A suavização não depende do dt: 1 s a 30 fps ≈ 1 s a 240 fps. */
+    {
+        Jogador a, b;
+        int n;
+
+        iniciarJogador(&a);
+        for (n = 0; n < 30; n++)
+            atualizarJogador(&a, &c, 1.0f / 30.0f);
+        iniciarJogador(&b);
+        for (n = 0; n < 240; n++)
+            atualizarJogador(&b, &c, 1.0f / 240.0f);
+        VERIFICA(fabsf(a.frente.y - b.frente.y) < 5e-3f);
+    }
+}
+
 int main(void)
 {
     Jogador j;
@@ -238,6 +316,7 @@ int main(void)
     testarRenormalizacao();
     testarAceleracao();
     testarArena();
+    testarSuavizacao();
 
     return RESULTADO_TESTES();
 }

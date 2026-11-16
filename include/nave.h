@@ -10,8 +10,11 @@
 #define VEL_GUINADA 1.0f
 #define VEL_ROLAGEM 2.0f
 
-/* Jogador perto do Destróier (na origem), olhando para fora da arena. */
+/* Jogador perto do Destróier (na origem), olhando para fora da arena. Zera a velocidade angular. */
 void iniciarJogador(Jogador *j);
+/* Constante de tempo (s) da suavização da rotação: ~63% da velocidade angular alvo em TAU_GIRO. */
+#define TAU_GIRO    0.1f
+
 /* Limites de velocidade (u/s) e aceleração com o eixo em ±1 (u/s²). */
 #define VEL_MIN     40.0f
 #define VEL_MAX     120.0f
@@ -21,7 +24,8 @@ void iniciarJogador(Jogador *j);
 #define RAIO_ARENA  2000.0f
 
 /*
- * Gira a nave no espaço local conforme os eixos de cmd (arfagem > 0 = nariz para cima,
+ * Gira a nave no espaço local conforme os eixos de cmd, com a velocidade angular suavizada
+ * (aproxima-se do alvo com constante de tempo TAU_GIRO, sem giro instantâneo) (arfagem > 0 = nariz para cima,
  * guinada > 0 = nariz para a direita, rolagem > 0 = asa direita para baixo),
  * renormaliza rot e recalcula frente/cima/direita. O eixo aceleracao acelera/freia
  * a velocidade, limitada a [VEL_MIN, VEL_MAX], e a posição avança frente * velocidade * dt.
