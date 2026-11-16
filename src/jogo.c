@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "jogo.h"
+#include "combate.h"
 #include "entrada.h"
 #include "inimigos.h"
 #include "nave.h"
@@ -9,6 +10,7 @@
 #include "telas.h"
 
 static RelogioCombate relogio;
+static int avisoArena;   /* 1 enquanto a nave está além do RAIO_ARENA; o HUD mostra o aviso */
 
 /* Libera as estruturas da partida em andamento; seguro de chamar mais de uma vez. */
 static void encerrarPartida(Jogo *g)
@@ -31,6 +33,7 @@ static void iniciarPartida(Jogo *g)
     gerarReforcos(&g->reforcos, DURACAO_PARTIDA);
     iniciarJogador(&g->jogador);
     relogio = (RelogioCombate){ 0 };
+    avisoArena = 0;
 }
 
 /* Derrota tem precedência sobre o tempo esgotado. */
@@ -47,10 +50,17 @@ static int verificarFim(Jogo *g)
     return 0;
 }
 
-/* Seção 3.4: processarReforcos, atualizarInimigos e atualizarCombate entram depois da nave. */
+/* Seção 3.4: processarReforcos e atualizarInimigos entram depois da nave. */
 static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
 {
-    atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
+    avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
+
+    /* resolverLasers roda logo depois de atualizarLasers: o segmento do laser é pos - vel * dt → pos. */
+    if (cmd->disparar)
+        dispararLaser(g);
+    atualizarLasers(g, PASSO_FIXO);
+    resolverLasers(g, PASSO_FIXO);
+    atualizarExplosoes(g, PASSO_FIXO);
 
     r->passos++;
     g->tempoDecorrido = r->passos * PASSO_FIXO;
@@ -78,6 +88,8 @@ static EstadoJogo combate(Jogo *g, const Comandos *cmd, int controleCaiu)
 
     DrawText(TextFormat("COMBATE  %3.0f s", g->tempoRestante), 20, 20, 20, RAYWHITE);
     DrawText("Esc/Start: pausa", 20, 50, 20, GRAY);
+    if (avisoArena)
+        DrawText("VOLTE PARA A ARENA", LARGURA_TELA / 2 - 140, 80, 28, RED);
     return proximo;
 }
 

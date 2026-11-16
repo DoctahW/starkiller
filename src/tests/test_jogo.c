@@ -1,6 +1,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "combate.h"
+#include "inimigos.h"
 #include "jogo.h"
 #include "nave.h"
 #include "teste.h"
@@ -95,6 +97,35 @@ int main(void)
     jogo.jogador.casco = 0.1f;
     VERIFICA(simular(PASSO_FIXO) == EST_COMBATE);
     VERIFICA(jogo.vitoria == -1);
+
+    /* sem disparar, nenhum laser nasce */
+    novaPartida(0);
+    simular(5.0f * PASSO_FIXO);
+    {
+        int ativos = 0;
+
+        for (int i = 0; i < MAX_LASERS; i++)
+            ativos += jogo.lasers[i].ativo;
+        VERIFICA(ativos == 0);
+    }
+
+    /* segurando o disparo, o passo fixo atira, acerta, abate o X-Wing à frente e pontua */
+    {
+        Comandos atirando = { .disparar = 1 };
+        Vector3 alvo;
+
+        novaPartida(0);
+        alvo = (Vector3){ jogo.jogador.pos.x + jogo.jogador.frente.x * 150.0f,
+                          jogo.jogador.pos.y + jogo.jogador.frente.y * 150.0f,
+                          jogo.jogador.pos.z + jogo.jogador.frente.z * 150.0f };
+        VERIFICA(inserirInimigo(&jogo.inimigos, criarInimigo(XWING, alvo, jogo.proximoId++)) == 1);
+        for (int i = 0; i < 200 && jogo.inimigos.tamanho > 0; i++)
+            simularCombate(&jogo, &relogio, &atirando, PASSO_FIXO);
+        VERIFICA(jogo.inimigos.tamanho == 0);
+        VERIFICA(jogo.inimigos.alvo == NULL);
+        VERIFICA(jogo.pontos > 0);
+        liberarListaInimigos(&jogo.inimigos);
+    }
 
     return RESULTADO_TESTES();
 }
