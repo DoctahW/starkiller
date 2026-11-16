@@ -155,3 +155,32 @@ int aplicarDano(Inimigo *in, float dano)
     }
     return in->casco <= 0.0f;
 }
+
+int criarExplosao(Jogo *g, Vector3 pos, float raioMax)
+{
+    int i;
+
+    for (i = 0; i < MAX_EXPLOSOES; i++) {
+        if (!g->explosoes[i].ativa) {
+            g->explosoes[i].pos = pos;
+            g->explosoes[i].tempo = 0.0f;
+            g->explosoes[i].raioMax = raioMax;
+            g->explosoes[i].ativa = 1;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void atualizarExplosoes(Jogo *g, float dt)
+{
+    int i;
+
+    for (i = 0; i < MAX_EXPLOSOES; i++) {
+        if (!g->explosoes[i].ativa)
+            continue;
+        g->explosoes[i].tempo += dt;
+        if (g->explosoes[i].tempo >= DURACAO_EXPLOSAO)
+            g->explosoes[i].ativa = 0;
+    }
+}

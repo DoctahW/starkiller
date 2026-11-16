@@ -402,6 +402,43 @@ static void testarAplicarDano(void)
     VERIFICA(proximo(in.escudo, 0.0f) && proximo(in.casco, 30.0f));
 }
 
+static int contarExplosoes(const Jogo *g)
+{
+    int i, n = 0;
+
+    for (i = 0; i < MAX_EXPLOSOES; i++)
+        n += g->explosoes[i].ativa != 0;
+    return n;
+}
+
+static void testarExplosoes(void)
+{
+    int i;
+
+    novoJogo();
+    VERIFICA(criarExplosao(&jogo, (Vector3){ 1.0f, 2.0f, 3.0f }, 15.0f) == 1);
+    VERIFICA(contarExplosoes(&jogo) == 1);
+    VERIFICA(jogo.explosoes[0].ativa && proximo(jogo.explosoes[0].tempo, 0.0f));
+    VERIFICA(proximo(jogo.explosoes[0].pos.z, 3.0f) && proximo(jogo.explosoes[0].raioMax, 15.0f));
+
+    /* Avança sem expirar, depois expira. */
+    atualizarExplosoes(&jogo, DURACAO_EXPLOSAO * 0.5f);
+    VERIFICA(jogo.explosoes[0].ativa && proximo(jogo.explosoes[0].tempo, DURACAO_EXPLOSAO * 0.5f));
+    atualizarExplosoes(&jogo, DURACAO_EXPLOSAO * 0.5f);
+    VERIFICA(contarExplosoes(&jogo) == 0);
+
+    /* Slot liberado é reaproveitado. */
+    VERIFICA(criarExplosao(&jogo, (Vector3){ 0 }, RAIO_EXPLOSAO) == 1);
+    VERIFICA(jogo.explosoes[0].ativa);
+
+    /* Pool cheio: ignora, sem crash. */
+    novoJogo();
+    for (i = 0; i < MAX_EXPLOSOES; i++)
+        VERIFICA(criarExplosao(&jogo, (Vector3){ 0 }, RAIO_EXPLOSAO) == 1);
+    VERIFICA(criarExplosao(&jogo, (Vector3){ 0 }, RAIO_EXPLOSAO) == 0);
+    VERIFICA(contarExplosoes(&jogo) == MAX_EXPLOSOES);
+}
+
 int main(void)
 {
     testarDisparo();
@@ -416,6 +453,7 @@ int main(void)
     testarUmAcertoPorLaser();
     testarAcertoNoUltimoPasso();
     testarAplicarDano();
+    testarExplosoes();
 
     return RESULTADO_TESTES();
 }
