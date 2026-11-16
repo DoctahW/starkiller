@@ -78,6 +78,24 @@ static void conferirLista(const ListaInimigos *l, int esperado){
     VERIFICA(alvoVisivel == 1);
 }
 
+//seta a distancia de cada no, ja que o criarInimigo deixa em zero
+static void setarDistancias(ListaInimigos *l, const float *vals, int qtd){
+    int i = 0;
+    for(NoInimigo *no = l->inicio; no != NULL && i < qtd; no = no->prox){
+        no->dado.distancia = vals[i];
+        i++;
+    }
+}
+
+static int estaCrescente(const ListaInimigos *l){
+    for(const NoInimigo *no = l->inicio; no != NULL && no->prox != NULL; no = no->prox){
+        if(no->dado.distancia > no->prox->dado.distancia){
+            return 0;
+        }
+    }
+    return 1;
+}
+
 // ==================== LST-01: criarInimigo ====================
 
 static void testarXWing(){
@@ -486,6 +504,134 @@ static void testarMiraAposInsercaoERemocao(){
     liberarListaInimigos(&lista);
 }
 
+static void testarOrdenarListaVazia(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+
+    ordenarPorDistancia(&lista);
+
+    VERIFICA(lista.inicio == NULL);
+    VERIFICA(lista.fim == NULL);
+    VERIFICA(lista.alvo == NULL);
+    VERIFICA(lista.tamanho == 0);
+}
+
+static void testarOrdenarUmNo(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 1);
+    float v[] = {42.0f};
+    setarDistancias(&lista, v, 1);
+    NoInimigo *unico = lista.inicio;
+
+    ordenarPorDistancia(&lista);
+
+    VERIFICA(lista.inicio == unico);
+    VERIFICA(lista.fim == unico);
+    VERIFICA(lista.alvo == unico);
+    conferirLista(&lista, 1);
+
+    liberarListaInimigos(&lista);
+}
+
+static void testarOrdenarDesordenada(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 3);
+    float v[] = {30.0f, 10.0f, 20.0f};
+    setarDistancias(&lista, v, 3);
+
+    ordenarPorDistancia(&lista);
+
+    conferirLista(&lista, 3);
+    VERIFICA(estaCrescente(&lista) == 1);
+    VERIFICA(lista.inicio->dado.id == 2); //o mais perto vira o inicio
+    VERIFICA(lista.inicio->prox->dado.id == 3);
+    VERIFICA(lista.fim->dado.id == 1); //o mais longe vira o fim
+    VERIFICA(proximo(lista.inicio->dado.distancia, 10.0f));
+    VERIFICA(proximo(lista.fim->dado.distancia, 30.0f));
+
+    liberarListaInimigos(&lista);
+}
+
+static void testarOrdenarJaOrdenada(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 3);
+    float v[] = {10.0f, 20.0f, 30.0f};
+    setarDistancias(&lista, v, 3);
+
+    ordenarPorDistancia(&lista);
+
+    conferirLista(&lista, 3);
+    VERIFICA(estaCrescente(&lista) == 1);
+    VERIFICA(lista.inicio->dado.id == 1); //nada saiu do lugar
+    VERIFICA(lista.inicio->prox->dado.id == 2);
+    VERIFICA(lista.fim->dado.id == 3);
+
+    liberarListaInimigos(&lista);
+}
+
+static void testarOrdenarInvertida(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 4);
+    float v[] = {40.0f, 30.0f, 20.0f, 10.0f};
+    setarDistancias(&lista, v, 4);
+
+    ordenarPorDistancia(&lista);
+
+    conferirLista(&lista, 4);
+    VERIFICA(estaCrescente(&lista) == 1);
+    VERIFICA(lista.inicio->dado.id == 4);
+    VERIFICA(lista.inicio->prox->dado.id == 3);
+    VERIFICA(lista.fim->dado.id == 1);
+
+    liberarListaInimigos(&lista);
+}
+
+//o criterio 2: alvo continua sendo o mesmo no, nao o mais proximo
+static void testarAlvoContinuaOMesmoNo(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 3);
+    float v[] = {30.0f, 10.0f, 20.0f};
+    setarDistancias(&lista, v, 3);
+
+    lista.alvo = buscarPorId(&lista, 3);
+    NoInimigo *alvo = lista.alvo;
+
+    ordenarPorDistancia(&lista);
+
+    conferirLista(&lista, 3);
+    VERIFICA(lista.alvo == alvo); //mesmo ponteiro
+    VERIFICA(lista.alvo->dado.id == 3); //mesmo inimigo
+    VERIFICA(lista.alvo != lista.inicio); //mas deixou de ser o inicio
+    VERIFICA(lista.alvo == lista.inicio->prox); //esta no meio agora
+
+    liberarListaInimigos(&lista);
+}
+
+//empatados mantem a ordem de chegada
+static void testarOrdenacaoEstavel(){
+    ListaInimigos lista;
+    memset(&lista, 0, sizeof(lista));
+    montarLista(&lista, 4);
+    float v[] = {20.0f, 10.0f, 20.0f, 5.0f};
+    setarDistancias(&lista, v, 4);
+
+    ordenarPorDistancia(&lista);
+
+    conferirLista(&lista, 4);
+    VERIFICA(estaCrescente(&lista) == 1);
+    VERIFICA(lista.inicio->dado.id == 4); //5
+    VERIFICA(lista.inicio->prox->dado.id == 2); //10
+    VERIFICA(lista.inicio->prox->prox->dado.id == 1); //20, chegou antes do id 3
+    VERIFICA(lista.fim->dado.id == 3); //20 empatado, ficou depois
+
+    liberarListaInimigos(&lista);
+}
+
 int main(void){
     testarXWing();
     testarYWing();
@@ -513,6 +659,15 @@ int main(void){
     testarUmNoFicaNeleMesmo();
     testarIdaEVolta();
     testarMiraAposInsercaoERemocao();
+
+
+    testarOrdenarListaVazia();
+    testarOrdenarUmNo();
+    testarOrdenarDesordenada();
+    testarOrdenarJaOrdenada();
+    testarOrdenarInvertida();
+    testarAlvoContinuaOMesmoNo();
+    testarOrdenacaoEstavel();
 
     return RESULTADO_TESTES();
 }
