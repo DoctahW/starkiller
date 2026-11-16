@@ -68,3 +68,37 @@ void liberarListaInimigos(ListaInimigos *l)
     l->inicio = l->fim = l->alvo = NULL;
     l->tamanho = 0;
 }
+
+void removerInimigo(ListaInimigos *l, NoInimigo *no){
+    if(no == NULL){
+        return;
+    }
+
+    //alvo definido antes do free, depois nao da mais pra ler prox e ant
+    if(l->alvo == no){
+        if(no->prox != NULL){
+            l->alvo = no->prox;
+        } else if(no->ant != NULL){
+            l->alvo = no->ant;
+        } else {
+            l->alvo = NULL;
+        }
+    }
+
+    //descola do vizinho da esquerda
+    if(no->ant != NULL){
+        no->ant->prox = no->prox;
+    } else {
+        l->inicio = no->prox;
+    }
+
+    //descola do vizinho da direita
+    if(no->prox != NULL){
+        no->prox->ant = no->ant;
+    } else {
+        l->fim = no->ant;
+    }
+
+    free(no);
+    l->tamanho--;
+}
