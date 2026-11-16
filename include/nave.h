@@ -17,13 +17,18 @@ void iniciarJogador(Jogador *j);
 #define VEL_MAX     120.0f
 #define ACELERACAO  40.0f
 
+/* Raio da arena, centrada na origem. */
+#define RAIO_ARENA  2000.0f
+
 /*
  * Gira a nave no espaço local conforme os eixos de cmd (arfagem > 0 = nariz para cima,
  * guinada > 0 = nariz para a direita, rolagem > 0 = asa direita para baixo),
  * renormaliza rot e recalcula frente/cima/direita. O eixo aceleracao acelera/freia
  * a velocidade, limitada a [VEL_MIN, VEL_MAX], e a posição avança frente * velocidade * dt.
+ * Se a posição passar de RAIO_ARENA, a nave é devolvida à borda da esfera e a função
+ * devolve 1 (aviso de limite da arena para o HUD); caso contrário, 0.
  */
-void atualizarJogador(Jogador *j, const Comandos *cmd, float dt);
+int atualizarJogador(Jogador *j, const Comandos *cmd, float dt);
 /* Câmera de cabine: position = pos, target = pos + frente, up = cima. */
 Camera3D cameraDoJogador(const Jogador *j);
 
