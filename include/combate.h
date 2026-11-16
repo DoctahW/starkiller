@@ -50,6 +50,14 @@ int colidirLasers(Jogo *g, float dt);
  */
 int aplicarDano(Inimigo *in, float dano);
 
+/*
+ * Como colidirLasers, mas aplica o dano do laser (aplicarDano) ao inimigo atingido. Se o casco zera:
+ * registrarAbate, explosão na posição do caça e removerInimigo (o alvo da mira continua válido).
+ * Como cada laser acerta no máximo um inimigo, remover durante a varredura de lasers é seguro.
+ * Devolve o número de acertos.
+ */
+int resolverLasers(Jogo *g, float dt);
+
 #define DURACAO_EXPLOSAO 0.6f    /* s de vida de uma explosão */
 #define RAIO_EXPLOSAO    20.0f   /* raio máximo (chute; ajustar com o visual) */
 
