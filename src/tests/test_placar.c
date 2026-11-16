@@ -152,7 +152,7 @@ int main(void)
         liberarPlacar(raiz);
     }
 
-    /* Nome: trunca em 15, neutraliza ';' e aceita NULL */
+    /* Nome: trunca em 15, neutraliza ';' e usa "anonimo" quando vazio */
     raiz = inserirPontuacao(NULL, "ABCDEFGHIJKLMNOPQRST", 1);
     VERIFICA(strlen(raiz->nome) == PLACAR_MAX_NOME);
     VERIFICA(strcmp(raiz->nome, "ABCDEFGHIJKLMNO") == 0);
@@ -163,7 +163,11 @@ int main(void)
     liberarPlacar(raiz);
 
     raiz = inserirPontuacao(NULL, NULL, 1);
-    VERIFICA(raiz != NULL && raiz->nome[0] == '\0');
+    VERIFICA(raiz != NULL && strcmp(raiz->nome, "anonimo") == 0);
+    liberarPlacar(raiz);
+
+    raiz = inserirPontuacao(NULL, "", 1);
+    VERIFICA(raiz != NULL && strcmp(raiz->nome, "anonimo") == 0);
     liberarPlacar(raiz);
 
     /* Persistência: árvore vazia grava arquivo vazio e carrega NULL */
@@ -202,6 +206,16 @@ int main(void)
 
     /* Arquivo inexistente: árvore vazia, sem travar */
     VERIFICA(carregarPlacar(PASTA "/nao_existe.dat") == NULL);
+
+    /* Nome vazio vira "anonimo" e sobrevive ao arquivo (não vira ";pontos") */
+    raiz = inserirPontuacao(NULL, NULL, 42);
+    VERIFICA(strcmp(raiz->nome, "anonimo") == 0);
+    VERIFICA(salvarPlacar(raiz, ARQUIVO) == 1);
+    liberarPlacar(raiz);
+    raiz = carregarPlacar(ARQUIVO);
+    VERIFICA(raiz != NULL && raiz->pontos == 42);
+    VERIFICA(strcmp(raiz->nome, "anonimo") == 0);
+    liberarPlacar(raiz);
 
     /* Salvar cria a pasta que ainda não existe */
     raiz = inserirPontuacao(NULL, "Dir", 1);
