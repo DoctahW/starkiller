@@ -27,6 +27,7 @@ static void novoJogo(void)
 {
     memset(&jogo, 0, sizeof jogo);
     iniciarJogador(&jogo.jogador);
+    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 0.0f };   /* origem, para contas simples */
 }
 
 static void testarDisparo(void)
@@ -168,6 +169,160 @@ static void testarCadenciaContinua(void)
     VERIFICA(contarAtivos(&jogo) <= 2 * 14);
 }
 
+static int acerta(Vector3 a, Vector3 b, Vector3 c, float r, float *t)
+{
+    return segmentoAcertaEsfera(a, b, c, r, t);
+}
+
+static void testarSegmentoEsfera(void)
+{
+    Vector3 o = { 0.0f, 0.0f, 0.0f };
+    Vector3 c = { 0.0f, 0.0f, 50.0f };
+    float t = -1.0f;
+
+    /* De frente: entra em z = 45 (raio 5), 45% de um segmento de 0 a 100. */
+    VERIFICA(acerta(o, (Vector3){ 0.0f, 0.0f, 100.0f }, c, 5.0f, &t));
+    VERIFICA(proximo(t, 0.45f));
+
+    /* Túnel: os dois extremos estão fora da esfera, mas o caminho a atravessa. */
+    VERIFICA(acerta((Vector3){ 0.0f, 0.0f, 40.0f }, (Vector3){ 0.0f, 0.0f, 60.0f }, c, 5.0f, &t));
+    VERIFICA(proximo(t, 0.25f));
+    VERIFICA(acerta((Vector3){ 0.0f, 0.0f, 0.0f }, (Vector3){ 0.0f, 0.0f, 1000.0f }, c, 0.5f, NULL));
+
+    /* Passa ao lado, a mais que o raio: erra. */
+    VERIFICA(!acerta(o, (Vector3){ 0.0f, 0.0f, 100.0f }, (Vector3){ 6.0f, 0.0f, 50.0f }, 5.0f, NULL));
+    /* Rasante dentro do raio: acerta. */
+    VERIFICA(acerta(o, (Vector3){ 0.0f, 0.0f, 100.0f }, (Vector3){ 4.0f, 0.0f, 50.0f }, 5.0f, NULL));
+    /* Tangente exata conta como acerto. */
+    VERIFICA(acerta(o, (Vector3){ 0.0f, 0.0f, 100.0f }, (Vector3){ 5.0f, 0.0f, 50.0f }, 5.0f, NULL));
+
+    /* Segmento que termina antes da esfera erra; esfera atrás da origem erra. */
+    VERIFICA(!acerta(o, (Vector3){ 0.0f, 0.0f, 40.0f }, c, 5.0f, NULL));
+    VERIFICA(!acerta((Vector3){ 0.0f, 0.0f, 100.0f }, (Vector3){ 0.0f, 0.0f, 200.0f }, c, 5.0f, NULL));
+    VERIFICA(!acerta((Vector3){ 0.0f, 0.0f, 60.0f }, (Vector3){ 0.0f, 0.0f, 100.0f }, c, 5.0f, NULL));
+
+    /* Começa dentro da esfera: acerta com t = 0. */
+    VERIFICA(acerta((Vector3){ 0.0f, 0.0f, 52.0f }, (Vector3){ 0.0f, 0.0f, 120.0f }, c, 5.0f, &t));
+    VERIFICA(t == 0.0f);
+
+    /* Segmento degenerado (a == b): só acerta se estiver dentro. */
+    VERIFICA(acerta((Vector3){ 0.0f, 0.0f, 52.0f }, (Vector3){ 0.0f, 0.0f, 52.0f }, c, 5.0f, NULL));
+    VERIFICA(!acerta(o, o, c, 5.0f, NULL));
+
+    /* Direção oblíqua. */
+    VERIFICA(acerta(o, (Vector3){ 100.0f, 100.0f, 100.0f }, (Vector3){ 50.0f, 50.0f, 50.0f }, 1.0f, NULL));
+}
+
+static void testarRaios(void)
+{
+    VERIFICA(proximo(raioInimigo(XWING), RAIO_XWING));
+    VERIFICA(proximo(raioInimigo(YWING), RAIO_YWING));
+    VERIFICA(proximo(raioInimigo(AWING), RAIO_AWING));
+}
+
+/* Coloca um inimigo de teste numa lista encadeada montada à mão (sem depender de inserirInimigo). */
+static void ligar(NoInimigo *nos, int n)
+{
+    int i;
+
+    jogo.inimigos.inicio = n > 0 ? &nos[0] : NULL;
+    jogo.inimigos.fim = n > 0 ? &nos[n - 1] : NULL;
+    jogo.inimigos.tamanho = n;
+    for (i = 0; i < n; i++) {
+        nos[i].ant = i > 0 ? &nos[i - 1] : NULL;
+        nos[i].prox = i + 1 < n ? &nos[i + 1] : NULL;
+    }
+}
+
+static void testarColisaoLasers(void)
+{
+    NoInimigo nos[2];
+    float dt = 1.0f / 60.0f;
+
+    memset(nos, 0, sizeof nos);
+    novoJogo();
+    nos[0].dado.tipo = XWING;
+    nos[0].dado.pos = (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 100.0f };
+    ligar(nos, 1);
+
+    /* O X-Wing fica em x = -9: só o laser do canhão em x = -3 o atinge (distância 6 < raio 8); o outro (x = +3) passa a 12. */
+    dispararLaser(&jogo);
+    atualizarLasers(&jogo, dt);
+    VERIFICA(colidirLasers(&jogo, dt) == 0);          /* ainda longe: z ~ 15 */
+    atualizarLasers(&jogo, 0.15f);
+    {
+        int acertos = colidirLasers(&jogo, 0.15f);    /* z ~ 105 depois de 0,15 s: segmento 15..105 */
+
+        VERIFICA(acertos == 1);
+        VERIFICA(contarAtivos(&jogo) == 1);
+    }
+
+    /* Mesmo cenário com um passo grande: o segmento evita o túnel. */
+    novoJogo();
+    ligar(nos, 1);
+    nos[0].dado.pos = (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 300.0f };
+    dispararLaser(&jogo);
+    atualizarLasers(&jogo, 1.0f);                     /* pos.z ~ 605, anterior ~ 5 */
+    VERIFICA(colidirLasers(&jogo, 1.0f) == 1);
+    VERIFICA(contarAtivos(&jogo) == 1);
+
+    /* Inimigo fora do alcance: ninguém acerta e os lasers continuam ativos. */
+    novoJogo();
+    ligar(nos, 1);
+    nos[0].dado.pos = (Vector3){ 200.0f, 200.0f, 100.0f };
+    dispararLaser(&jogo);
+    atualizarLasers(&jogo, 0.2f);
+    VERIFICA(colidirLasers(&jogo, 0.2f) == 0);
+    VERIFICA(contarAtivos(&jogo) == 2);
+
+    /* Lista vazia: sem acertos, sem falhas. */
+    novoJogo();
+    dispararLaser(&jogo);
+    atualizarLasers(&jogo, 0.2f);
+    VERIFICA(colidirLasers(&jogo, 0.2f) == 0);
+    VERIFICA(contarAtivos(&jogo) == 2);
+}
+
+static void testarUmAcertoPorLaser(void)
+{
+    NoInimigo nos[2];
+    float dt = 0.2f;
+
+    /* Dois inimigos em fila no caminho do laser do canhão em x = -3 (fora do alcance do outro): só o mais próximo é atingido,
+     * e o laser some (não passa a acertar o segundo). */
+    memset(nos, 0, sizeof nos);
+    novoJogo();
+    nos[0].dado.tipo = XWING;
+    nos[0].dado.pos = (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 100.0f };
+    nos[1].dado.tipo = XWING;
+    nos[1].dado.pos = (Vector3){ -3.0f * CANHAO_LATERAL, 0.0f, 60.0f };   /* mais perto, mas depois na lista */
+    ligar(nos, 2);
+    dispararLaser(&jogo);
+    atualizarLasers(&jogo, dt);
+    VERIFICA(colidirLasers(&jogo, dt) == 1);
+    VERIFICA(contarAtivos(&jogo) == 1);
+
+    /* Lasers já inativos e lasers inimigos são ignorados. */
+    novoJogo();
+    ligar(nos, 1);
+    nos[0].dado.tipo = YWING;
+    nos[0].dado.pos = (Vector3){ 0.0f, 0.0f, 100.0f };
+    jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 100.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = 1.0f, .ativo = 0, .doJogador = 1 };
+    jogo.lasers[1] = (Laser){ .pos = { 0.0f, 0.0f, 100.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = 1.0f, .ativo = 1, .doJogador = 0 };
+    VERIFICA(colidirLasers(&jogo, dt) == 0);
+    VERIFICA(jogo.lasers[1].ativo == 1);
+
+    /* Dois lasers do jogador no mesmo inimigo: dois acertos, os dois somem. */
+    novoJogo();
+    ligar(nos, 1);
+    nos[0].dado.tipo = AWING;
+    nos[0].dado.pos = (Vector3){ 0.0f, 0.0f, 100.0f };
+    jogo.lasers[3] = (Laser){ .pos = { 0.0f, 0.0f, 100.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = 1.0f, .ativo = 1, .doJogador = 1 };
+    jogo.lasers[7] = jogo.lasers[3];
+    VERIFICA(colidirLasers(&jogo, dt) == 2);
+    VERIFICA(contarAtivos(&jogo) == 0);
+}
+
 int main(void)
 {
     testarDisparo();
@@ -176,6 +331,10 @@ int main(void)
     testarOrientacao();
     testarPoolCheio();
     testarCadenciaContinua();
+    testarSegmentoEsfera();
+    testarRaios();
+    testarColisaoLasers();
+    testarUmAcertoPorLaser();
 
     return RESULTADO_TESTES();
 }
