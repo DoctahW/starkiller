@@ -363,6 +363,45 @@ static void testarUmAcertoPorLaser(void)
     VERIFICA(contarAtivos(&jogo) == 0);
 }
 
+static void testarAplicarDano(void)
+{
+    Inimigo in = { .escudo = 20.0f, .escudoMax = 20.0f, .casco = 30.0f, .cascoMax = 30.0f };
+
+    /* Escudo absorve primeiro; casco intacto. */
+    VERIFICA(aplicarDano(&in, 15.0f) == 0);
+    VERIFICA(proximo(in.escudo, 5.0f) && proximo(in.casco, 30.0f));
+
+    /* Dano que passa do escudo: o resto vai para o casco. */
+    VERIFICA(aplicarDano(&in, 15.0f) == 0);
+    VERIFICA(proximo(in.escudo, 0.0f) && proximo(in.casco, 20.0f));
+
+    /* Sem escudo, direto no casco. */
+    VERIFICA(aplicarDano(&in, 10.0f) == 0);
+    VERIFICA(proximo(in.casco, 10.0f));
+
+    /* Dano <= 0 não altera nada. */
+    VERIFICA(aplicarDano(&in, 0.0f) == 0);
+    VERIFICA(aplicarDano(&in, -5.0f) == 0);
+    VERIFICA(proximo(in.escudo, 0.0f) && proximo(in.casco, 10.0f));
+
+    /* Casco exato em 0 abate; excesso não deixa casco negativo. */
+    VERIFICA(aplicarDano(&in, 10.0f) == 1);
+    VERIFICA(proximo(in.casco, 0.0f));
+    in.casco = 5.0f;
+    VERIFICA(aplicarDano(&in, 100.0f) == 1);
+    VERIFICA(proximo(in.casco, 0.0f) && proximo(in.escudo, 0.0f));
+
+    /* Um golpe só atravessa escudo e casco. */
+    in = (Inimigo){ .escudo = 20.0f, .casco = 30.0f };
+    VERIFICA(aplicarDano(&in, 50.0f) == 1);
+    VERIFICA(proximo(in.escudo, 0.0f) && proximo(in.casco, 0.0f));
+
+    /* Dano exato do escudo: escudo zera, casco intacto, sem abate. */
+    in = (Inimigo){ .escudo = 20.0f, .casco = 30.0f };
+    VERIFICA(aplicarDano(&in, 20.0f) == 0);
+    VERIFICA(proximo(in.escudo, 0.0f) && proximo(in.casco, 30.0f));
+}
+
 int main(void)
 {
     testarDisparo();
@@ -376,6 +415,7 @@ int main(void)
     testarColisaoLasers();
     testarUmAcertoPorLaser();
     testarAcertoNoUltimoPasso();
+    testarAplicarDano();
 
     return RESULTADO_TESTES();
 }
