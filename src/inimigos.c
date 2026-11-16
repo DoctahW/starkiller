@@ -57,18 +57,6 @@ void inserirInimigo(ListaInimigos *l, Inimigo in)
     l->tamanho++;
 }
 
-void liberarListaInimigos(ListaInimigos *l)
-{
-    NoInimigo *no = l->inicio;
-    while (no != NULL) {
-        NoInimigo *prox = no->prox;
-        free(no);
-        no = prox;
-    }
-    l->inicio = l->fim = l->alvo = NULL;
-    l->tamanho = 0;
-}
-
 void removerInimigo(ListaInimigos *l, NoInimigo *no){
     if(no == NULL){
         return;
@@ -101,4 +89,40 @@ void removerInimigo(ListaInimigos *l, NoInimigo *no){
 
     free(no);
     l->tamanho--;
+}
+
+void proximoAlvo(ListaInimigos *l){
+    if(l->alvo == NULL){
+        return; //lista vazia
+    }
+
+    if(l->alvo->prox != NULL){
+        l->alvo = l->alvo->prox;
+    } else {
+        l->alvo = l->inicio; //tava no fim, volta pro comeco
+    }
+}
+
+void alvoAnterior(ListaInimigos *l){
+    if(l->alvo == NULL){
+        return; //lista vazia
+    }
+
+    if(l->alvo->ant != NULL){
+        l->alvo = l->alvo->ant;
+    } else {
+        l->alvo = l->fim; //tava no comeco, volta pro fim
+    }
+}
+
+void liberarListaInimigos(ListaInimigos *l)
+{
+    NoInimigo *no = l->inicio;
+    while (no != NULL) {
+        NoInimigo *prox = no->prox;
+        free(no);
+        no = prox;
+    }
+    l->inicio = l->fim = l->alvo = NULL;
+    l->tamanho = 0;
 }
