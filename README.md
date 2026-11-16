@@ -102,7 +102,7 @@ src/
   pontuacao.c    pontuação
   telas.c        menu, fim de partida, ranking e controles
   audio.c        efeitos e música
-  tests/         testes de console das estruturas de dados (test_*.c)
+  tests/         testes de console das estruturas de dados e do loop de combate (test_*.c)
 ```
 
 Cada módulo tem um `include/<modulo>.h` e um `src/<modulo>.c`, criados pelo dono na primeira story do módulo. A pasta `dados/` (placar e configuração) é criada pelo jogo no primeiro salvamento e não é versionada.
