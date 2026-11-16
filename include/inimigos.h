@@ -27,4 +27,8 @@ void inserirInimigo(ListaInimigos *l, Inimigo in);
 //Libera todos os nós e zera a lista
 void liberarListaInimigos(ListaInimigos *l);
 
+//Remove o no dado em O(1) e libera a memoria dele
+//Se era o alvo: passa pro prox, senao pro ant, senao NULL
+void removerInimigo(ListaInimigos *l, NoInimigo *no);
+
 #endif
