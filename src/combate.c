@@ -4,6 +4,8 @@
 
 #include "raymath.h"
 #include "pontuacao.h"
+#include "destroier.h"
+#include "nave.h"
 #include "inimigos.h"
 
 /* Índice do primeiro slot livre a partir de `de`, ou -1. */
@@ -245,4 +247,72 @@ float raioExplosao(const Explosao *e)
     float p = progressoExplosao(e);
 
     return e->raioMax * p * (2.0f - p);   /* ease-out: abre rápido, desacelera no fim */
+}
+
+int dispararLaserInimigo(Jogo *g, const Inimigo *in)
+{
+    Vector3 alvo, dir;
+    int slot;
+    Laser *l;
+
+    if (in->estadoIA == IA_ATACAR_JOGADOR)
+        alvo = g->jogador.pos;
+    else if (in->estadoIA == IA_ATACAR_DESTROIER)
+        alvo = (Vector3){ 0.0f, 0.0f, 0.0f };
+    else
+        return 0;
+
+    dir = Vector3Subtract(alvo, in->pos);
+    if (Vector3Length(dir) < 1e-6f)
+        return 0;
+    slot = proximoLivre(g, 0);
+    if (slot < 0)
+        return 0;
+
+    l = &g->lasers[slot];
+    ativarLaser(l, in->pos, Vector3Scale(Vector3Normalize(dir), VEL_LASER_INIMIGO));
+    l->doJogador = 0;
+    l->vida = VIDA_LASER_INIMIGO;
+    l->dano = DANO_LASER_INIMIGO;
+    return 1;
+}
+
+int colidirLasersInimigos(Jogo *g, float dt)
+{
+    int i, k, acertosTie = 0;
+
+    for (i = 0; i < MAX_LASERS; i++) {
+        Laser *l = &g->lasers[i];
+        Vector3 anterior;
+        float t, melhor = 2.0f;
+        int noTie = 0;
+
+        if (!l->ativo || l->doJogador)
+            continue;
+
+        anterior = Vector3Subtract(l->pos, Vector3Scale(l->vel, dt));
+        if (segmentoAcertaEsfera(anterior, l->pos, g->jogador.pos, RAIO_JOGADOR, &t)) {
+            melhor = t;
+            noTie = 1;
+        }
+        for (k = 0; k < NUM_ESFERAS_DESTROIER; k++) {
+            if (segmentoAcertaEsfera(anterior, l->pos, ESFERAS_DESTROIER[k].centro, ESFERAS_DESTROIER[k].raio, &t)
+                && t < melhor) {
+                melhor = t;
+                noTie = 0;
+            }
+        }
+        if (melhor > 1.0f)
+            continue;
+
+        l->ativo = 0;
+        if (noTie) {
+            g->jogador.casco -= l->dano;
+            registrarDanoJogador(g);
+            acertosTie++;
+        } else {
+            g->cascoDestroier -= l->dano;
+        }
+    }
+    return acertosTie;
 }
