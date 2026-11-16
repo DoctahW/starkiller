@@ -9,6 +9,7 @@
 
 static Jogo jogo;
 static RelogioCombate relogio;
+static const Comandos parado = { 0 };
 
 /* Partida em andamento com cascos cheios e `passos` passos já jogados. */
 static void novaPartida(int passos)
@@ -24,7 +25,7 @@ static void novaPartida(int passos)
 
 static EstadoJogo simular(float dtFrame)
 {
-    return simularCombate(&jogo, &relogio, dtFrame);
+    return simularCombate(&jogo, &relogio, &parado, dtFrame);
 }
 
 int main(void)

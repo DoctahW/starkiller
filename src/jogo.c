@@ -49,20 +49,22 @@ static int verificarFim(Jogo *g)
     return 0;
 }
 
-/* Seção 3.4: atualizarNave, processarReforcos, atualizarInimigos e atualizarCombate entram antes do timer. */
-static void passoCombate(Jogo *g, RelogioCombate *r)
+/* Seção 3.4: processarReforcos, atualizarInimigos e atualizarCombate entram depois da nave. */
+static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
 {
+    atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
+
     r->passos++;
     g->tempoDecorrido = r->passos * PASSO_FIXO;
     g->tempoRestante = (PASSOS_PARTIDA - r->passos) * PASSO_FIXO;
 }
 
-EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, float dtFrame)
+EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd, float dtFrame)
 {
     r->acumulador += dtFrame < DT_MAXIMO ? dtFrame : DT_MAXIMO;
     while (r->acumulador >= PASSO_FIXO) {
         r->acumulador -= PASSO_FIXO;
-        passoCombate(g, r);
+        passoCombate(g, r, cmd);
         if (verificarFim(g))
             return EST_FIM;
     }
@@ -74,7 +76,7 @@ static EstadoJogo combate(Jogo *g, const Comandos *cmd, int controleCaiu)
     if (cmd->pausa || controleCaiu)
         return EST_PAUSA;
 
-    EstadoJogo proximo = simularCombate(g, &relogio, GetFrameTime());
+    EstadoJogo proximo = simularCombate(g, &relogio, cmd, GetFrameTime());
 
     DrawText(TextFormat("COMBATE  %3.0f s", g->tempoRestante), 20, 20, 20, RAYWHITE);
     DrawText("Esc/Start: pausa", 20, 50, 20, GRAY);
