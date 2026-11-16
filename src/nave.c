@@ -1,11 +1,17 @@
 #include "nave.h"
+#include <math.h>
+
 #include "raymath.h"
 
 #define VELOCIDADE_INICIAL VEL_MIN
 #define CASCO_JOGADOR      100.0f
 
+/* Velocidade angular atual (rad/s) em x = arfagem, y = guinada, z = rolagem. Só existe um jogador. */
+static Vector3 velAng;
+
 void iniciarJogador(Jogador *j)
 {
+    velAng = (Vector3){ 0.0f, 0.0f, 0.0f };
     j->pos = (Vector3){ 0.0f, 0.0f, 300.0f };
     j->rot = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f };
     j->frente = (Vector3){ 0.0f, 0.0f, 1.0f };
@@ -26,10 +32,22 @@ static void derivarEixos(Jogador *j)
 
 int atualizarJogador(Jogador *j, const Comandos *cmd, float dt)
 {
+    /* Suavização exponencial (independe do dt): a velocidade angular persegue o alvo do comando. */
+    Vector3 alvo = { cmd->arfagem * VEL_ARFAGEM, cmd->guinada * VEL_GUINADA, cmd->rolagem * VEL_ROLAGEM };
+    Vector3 antes = velAng;
+    float k = 1.0f - expf(-dt / TAU_GIRO);
+    Vector3 media;
+
+    velAng.x += (alvo.x - velAng.x) * k;
+    velAng.y += (alvo.y - velAng.y) * k;
+    velAng.z += (alvo.z - velAng.z) * k;
+    /* Ângulo do passo pela média das velocidades (trapézio), mais preciso que só a nova. */
+    media = Vector3Scale(Vector3Add(antes, velAng), 0.5f);
+
     /* Rotação incremental no espaço local: rot * delta gira em torno dos eixos da própria nave. */
-    Quaternion arf = QuaternionFromAxisAngle((Vector3){ -1.0f, 0.0f, 0.0f }, cmd->arfagem * VEL_ARFAGEM * dt);
-    Quaternion gui = QuaternionFromAxisAngle((Vector3){ 0.0f, -1.0f, 0.0f }, cmd->guinada * VEL_GUINADA * dt);
-    Quaternion rol = QuaternionFromAxisAngle((Vector3){ 0.0f, 0.0f, 1.0f }, cmd->rolagem * VEL_ROLAGEM * dt);
+    Quaternion arf = QuaternionFromAxisAngle((Vector3){ -1.0f, 0.0f, 0.0f }, media.x * dt);
+    Quaternion gui = QuaternionFromAxisAngle((Vector3){ 0.0f, -1.0f, 0.0f }, media.y * dt);
+    Quaternion rol = QuaternionFromAxisAngle((Vector3){ 0.0f, 0.0f, 1.0f }, media.z * dt);
     Quaternion delta = QuaternionMultiply(QuaternionMultiply(arf, gui), rol);
 
     j->rot = QuaternionNormalize(QuaternionMultiply(j->rot, delta));
