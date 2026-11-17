@@ -5,7 +5,7 @@
 
 /*
  * Destróier Estelar aproximado por esferas, centrado na origem (casco comprido ao longo de Z,
- * proa em +Z). Constante COMPARTILHADA: o render.c desenha o modelo nestas dimensões e a colisão
+ * proa em +Z). Constante COMPARTILHADA: o render.c desenhará o modelo (VIS-03) nestas dimensões e a colisão
  * da nave (colidirDestroier) usa as mesmas esferas. Não duplicar estes valores em outro lugar.
  * Valores provisórios (chutes): a VIS-03 (#57) ajusta quando o modelo final existir.
  */

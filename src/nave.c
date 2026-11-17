@@ -120,6 +120,8 @@ int colidirDestroier(Jogo *g, float dt)
 
     if (contato && recargaColisao <= 0.0f) {
         g->jogador.casco -= DANO_COLISAO_DESTROIER;
+        if (g->jogador.casco < 0.0f)
+            g->jogador.casco = 0.0f;
         registrarDanoJogador(g);
         recargaColisao = RECARGA_COLISAO;
     }
