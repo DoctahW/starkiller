@@ -54,6 +54,18 @@ float fatorCooldownIA(float tempoDecorrido)
 }
 
 /*
+ * IA-03: estado do X-Wing derivado do tempo da partida e do id (sem campo novo no Inimigo).
+ * Cada caça troca de alvo a cada 8–12 s; o deslocamento por id evita que todos troquem juntos.
+ */
+static EstadoIA estadoDoXWing(const Inimigo *in, const Jogo *g)
+{
+    float metade = TROCA_XWING_MIN + (float)(in->id % TROCA_XWING_VARIACAO);
+    float fase = fmodf(g->tempoDecorrido + (float)(in->id % 7), 2.0f * metade);
+
+    return fase < metade ? IA_ATACAR_DESTROIER : IA_ATACAR_JOGADOR;
+}
+
+/*
  * Alvo do estado atual, na convenção da seção 3.5: o Destróier fica fixo na origem
  * (tabela 2.2) e o jogador é o ponto perseguido ou a referência para fugir.
  */
@@ -116,8 +128,45 @@ static void desviarCasco(Inimigo *in)
     }
 }
 
-/* IA-02: 8 de dano/s no casco do Destróier enquanto o Y-Wing estiver no alcance. */
-static void bombardearDestroier(Inimigo *in, Jogo *g, float dt)
+/*
+ * IA-03: X-Wing e A-Wing atiram quando o alvo está a menos de ALCANCE_TIRO_INIMIGO e dentro
+ * do cone de 15° à frente, respeitando `cooldownTiro` (base × fator de dificuldade da IA-05).
+ * O alvo é o do estado atual; fugir não atira.
+ */
+static void atirarSeNoCone(Inimigo *in, Jogo *g, float dt)
+{
+    Vector3 alvo, rumo;
+    float dist, cosseno;
+
+    if (in->cooldownTiro > 0.0f) {
+        in->cooldownTiro -= dt;
+        if (in->cooldownTiro < 0.0f)
+            in->cooldownTiro = 0.0f;
+    }
+    if (in->tipo == YWING || in->estadoIA == IA_FUGIR)
+        return;
+    if (in->cooldownTiro > 0.0f || Vector3LengthSqr(in->vel) < 1e-6f)
+        return;
+
+    if (in->estadoIA == IA_ATACAR_JOGADOR)
+        alvo = g->jogador.pos;
+    else
+        alvo = (Vector3){ 0.0f, 0.0f, 0.0f };
+
+    rumo = Vector3Subtract(alvo, in->pos);
+    dist = Vector3Length(rumo);
+    if (dist > ALCANCE_TIRO_INIMIGO || dist < 1e-6f)
+        return;
+
+    cosseno = Vector3DotProduct(Vector3Normalize(in->vel), Vector3Scale(rumo, 1.0f / dist));
+    if (cosseno < COSSENO_CONE_TIRO)
+        return;
+
+    if (dispararLaserInimigo(g, in))
+        in->cooldownTiro = COOLDOWN_TIRO_INIMIGO * fatorCooldownIA(g->tempoDecorrido);
+}
+
+/* IA-02: 8 de dano/s no casco do Destróier enquanto o Y-Wing estiver no alcance. */static void bombardearDestroier(Inimigo *in, Jogo *g, float dt)
 {
     if (in->tipo != YWING || in->estadoIA != IA_ATACAR_DESTROIER)
         return;
@@ -131,13 +180,20 @@ static void bombardearDestroier(Inimigo *in, Jogo *g, float dt)
 
 void ia_atualizar(Inimigo *in, Jogo *g, float dt)
 {
-    Vector3 alvo = in->tipo == YWING && in->estadoIA == IA_ATACAR_DESTROIER
-                       ? alvoOrbita(in)
-                       : alvoDoEstado(in, g);
-    Vector3 rumo = Vector3Subtract(alvo, in->pos);
-    float dist = Vector3Length(rumo);
+    Vector3 alvo;
+    Vector3 rumo;
+    float dist;
     float fatorVel = fatorVelocidadeIA(g->tempoDecorrido);
     Vector3 desejada = { 0.0f, 0.0f, 0.0f };
+
+    if (in->tipo == XWING && in->estadoIA != IA_FUGIR)
+        in->estadoIA = estadoDoXWing(in, g);
+
+    alvo = in->tipo == YWING && in->estadoIA == IA_ATACAR_DESTROIER
+               ? alvoOrbita(in)
+               : alvoDoEstado(in, g);
+    rumo = Vector3Subtract(alvo, in->pos);
+    dist = Vector3Length(rumo);
 
     if (dist > DIST_MINIMA)
         desejada = Vector3Scale(rumo, velocidadeMaxima(in->tipo) * fatorVel / dist);
@@ -146,5 +202,6 @@ void ia_atualizar(Inimigo *in, Jogo *g, float dt)
     in->vel = Vector3MoveTowards(in->vel, desejada, ACELERACAO_IA * fatorVel * fatorVel * dt);
     in->pos = Vector3Add(in->pos, Vector3Scale(in->vel, dt));
     desviarCasco(in);
+    atirarSeNoCone(in, g, dt);
     bombardearDestroier(in, g, dt);
 }
