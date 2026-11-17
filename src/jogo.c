@@ -54,9 +54,18 @@ static int verificarFim(Jogo *g)
     return 0;
 }
 
+/* Trava a mira no caça mais próximo; a lista fica em ordem de distância. */
+static void mirarMaisProximo(Jogo *g)
+{
+    ordenarPorDistancia(&g->inimigos);
+    g->inimigos.alvo = g->inimigos.inicio;
+}
+
 /* Seção 3.4, passos 2 a 5: nave → reforços → inimigos → combate. */
 static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
 {
+    int tinhaAlvo, idAlvo;
+
     avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
     colidirDestroier(g, PASSO_FIXO);
 
@@ -73,22 +82,31 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
     if (cmd->disparar)
         dispararLaser(g);
     atualizarLasers(g, PASSO_FIXO);
+    tinhaAlvo = g->inimigos.alvo != NULL;
+    idAlvo = tinhaAlvo ? g->inimigos.alvo->dado.id : 0;
     resolverLasers(g, PASSO_FIXO);
+    /* Alvo abatido: removerInimigo passa a mira ao vizinho da lista; o mais próximo é mais útil. */
+    if (tinhaAlvo && (g->inimigos.alvo == NULL || g->inimigos.alvo->dado.id != idAlvo))
+        mirarMaisProximo(g);
     colidirLasersInimigos(g, PASSO_FIXO);
     atualizarExplosoes(g, PASSO_FIXO);
 }
 
-/* Seção 3.4, passo 1: ações de borda valem uma vez por frame, mesmo em frames sem passo ou com vários. */
+/*
+ * Seção 3.4, passo 1: ações de borda valem uma vez por frame, mesmo em frames sem passo ou com vários.
+ * Próximo e anterior andam na lista em ordem de distância: do alvo atual para o seguinte mais longe
+ * ou mais perto, nunca para um caça qualquer do outro lado da arena.
+ */
 static void tratarMira(Jogo *g, const Comandos *cmd)
 {
+    if (cmd->proximoAlvo || cmd->alvoAnterior)
+        ordenarPorDistancia(&g->inimigos);
     if (cmd->proximoAlvo)
         proximoAlvo(&g->inimigos);
     if (cmd->alvoAnterior)
         alvoAnterior(&g->inimigos);
-    if (cmd->alvoMaisProximo) {
-        ordenarPorDistancia(&g->inimigos);
-        g->inimigos.alvo = g->inimigos.inicio;
-    }
+    if (cmd->alvoMaisProximo)
+        mirarMaisProximo(g);
 }
 
 EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd, float dtFrame)

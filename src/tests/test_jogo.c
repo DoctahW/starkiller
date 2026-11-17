@@ -165,6 +165,56 @@ static void testarReforcosNoLoop(void)
     liberarFila(&jogo.reforcos);
 }
 
+/*
+ * Trocar de alvo anda na ordem de distância (anterior = o seguinte mais perto), e abater o alvo
+ * trava a mira no caça mais próximo, não no vizinho de lista que removerInimigo escolheria.
+ */
+static void testarMiraPorDistancia(void)
+{
+    Comandos cmd = { 0 };
+    int idPerto, idMedio;
+
+    novaPartida(0);
+    adicionarInimigo((Vector3){ 0.0f, 0.0f, 1620.0f }, 250.0f);   /* longe: vira o alvo, entrou primeiro */
+    idPerto = jogo.proximoId;
+    adicionarInimigo((Vector3){ 0.0f, 0.0f, 1420.0f }, 50.0f);
+    idMedio = jogo.proximoId;
+    adicionarInimigo((Vector3){ 0.0f, 0.0f, 1520.0f }, 150.0f);
+
+    cmd.alvoAnterior = 1;
+    simularCom(&cmd, 0.0f);
+    VERIFICA(jogo.inimigos.alvo->dado.id == idMedio);
+    simularCom(&cmd, 0.0f);
+    VERIFICA(jogo.inimigos.alvo->dado.id == idPerto);
+    cmd.alvoAnterior = 0;
+    cmd.proximoAlvo = 1;
+    simularCom(&cmd, 0.0f);
+    VERIFICA(jogo.inimigos.alvo->dado.id == idMedio);
+
+    /* Abate do alvo: a lista o trocaria pelo próximo inserido (longe); a mira vai para o mais próximo. */
+    {
+        Comandos atirando = { .disparar = 1 };
+        Vector3 frente = Vector3Add(jogo.jogador.pos, Vector3Scale(jogo.jogador.frente, 690.0f));
+        int idAbatido, idLonge, idProximo;
+
+        novaPartida(0);
+        idAbatido = jogo.proximoId;
+        adicionarInimigo(frente, 690.0f);
+        idLonge = jogo.proximoId;
+        adicionarInimigo((Vector3){ 3000.0f, 0.0f, 1370.0f }, 3000.0f);
+        idProximo = jogo.proximoId;
+        adicionarInimigo((Vector3){ -1500.0f, 0.0f, 1370.0f }, 1500.0f);
+        VERIFICA(jogo.inimigos.alvo->dado.id == idAbatido);
+
+        for (int i = 0; i < 200 && jogo.inimigos.tamanho == 3; i++)
+            simularCombate(&jogo, &relogio, &atirando, PASSO_FIXO);
+        VERIFICA(jogo.inimigos.tamanho == 2);
+        VERIFICA(jogo.inimigos.alvo != NULL && jogo.inimigos.alvo->dado.id == idProximo);
+        VERIFICA(jogo.inimigos.alvo->dado.id != idLonge);
+    }
+    liberarListaInimigos(&jogo.inimigos);
+}
+
 int main(void)
 {
     /* roda só os passos inteiros que cabem e guarda a sobra para o próximo frame */
@@ -263,6 +313,7 @@ int main(void)
     }
 
     testarComandosDeCombate();
+    testarMiraPorDistancia();
     testarReforcosNoLoop();
 
     return RESULTADO_TESTES();
