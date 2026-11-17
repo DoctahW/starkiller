@@ -3,6 +3,7 @@
 
 #include "inimigos.h"
 #include "nave.h"
+#include "raymath.h"
 #include "teste.h"
 
 #define EPS 1e-5f
@@ -670,21 +671,24 @@ static void testarAtualizarListaVazia(void){
     VERIFICA(jogo.inimigos.tamanho == 0);
 }
 
-static void testarDespawnForaDaArena(void){
+//quem passa da borda volta pra ela, sem a velocidade pra fora; nao sai da lista nem conta abate
+static void testarBordaDaArena(void){
     int i, ativas = 0;
+    NoInimigo *fora;
 
     memset(&jogo, 0, sizeof(jogo));
     porNaFrente(&jogo.inimigos, 1, 500.0f);
     porNaFrente(&jogo.inimigos, 2, RAIO_ARENA + 500.0f);
     porNaFrente(&jogo.inimigos, 3, 600.0f);
+    fora = buscarPorId(&jogo.inimigos, 2);
+    fora->dado.vel = (Vector3){0.0f, 0.0f, 500.0f};
 
     atualizarInimigos(&jogo, 1.0f / 60.0f);
 
-    conferirLista(&jogo.inimigos, 2);
-    VERIFICA(jogo.inimigos.inicio->dado.id == 1);
-    VERIFICA(jogo.inimigos.fim->dado.id == 3);
-    VERIFICA(jogo.inimigos.inicio->prox == jogo.inimigos.fim);
-
+    conferirLista(&jogo.inimigos, 3);
+    VERIFICA(buscarPorId(&jogo.inimigos, 2) == fora);
+    VERIFICA(fabsf(fora->dado.pos.z - RAIO_ARENA) < 1e-2f);
+    VERIFICA(fora->dado.vel.z <= EPS);
 
     VERIFICA(jogo.abates == 0);
     for(i = 0; i < MAX_EXPLOSOES; i++)
@@ -694,35 +698,42 @@ static void testarDespawnForaDaArena(void){
     liberarListaInimigos(&jogo.inimigos);
 }
 
-static void testarDespawnDeVariosSeguidos(void){
+//varios passos voando pra fora: nunca passa da borda
+static void testarBordaEmVariosPassos(void){
+    int i, dentro = 1;
+    NoInimigo *no;
+
     memset(&jogo, 0, sizeof(jogo));
-    porNaFrente(&jogo.inimigos, 1, 500.0f);
-    porNaFrente(&jogo.inimigos, 2, RAIO_ARENA + 100.0f);
-    porNaFrente(&jogo.inimigos, 3, RAIO_ARENA + 200.0f);
-    porNaFrente(&jogo.inimigos, 4, 600.0f);
+    porNaFrente(&jogo.inimigos, 1, RAIO_ARENA - 10.0f);
+    no = jogo.inimigos.inicio;
+    no->dado.vel = (Vector3){0.0f, 0.0f, 300.0f};
 
-    atualizarInimigos(&jogo, 1.0f / 60.0f);
+    for(i = 0; i < 60; i++){
+        atualizarInimigos(&jogo, 1.0f / 60.0f);
+        dentro &= Vector3Length(no->dado.pos) <= RAIO_ARENA + 1e-2f;
+    }
 
-    conferirLista(&jogo.inimigos, 2);
-    VERIFICA(jogo.inimigos.inicio->dado.id == 1);
-    VERIFICA(jogo.inimigos.fim->dado.id == 4);
+    VERIFICA(dentro);
+    VERIFICA(jogo.inimigos.tamanho == 1);
 
     liberarListaInimigos(&jogo.inimigos);
 }
 
-static void testarAlvoDespawnado(void){
+//o alvo da mira na borda continua o mesmo no
+static void testarAlvoNaBorda(void){
+    NoInimigo *alvo;
+
     memset(&jogo, 0, sizeof(jogo));
     porNaFrente(&jogo.inimigos, 1, 500.0f);
     porNaFrente(&jogo.inimigos, 2, 600.0f);
     porNaFrente(&jogo.inimigos, 3, RAIO_ARENA + 500.0f);
-    jogo.inimigos.alvo = buscarPorId(&jogo.inimigos, 3);
+    alvo = jogo.inimigos.alvo = buscarPorId(&jogo.inimigos, 3);
 
     atualizarInimigos(&jogo, 1.0f / 60.0f);
 
-    conferirLista(&jogo.inimigos, 2);
-    VERIFICA(jogo.inimigos.alvo != NULL);
-    VERIFICA(jogo.inimigos.alvo->dado.id == 2);
-    VERIFICA(jogo.inimigos.alvo == jogo.inimigos.fim);
+    conferirLista(&jogo.inimigos, 3);
+    VERIFICA(jogo.inimigos.alvo == alvo);
+    VERIFICA(jogo.inimigos.alvo->dado.id == 3);
 
     liberarListaInimigos(&jogo.inimigos);
 }
@@ -793,9 +804,9 @@ int main(void){
 
     testarAtualizarRecalculaDistancia();
     testarAtualizarListaVazia();
-    testarDespawnForaDaArena();
-    testarDespawnDeVariosSeguidos();
-    testarAlvoDespawnado();
+    testarBordaDaArena();
+    testarBordaEmVariosPassos();
+    testarAlvoNaBorda();
     testarArenaNaoEADistanciaDoJogador();
     testarAtualizarMovePelaIA();
 
