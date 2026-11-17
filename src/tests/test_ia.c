@@ -11,16 +11,6 @@
 #define DT (1.0f / 60.0f)
 #define QUASE(a, b) (fabsf((a) - (b)) < 1e-4f)
 
-static float comprimento(Vector3 v)
-{
-    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
-}
-
-static float distancia(Vector3 a, Vector3 b)
-{
-    return comprimento((Vector3){ a.x - b.x, a.y - b.y, a.z - b.z });
-}
-
 static Inimigo novoInimigo(TipoNave tipo, Vector3 pos, EstadoIA estado)
 {
     Inimigo in = criarInimigo(tipo, pos, 1);
@@ -40,21 +30,21 @@ static void testarAproximaDoDestroier(void)
 {
     Jogo g = { 0 };
     Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 1000.0f }, IA_ATACAR_DESTROIER);
-    float antes = comprimento(in.pos);
+    float antes = Vector3Length(in.pos);
 
     iniciarJogador(&g.jogador);
 
     ia_atualizar(&in, &g, DT);
-    VERIFICA(comprimento(in.vel) > 0.0f);
-    VERIFICA(comprimento(in.vel) < VEL_XWING);   /* um passo não chega na velocidade máxima */
+    VERIFICA(Vector3Length(in.vel) > 0.0f);
+    VERIFICA(Vector3Length(in.vel) < VEL_XWING);   /* um passo não chega na velocidade máxima */
     VERIFICA(in.vel.z < 0.0f);                    /* Destróier na origem: -z */
-    VERIFICA(comprimento(in.pos) < antes);
+    VERIFICA(Vector3Length(in.pos) < antes);
 
     simular(&in, &g, 300);
-    VERIFICA(comprimento(in.vel) <= VEL_XWING + 1e-3f);
-    VERIFICA(comprimento(in.vel) > 0.99f * VEL_XWING);
+    VERIFICA(Vector3Length(in.vel) <= VEL_XWING + 1e-3f);
+    VERIFICA(Vector3Length(in.vel) > 0.99f * VEL_XWING);
     VERIFICA(in.vel.z < -0.99f * VEL_XWING);
-    VERIFICA(comprimento(in.pos) < antes);
+    VERIFICA(Vector3Length(in.pos) < antes);
 }
 
 /* Tabela 2.2: cada tipo respeita a própria velocidade máxima. */
@@ -73,8 +63,8 @@ static void testarVelocidadeMaximaPorTipo(void)
         Inimigo in = novoInimigo(casos[i].tipo, (Vector3){ 0.0f, 0.0f, 1500.0f }, IA_ATACAR_DESTROIER);
 
         simular(&in, &g, 300);
-        VERIFICA(comprimento(in.vel) <= casos[i].velMax + 1e-3f);
-        VERIFICA(comprimento(in.vel) > 0.99f * casos[i].velMax);
+        VERIFICA(Vector3Length(in.vel) <= casos[i].velMax + 1e-3f);
+        VERIFICA(Vector3Length(in.vel) > 0.99f * casos[i].velMax);
     }
 }
 
@@ -87,9 +77,9 @@ static void testarPersegueJogador(void)
 
     iniciarJogador(&g.jogador);   /* jogador em (0, 0, 300) */
 
-    antes = distancia(in.pos, g.jogador.pos);
+    antes = Vector3Distance(in.pos, g.jogador.pos);
     simular(&in, &g, 120);
-    VERIFICA(distancia(in.pos, g.jogador.pos) < antes);
+    VERIFICA(Vector3Distance(in.pos, g.jogador.pos) < antes);
     VERIFICA(in.vel.z > 0.0f);
 }
 
@@ -102,9 +92,9 @@ static void testarFogeDoJogador(void)
 
     iniciarJogador(&g.jogador);
 
-    antes = distancia(in.pos, g.jogador.pos);
+    antes = Vector3Distance(in.pos, g.jogador.pos);
     simular(&in, &g, 120);
-    VERIFICA(distancia(in.pos, g.jogador.pos) > antes);
+    VERIFICA(Vector3Distance(in.pos, g.jogador.pos) > antes);
     VERIFICA(in.pos.z > 400.0f);
 }
 
@@ -119,8 +109,8 @@ static void testarAlvoNaMesmaPosicao(void)
     simular(&in, &g, 10);
     VERIFICA(isfinite(in.vel.x) && isfinite(in.vel.y) && isfinite(in.vel.z));
     VERIFICA(isfinite(in.pos.x) && isfinite(in.pos.y) && isfinite(in.pos.z));
-    VERIFICA(QUASE(comprimento(in.vel), 0.0f));
-    VERIFICA(QUASE(comprimento(in.pos), 0.0f));
+    VERIFICA(QUASE(Vector3Length(in.vel), 0.0f));
+    VERIFICA(QUASE(Vector3Length(in.pos), 0.0f));
 }
 
 /* Seção 3.4, passo 4: atualizarInimigos delega o movimento à IA. */
@@ -139,10 +129,10 @@ static void testarAtualizarInimigosMove(void)
     VERIFICA(g.inimigos.inicio != NULL);
     VERIFICA(g.inimigos.tamanho == 1);
     VERIFICA(g.inimigos.inicio->dado.pos.z < antes.z);
-    VERIFICA(comprimento(g.inimigos.inicio->dado.vel) > 0.0f);
-    VERIFICA(comprimento(g.inimigos.inicio->dado.vel) <= VEL_XWING);
+    VERIFICA(Vector3Length(g.inimigos.inicio->dado.vel) > 0.0f);
+    VERIFICA(Vector3Length(g.inimigos.inicio->dado.vel) <= VEL_XWING);
     /* a distância do passo é medida antes do movimento, como na seção 3.4 */
-    VERIFICA(QUASE(g.inimigos.inicio->dado.distancia, distancia(antes, g.jogador.pos)));
+    VERIFICA(QUASE(g.inimigos.inicio->dado.distancia, Vector3Distance(antes, g.jogador.pos)));
 
     liberarListaInimigos(&g.inimigos);
 }

@@ -87,8 +87,9 @@ static void testarComandosDeCombate(void)
     cmd.alvoMaisProximo = 1;
     simularCom(&cmd, 0.0f);
     VERIFICA(jogo.inimigos.alvo == jogo.inimigos.inicio);
-    VERIFICA(jogo.inimigos.inicio->dado.distancia < jogo.inimigos.fim->dado.distancia);
-    VERIFICA(jogo.inimigos.fim->dado.distancia > 200.0f);
+    /* 6 passos desde o spawn: jogador a 40 u/s e caças a 0,7 de deslocamento em -z */
+    VERIFICA(QUASE(jogo.inimigos.inicio->dado.distancia, 45.5f));
+    VERIFICA(QUASE(jogo.inimigos.fim->dado.distancia, 245.5f));
 
     /* disparar segurado: dispara só nos passos, respeitando o cooldown de 9 passos */
     novaPartida(0);
