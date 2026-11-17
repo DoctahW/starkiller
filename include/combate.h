@@ -58,9 +58,9 @@ int aplicarDano(Inimigo *in, float dano);
  */
 int resolverLasers(Jogo *g, float dt);
 
-/* Laser inimigo (vermelho): mais lento que o do jogador, vida para cruzar a arena (chutes; ajustar no teste de jogo). */
-#define VEL_LASER_INIMIGO   400.0f   /* u/s */
-#define VIDA_LASER_INIMIGO  5.0f     /* s: 400 u/s * 5 s = 2000 u, o raio da arena */
+/* Laser inimigo (vermelho): mesma escala do mundo (×4,6); 5 s cobrem a arena de 9000 u. */
+#define VEL_LASER_INIMIGO   1840.0f  /* u/s */
+#define VIDA_LASER_INIMIGO  5.0f
 #define DANO_LASER_INIMIGO  8.0f     /* tirado do casco do TIE ou de cascoDestroier */
 
 /*
@@ -71,10 +71,11 @@ int resolverLasers(Jogo *g, float dt);
  */
 int dispararLaserInimigo(Jogo *g, const Inimigo *in);
 /*
- * Colisão dos lasers inimigos × TIE (esfera RAIO_JOGADOR) e × Destróier (ESFERAS_DESTROIER). Roda logo
- * depois de atualizarLasers, com o mesmo segmento (pos - vel * dt → pos). Cada laser atinge só o
- * primeiro alvo que atravessa e é desativado. No TIE: casco -= dano e registrarDanoJogador. No Destróier:
- * cascoDestroier -= dano. Devolve quantos acertos no TIE houve neste passo (quem chama vibra o controle).
+ * Colisão dos lasers inimigos × TIE (esfera RAIO_JOGADOR) e × Destróier (casco de destroier.h,
+ * amostrando o segmento). Roda logo depois de atualizarLasers, com o mesmo segmento
+ * (pos - vel * dt → pos). Cada laser atinge só o primeiro alvo que atravessa e é desativado.
+ * No TIE: casco -= dano e registrarDanoJogador. No Destróier: cascoDestroier -= dano.
+ * Devolve quantos acertos no TIE houve neste passo (quem chama vibra o controle).
  */
 int colidirLasersInimigos(Jogo *g, float dt);
 

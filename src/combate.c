@@ -277,41 +277,66 @@ int dispararLaserInimigo(Jogo *g, const Inimigo *in)
     return 1;
 }
 
+/* Passo de amostragem do segmento no casco: menor que meia célula (8 u), nada é pulado. */
+#define PASSO_CASCO 4.0f
+
+/* Fração [0, 1] onde o segmento entra no casco; 0 se já começa dentro. Devolve 0 se não entra. */
+static int segmentoEntraNoCasco(Vector3 a, Vector3 b, float *t)
+{
+    Vector3 d = Vector3Subtract(b, a);
+    float comprimento = Vector3Length(d);
+    int passos, i;
+
+    if (tocaDestroier(a, 0.0f)) {
+        *t = 0.0f;
+        return 1;
+    }
+    if (comprimento < 1e-6f)
+        return 0;
+    passos = (int)ceilf(comprimento / PASSO_CASCO);
+
+    for (i = 1; i <= passos; i++) {
+        float f = (float)i / (float)passos;
+
+        if (tocaDestroier(Vector3Add(a, Vector3Scale(d, f)), 0.0f)) {
+            *t = f;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int colidirLasersInimigos(Jogo *g, float dt)
 {
-    int i, k, acertosTie = 0;
+    int i, acertosTie = 0;
 
     for (i = 0; i < MAX_LASERS; i++) {
         Laser *l = &g->lasers[i];
         Vector3 anterior;
-        float t, melhor = 2.0f;
-        int noTie = 0;
+        float tTie = 2.0f, tCasco = 2.0f, t;
 
         if (!l->ativo || l->doJogador)
             continue;
 
         anterior = Vector3Subtract(l->pos, Vector3Scale(l->vel, dt));
-        if (segmentoAcertaEsfera(anterior, l->pos, g->jogador.pos, RAIO_JOGADOR, &t)) {
-            melhor = t;
-            noTie = 1;
-        }
-        for (k = 0; k < NUM_ESFERAS_DESTROIER; k++) {
-            if (segmentoAcertaEsfera(anterior, l->pos, ESFERAS_DESTROIER[k].centro, ESFERAS_DESTROIER[k].raio, &t)
-                && t < melhor) {
-                melhor = t;
-                noTie = 0;
-            }
-        }
-        if (melhor > 1.0f)
+        if (segmentoAcertaEsfera(anterior, l->pos, g->jogador.pos, RAIO_JOGADOR, &t))
+            tTie = t;
+        if (segmentoEntraNoCasco(anterior, l->pos, &t))
+            tCasco = t;
+        if (tTie > 1.0f && tCasco > 1.0f)
             continue;
 
         l->ativo = 0;
-        if (noTie) {
+        if (tTie <= tCasco) {
             g->jogador.casco -= l->dano;
+            if (g->jogador.casco < 0.0f)
+                g->jogador.casco = 0.0f;
             registrarDanoJogador(g);
             acertosTie++;
         } else {
             g->cascoDestroier -= l->dano;
+            if (g->cascoDestroier < 0.0f)
+                g->cascoDestroier = 0.0f;
         }
     }
     return acertosTie;
