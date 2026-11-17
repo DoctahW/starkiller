@@ -5,14 +5,15 @@
 #include "raymath.h"
 
 /* Aceleração com que o rumo é corrigido: sem virar no mesmo frame, como pede a IA-01. */
-#define ACELERACAO_IA 120.0f
+#define ACELERACAO_IA 550.0f
 #define DIST_MINIMA   1e-4f
 
-/* IA-02: o Y-Wing bombardeia a menos de 150 do Destróier e orbita a ~120. */
-#define ALCANCE_BOMBA_YWING 150.0f
+/* IA-02: o Y-Wing bombardeia a menos de 685 do Destróier e orbita a ~550. */
+#define ALCANCE_BOMBA_YWING 685.0f
 #define DANO_BOMBA_YWING    8.0f
-#define RAIO_ORBITA_YWING   120.0f
-#define AVANCO_ORBITA       40.0f
+#define RAIO_ORBITA_YWING   550.0f
+#define AVANCO_ORBITA       185.0f
+#define FOLGA_ORBITA        90.0f   /* além do anel por mais que isto, volta direto para ele */
 
 static float velocidadeMaxima(TipoNave tipo)
 {
@@ -58,7 +59,7 @@ static Vector3 alvoOrbita(const Inimigo *in)
         return (Vector3){ RAIO_ORBITA_YWING, 0.0f, 0.0f };
 
     raio = Vector3Scale(raio, 1.0f / dist);
-    if (dist > RAIO_ORBITA_YWING + 20.0f)
+    if (dist > RAIO_ORBITA_YWING + FOLGA_ORBITA)
         return Vector3Scale(raio, RAIO_ORBITA_YWING);
 
     eixo = fabsf(raio.y) > 0.9f ? (Vector3){ 1.0f, 0.0f, 0.0f } : (Vector3){ 0.0f, 1.0f, 0.0f };

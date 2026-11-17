@@ -8,8 +8,8 @@
 #define PRIMEIRA_ONDA    3.0f
 #define INTERVALO_ONDAS  20.0f
 
-/* Os reforços nascem numa esfera de raio 1800, dentro da arena (RAIO_ARENA = 2000). */
-#define RAIO_REFORCO     1800.0f
+/* Os reforços nascem numa esfera de raio 8200, dentro da arena (RAIO_ARENA = 9000). */
+#define RAIO_REFORCO     8200.0f
 #define ESPACO_FORMACAO  30.0f
 #define COLUNAS_FORMACAO 3
 

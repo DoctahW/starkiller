@@ -4,7 +4,7 @@
 #include "tipos.h"
 
 #define COOLDOWN_LASER   0.15f   /* s entre disparos do jogador */
-#define VEL_LASER        600.0f  /* u/s */
+#define VEL_LASER        2750.0f /* u/s */
 #define VIDA_LASER       2.0f    /* s até o laser desativar */
 #define TOLERANCIA_COOLDOWN 1e-6f /* s; absorve o erro de float de 9 passos de 1/60 s */
 #define DANO_LASER       10.0f

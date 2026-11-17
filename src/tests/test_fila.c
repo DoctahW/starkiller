@@ -180,7 +180,7 @@ static float distancia(Vector3 a, Vector3 b)
 
 /*
  * REF-04: processarReforcos desenfileira o que já venceu e faz o grupo nascer junto,
- * na borda (~1800) e em formação. A distância ao jogador já sai preenchida.
+ * na borda (~8200) e em formação. A distância ao jogador já sai preenchida.
  */
 static void testarProcessarReforcos(void)
 {
@@ -220,9 +220,9 @@ static void testarProcessarReforcos(void)
 
     /* todos na borda, perto uns dos outros (formação) e com a distância ao jogador certa */
     primeiro = &jogo.inimigos.inicio->dado.pos;
-    VERIFICA(comprimento(*primeiro) > 1700.0f && comprimento(*primeiro) < 1900.0f);
+    VERIFICA(comprimento(*primeiro) > 8100.0f && comprimento(*primeiro) < 8300.0f);
     for (const NoInimigo *no = jogo.inimigos.inicio; no != NULL; no = no->prox) {
-        VERIFICA(comprimento(no->dado.pos) > 1700.0f && comprimento(no->dado.pos) < 1900.0f);
+        VERIFICA(comprimento(no->dado.pos) > 8100.0f && comprimento(no->dado.pos) < 8300.0f);
         VERIFICA(distancia(no->dado.pos, *primeiro) <= 100.0f);
         VERIFICA(fabsf(no->dado.distancia - distancia(no->dado.pos, jogo.jogador.pos)) < 0.001f);
     }

@@ -17,7 +17,7 @@ void iniciarJogador(Jogador *j)
 {
     velAng = (Vector3){ 0.0f, 0.0f, 0.0f };
     recargaColisao = 0.0f;
-    j->pos = (Vector3){ 0.0f, 0.0f, 300.0f };
+    j->pos = (Vector3){ 0.0f, 0.0f, 1370.0f };   /* ~550 à frente da proa */
     j->rot = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f };
     j->frente = (Vector3){ 0.0f, 0.0f, 1.0f };
     j->cima = (Vector3){ 0.0f, 1.0f, 0.0f };
