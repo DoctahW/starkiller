@@ -11,6 +11,11 @@
 #define DT (1.0f / 60.0f)
 #define QUASE(a, b) (fabsf((a) - (b)) < 1e-4f)
 
+/* Valores da tabela 2.2 e do criterio da IA-02. */
+#define BOMBA_DANO    8.0f
+#define BOMBA_ALCANCE 150.0f
+#define ORBITA_RAIO   120.0f
+
 static Inimigo novoInimigo(TipoNave tipo, Vector3 pos, EstadoIA estado)
 {
     Inimigo in = criarInimigo(tipo, pos, 1);
@@ -137,6 +142,53 @@ static void testarAtualizarInimigosMove(void)
     liberarListaInimigos(&g.inimigos);
 }
 
+/* IA-02: a menos de 150 do Destróier, o Y-Wing causa 8 de dano/s no casco. */
+static void testarYwingBombardeia(void)
+{
+    Jogo g = { 0 };
+    Inimigo in = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, 100.0f }, IA_ATACAR_DESTROIER);
+
+    iniciarJogador(&g.jogador);
+    g.cascoDestroier = 2000.0f;
+
+    ia_atualizar(&in, &g, DT);
+    VERIFICA(QUASE(g.cascoDestroier, 2000.0f - BOMBA_DANO * DT));
+
+    simular(&in, &g, 59);
+    /* 1 s de bombardeio; a tolerância cobre o arredondamento do float a cada passo */
+    VERIFICA(fabsf(g.cascoDestroier - (2000.0f - BOMBA_DANO)) < 0.01f);
+}
+
+/* IA-02: fora do alcance não há dano; o Y-Wing orbita em volta do Destróier. */
+static void testarYwingForaDeAlcance(void)
+{
+    Jogo g = { 0 };
+    Inimigo longe = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, 400.0f }, IA_ATACAR_DESTROIER);
+    Inimigo orbita = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, ORBITA_RAIO }, IA_ATACAR_DESTROIER);
+    float antes = Vector3Length(orbita.pos);
+
+    iniciarJogador(&g.jogador);
+    g.cascoDestroier = 2000.0f;
+
+    ia_atualizar(&longe, &g, DT);
+    VERIFICA(g.cascoDestroier == 2000.0f);
+    VERIFICA(Vector3Length(longe.pos) < 400.0f);
+
+    simular(&longe, &g, 600);
+    VERIFICA(Vector3Length(longe.pos) > ORBITA_RAIO - 40.0f);
+    VERIFICA(Vector3Length(longe.pos) < BOMBA_ALCANCE + 10.0f);
+    VERIFICA(g.cascoDestroier < 2000.0f);
+
+    simular(&orbita, &g, 600);
+    /* fica no anel e continua bombardeando */
+    VERIFICA(Vector3Length(orbita.pos) > 80.0f);
+    VERIFICA(Vector3Length(orbita.pos) < BOMBA_ALCANCE + 10.0f);
+    VERIFICA(Vector3Length(orbita.pos) > antes - 60.0f);
+    VERIFICA(fabsf(Vector3DotProduct(Vector3Normalize(orbita.pos), orbita.vel)) < 10.0f);
+    VERIFICA(Vector3Length(orbita.vel) > 20.0f);
+    VERIFICA(g.cascoDestroier < 2000.0f - BOMBA_DANO);
+}
+
 int main(void)
 {
     testarAproximaDoDestroier();
@@ -145,6 +197,8 @@ int main(void)
     testarFogeDoJogador();
     testarAlvoNaMesmaPosicao();
     testarAtualizarInimigosMove();
+    testarYwingBombardeia();
+    testarYwingForaDeAlcance();
 
     return RESULTADO_TESTES();
 }
