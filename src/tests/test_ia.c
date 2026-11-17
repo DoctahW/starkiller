@@ -116,7 +116,7 @@ static void testarAlvoNaMesmaPosicao(void)
     Inimigo noJogador;
 
     iniciarJogador(&g.jogador);
-    noJogador = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 5000.0f }, IA_ATACAR_JOGADOR);
+    noJogador = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 5000.0f }, IA_ATACAR_JOGADOR);
     g.jogador.pos = noJogador.pos;
 
     simular(&naOrigem, &g, 10);
@@ -319,6 +319,120 @@ static void testarAceleracaoAcompanhaFator(void)
     VERIFICA(fabsf(Vector3Length(fim.vel) / Vector3Length(inicio.vel) - 1.69f) < 0.05f);
 }
 
+/* Zera o jogo e põe o jogador na posição padrão da escala nova (fora do casco). */
+static void iniciarJogoVazio(Jogo *g)
+{
+    memset(g, 0, sizeof *g);
+    iniciarJogador(&g->jogador);
+    g->jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
+}
+
+static int lasersAtivos(const Jogo *g)
+{
+    int i, n = 0;
+
+    for (i = 0; i < MAX_LASERS; i++)
+        n += g->lasers[i].ativo != 0;
+    return n;
+}
+
+/* IA-03: o X-Wing troca de alvo a cada 8–12 s, com o intervalo variando pelo id. */
+static void testarAlternanciaXWing(void)
+{
+    Jogo g;
+    Inimigo in;
+    EstadoIA estado;
+    float ultimaTroca = 0.0f;
+    int trocas = 0;
+    int i;
+
+    iniciarJogoVazio(&g);
+    in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 6000.0f }, IA_ATACAR_DESTROIER);
+    in.id = 1;   /* 9 s por estado */
+    estado = in.estadoIA;
+
+    for (i = 1; i <= 60 * 60; i++) {
+        g.tempoDecorrido = i * DT;
+        ia_atualizar(&in, &g, DT);
+        if (in.estadoIA != estado) {
+            float intervalo = g.tempoDecorrido - ultimaTroca;
+
+            VERIFICA(intervalo >= TROCA_XWING_MIN - DT);
+            VERIFICA(intervalo <= TROCA_XWING_MIN + TROCA_XWING_VARIACAO - 1 + DT);
+            ultimaTroca = g.tempoDecorrido;
+            estado = in.estadoIA;
+            trocas++;
+        }
+    }
+    VERIFICA(trocas >= 4);
+}
+
+/* IA-03: X-Wing e A-Wing atiram no cone de 15° e respeitam o cooldown. */
+static void testarTiroNoCone(void)
+{
+    Jogo g;
+    Inimigo in;
+
+    /* A-Wing dentro do cone e do alcance: um laser inimigo e cooldown recarregado. */
+    iniciarJogoVazio(&g);
+    in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_JOGADOR);
+    in.vel = (Vector3){ 0.0f, 0.0f, -VEL_AWING };
+    ia_atualizar(&in, &g, DT);
+    VERIFICA(lasersAtivos(&g) == 1);
+    VERIFICA(g.lasers[0].doJogador == 0);
+    VERIFICA(QUASE(g.lasers[0].dano, DANO_LASER_INIMIGO));
+    VERIFICA(QUASE(in.cooldownTiro, COOLDOWN_TIRO_INIMIGO));
+
+    /* Ainda em cooldown: não dispara de novo. */
+    ia_atualizar(&in, &g, DT);
+    VERIFICA(lasersAtivos(&g) == 1);
+
+    /* Passado o cooldown, dispara outra vez. */
+    for (int i = 0; i < (int)(COOLDOWN_TIRO_INIMIGO / DT) + 1; i++)
+        ia_atualizar(&in, &g, DT);
+    VERIFICA(lasersAtivos(&g) == 2);
+
+    /* Fora do cone (voando para longe do alvo): não dispara. */
+    iniciarJogoVazio(&g);
+    in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_JOGADOR);
+    in.vel = (Vector3){ 0.0f, 0.0f, VEL_AWING };
+    ia_atualizar(&in, &g, DT);
+    VERIFICA(lasersAtivos(&g) == 0);
+
+    /* Fora do alcance: não dispara. */
+    iniciarJogoVazio(&g);
+    in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 4000.0f }, IA_ATACAR_JOGADOR);
+    in.vel = (Vector3){ 0.0f, 0.0f, -VEL_AWING };
+    ia_atualizar(&in, &g, DT);
+    VERIFICA(lasersAtivos(&g) == 0);
+
+    /* Y-Wing bombardeia, não atira. */
+    iniciarJogoVazio(&g);
+    in = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, 1500.0f }, IA_ATACAR_DESTROIER);
+    in.vel = (Vector3){ 0.0f, 0.0f, -VEL_YWING };
+    ia_atualizar(&in, &g, DT);
+    VERIFICA(lasersAtivos(&g) == 0);
+
+    /* X-Wing no estado de atacar o jogador também atira (id 0, t = 9 -> jogador). */
+    iniciarJogoVazio(&g);
+    g.tempoDecorrido = 9.0f;
+    in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_DESTROIER);
+    in.id = 0;
+    in.vel = (Vector3){ 0.0f, 0.0f, -VEL_XWING };
+    ia_atualizar(&in, &g, DT);
+    VERIFICA(in.estadoIA == IA_ATACAR_JOGADOR);
+    VERIFICA(lasersAtivos(&g) == 1);
+
+    /* No fim da partida o cooldown recarregado usa o fator da IA-05. */
+    iniciarJogoVazio(&g);
+    g.tempoDecorrido = DURACAO_PARTIDA;
+    in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_JOGADOR);
+    in.vel = (Vector3){ 0.0f, 0.0f, -VEL_AWING };
+    ia_atualizar(&in, &g, DT);
+    VERIFICA(lasersAtivos(&g) == 1);
+    VERIFICA(QUASE(in.cooldownTiro, COOLDOWN_TIRO_INIMIGO * FATOR_COOLDOWN_MIN));
+}
+
 int main(void)
 {
     testarAproximaDoDestroier();
@@ -334,6 +448,8 @@ int main(void)
     testarFatoresDeDificuldade();
     testarVelocidadeCresceComOTempo();
     testarAceleracaoAcompanhaFator();
+    testarAlternanciaXWing();
+    testarTiroNoCone();
 
     return RESULTADO_TESTES();
 }
