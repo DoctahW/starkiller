@@ -62,13 +62,15 @@ static int lasersAtivos(void)
 static void testarComandosDeCombate(void)
 {
     Comandos cmd = { 0 };
-    Vector3 longe = { 0.0f, 1000.0f, 0.0f };
+    Vector3 perto = { 0.0f, 0.0f, 350.0f };
+    Vector3 longe = { 0.0f, 0.0f, 550.0f };
+    Vector3 medio = { 0.0f, 0.0f, 450.0f };
 
     /* trocar de alvo vale uma vez por frame, com vários passos ou nenhum */
     novaPartida(0);
-    adicionarInimigo(longe, 30.0f);
-    adicionarInimigo(longe, 10.0f);
-    adicionarInimigo(longe, 20.0f);
+    adicionarInimigo(perto, 50.0f);
+    adicionarInimigo(longe, 250.0f);
+    adicionarInimigo(medio, 150.0f);
     NoInimigo *primeiro = jogo.inimigos.inicio;
     cmd.proximoAlvo = 1;
     simularCom(&cmd, 3.0f * PASSO_FIXO);
@@ -85,8 +87,8 @@ static void testarComandosDeCombate(void)
     cmd.alvoMaisProximo = 1;
     simularCom(&cmd, 0.0f);
     VERIFICA(jogo.inimigos.alvo == jogo.inimigos.inicio);
-    VERIFICA(jogo.inimigos.alvo->dado.distancia == 10.0f);
-    VERIFICA(jogo.inimigos.fim->dado.distancia == 30.0f);
+    VERIFICA(jogo.inimigos.inicio->dado.distancia < jogo.inimigos.fim->dado.distancia);
+    VERIFICA(jogo.inimigos.fim->dado.distancia > 200.0f);
 
     /* disparar segurado: dispara só nos passos, respeitando o cooldown de 9 passos */
     novaPartida(0);
@@ -138,6 +140,16 @@ static void testarReforcosNoLoop(void)
     VERIFICA(jogo.inimigos.fim->dado.tipo == XWING);
     VERIFICA(comprimento(jogo.inimigos.inicio->dado.pos) > 1700.0f);
     VERIFICA(comprimento(jogo.inimigos.inicio->dado.pos) < 1900.0f);
+
+    /* seção 3.4, passo 4 ligado: no loop, a IA move os caças na direção do Destróier */
+    {
+        float antes = comprimento(jogo.inimigos.inicio->dado.pos);
+
+        for (int i = 0; i < 60; i++)
+            simular(PASSO_FIXO);
+        VERIFICA(jogo.inimigos.tamanho == 2);
+        VERIFICA(comprimento(jogo.inimigos.inicio->dado.pos) < antes);
+    }
 
     liberarListaInimigos(&jogo.inimigos);
     liberarFila(&jogo.reforcos);

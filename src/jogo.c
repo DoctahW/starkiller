@@ -52,7 +52,7 @@ static int verificarFim(Jogo *g)
     return 0;
 }
 
-/* Seção 3.4, passos 2 a 5; atualizarInimigos (LST-07) entra entre os reforços e o combate. */
+/* Seção 3.4, passos 2 a 5: nave → reforços → inimigos → combate. */
 static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
 {
     avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
@@ -62,7 +62,8 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
     g->tempoDecorrido = r->passos * PASSO_FIXO;
     g->tempoRestante = (PASSOS_PARTIDA - r->passos) * PASSO_FIXO;
 
-    processarReforcos(g);   /* seção 3.4, passo 3 */
+    processarReforcos(g);               /* seção 3.4, passo 3 */
+    atualizarInimigos(g, PASSO_FIXO);   /* seção 3.4, passo 4 */
 
     /* disparar vale enquanto segurado; o cooldown é contado em passos, então o disparo fica no passo.
      * resolverLasers roda logo depois de atualizarLasers: o segmento do laser é pos - vel * dt → pos. */
