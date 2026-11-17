@@ -106,6 +106,7 @@ typedef struct {
     Laser lasers[MAX_LASERS];
     Explosao explosoes[MAX_EXPLOSOES];
     float cascoDestroier, tempoRestante, tempoDecorrido;
+    float tempoDano;   /* s restantes do feedback de dano (tremor e flash); armado por registrarDanoJogador */
     int pontos, sequenciaSemDano, abates, proximoId;
     EstadoJogo estado;
     int vitoria;

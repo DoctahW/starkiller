@@ -84,6 +84,27 @@ Camera3D cameraDoJogador(const Jogador *j)
     return cam;
 }
 
+Camera3D cameraComTremor(const Jogo *g)
+{
+    Camera3D cam = cameraDoJogador(&g->jogador);
+    float fator, dx, dy;
+    Vector3 direita, desloc;
+
+    if (g->tempoDano <= 0.0f)
+        return cam;
+
+    fator = g->tempoDano / DURACAO_FEEDBACK_DANO;
+    if (fator > 1.0f)
+        fator = 1.0f;
+    dx = sinf(g->tempoDecorrido * 90.0f) * AMPLITUDE_TREMOR * fator;
+    dy = cosf(g->tempoDecorrido * 110.0f) * AMPLITUDE_TREMOR * fator;
+    direita = Vector3CrossProduct(g->jogador.frente, g->jogador.cima);
+    desloc = Vector3Add(Vector3Scale(direita, dx), Vector3Scale(g->jogador.cima, dy));
+    cam.position = Vector3Add(cam.position, desloc);
+    cam.target = Vector3Add(cam.target, desloc);
+    return cam;
+}
+
 int colidirDestroier(Jogo *g, float dt)
 {
     int contato;

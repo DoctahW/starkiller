@@ -41,6 +41,7 @@ void registrarAbate(Jogo *g, TipoNave tipo)
 void registrarDanoJogador(Jogo *g)
 {
     g->sequenciaSemDano = 0;
+    g->tempoDano = DURACAO_FEEDBACK_DANO;
 }
 
 int bonusCasco(const Jogo *g)

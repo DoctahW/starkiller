@@ -21,7 +21,10 @@
 
 void registrarAbate(Jogo *g, TipoNave tipo);
 
-/* Zera a sequência sem dano; os pontos e os abates são mantidos. */
+/* Duração (s) do tremor de câmera e do flash vermelho depois de um dano ao jogador. */
+#define DURACAO_FEEDBACK_DANO 0.2f
+
+/* Zera a sequência sem dano e arma g->tempoDano (tremor e flash); pontos e abates são mantidos. */
 void registrarDanoJogador(Jogo *g);
 
 /* Multiplicador para a sequência informada: 0-2 -> x1; 3-5 -> x1,5; 6+ -> x2. */

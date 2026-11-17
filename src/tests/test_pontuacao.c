@@ -61,6 +61,7 @@ int main(void)
     /* Dano zera a sequência, mas não os pontos */
     registrarDanoJogador(&g);
     VERIFICA(g.sequenciaSemDano == 0);
+    VERIFICA(g.tempoDano == DURACAO_FEEDBACK_DANO);
     VERIFICA(g.pontos == 950);
     registrarAbate(&g, XWING);
     VERIFICA(g.pontos == 1050); /* voltou ao multiplicador x1 */
