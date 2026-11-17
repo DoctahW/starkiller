@@ -83,7 +83,7 @@ A CI (`.github/workflows/ci.yml`) roda `make` e `make test` em `ubuntu-latest` c
 ## Estrutura
 
 ```
-assets/          models/, textures/, sounds/
+assets/          models/, shaders/ (GLSL 330), textures/, sounds/
 include/         headers públicos de cada módulo
   tipos.h        contrato compartilhado entre os módulos
   teste.h        verificações dos testes de console
@@ -116,3 +116,7 @@ Cada módulo tem um `include/<modulo>.h` e um `src/<modulo>.c`, criados pelo don
 | Lista duplamente encadeada | Inimigos em combate e computador de mira | Inserção O(1) no fim, remoção O(1) no meio, navegação próximo/anterior          |
 | Fila encadeada (FIFO)      | Reforços rebeldes                        | Chegam em ordem cronológica; só o início é consultado                           |
 | Árvore binária de busca    | Placar de pilotos                        | Inserção O(log n) no caso médio; percurso em ordem gera o ranking sem reordenar |
+
+## Créditos
+
+- `assets/models/death_star.glb`: adaptado de ["Death Star - Star Wars"](https://sketchfab.com/3d-models/death-star-star-wars-423fb92f677f4448aef407112a1fc032), de [Quiznos323](https://sketchfab.com/quiznos323), licença [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0/). Alterações: superlaser e esqueleto removidos, mapas de normal e emissivo removidos, casco com metade dos polígonos e texturas com metade da resolução. A versão adaptada é distribuída sob a mesma licença.
