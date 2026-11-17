@@ -8,6 +8,12 @@
 #define ACELERACAO_IA 120.0f
 #define DIST_MINIMA   1e-4f
 
+/* IA-02: o Y-Wing bombardeia a menos de 150 do Destróier e orbita a ~120. */
+#define ALCANCE_BOMBA_YWING 150.0f
+#define DANO_BOMBA_YWING    8.0f
+#define RAIO_ORBITA_YWING   120.0f
+#define AVANCO_ORBITA       40.0f
+
 static float velocidadeMaxima(TipoNave tipo)
 {
     switch (tipo) {
@@ -38,9 +44,47 @@ static Vector3 alvoDoEstado(const Inimigo *in, const Jogo *g)
     }
 }
 
+/*
+ * Alvo do Y-Wing em bombardeio: um ponto do anel de órbita em volta do Destróier,
+ * avançado no sentido tangencial. Longe do anel, volta direto para o raio de órbita.
+ */
+static Vector3 alvoOrbita(const Inimigo *in)
+{
+    Vector3 raio = in->pos;
+    float dist = Vector3Length(raio);
+    Vector3 eixo, tangente;
+
+    if (dist < DIST_MINIMA)
+        return (Vector3){ RAIO_ORBITA_YWING, 0.0f, 0.0f };
+
+    raio = Vector3Scale(raio, 1.0f / dist);
+    if (dist > RAIO_ORBITA_YWING + 20.0f)
+        return Vector3Scale(raio, RAIO_ORBITA_YWING);
+
+    eixo = fabsf(raio.y) > 0.9f ? (Vector3){ 1.0f, 0.0f, 0.0f } : (Vector3){ 0.0f, 1.0f, 0.0f };
+    tangente = Vector3Normalize(Vector3CrossProduct(eixo, raio));
+    return Vector3Add(Vector3Scale(raio, RAIO_ORBITA_YWING), Vector3Scale(tangente, AVANCO_ORBITA));
+}
+
+/* IA-02: 8 de dano/s no casco do Destróier enquanto o Y-Wing estiver no alcance. */
+static void bombardearDestroier(Inimigo *in, Jogo *g, float dt)
+{
+    if (in->tipo != YWING || in->estadoIA != IA_ATACAR_DESTROIER)
+        return;
+    if (Vector3Length(in->pos) >= ALCANCE_BOMBA_YWING)
+        return;
+
+    g->cascoDestroier -= DANO_BOMBA_YWING * dt;
+    if (g->cascoDestroier < 0.0f)
+        g->cascoDestroier = 0.0f;
+}
+
 void ia_atualizar(Inimigo *in, Jogo *g, float dt)
 {
-    Vector3 rumo = Vector3Subtract(alvoDoEstado(in, g), in->pos);
+    Vector3 alvo = in->tipo == YWING && in->estadoIA == IA_ATACAR_DESTROIER
+                       ? alvoOrbita(in)
+                       : alvoDoEstado(in, g);
+    Vector3 rumo = Vector3Subtract(alvo, in->pos);
     float dist = Vector3Length(rumo);
     Vector3 desejada = { 0.0f, 0.0f, 0.0f };
 
@@ -49,4 +93,5 @@ void ia_atualizar(Inimigo *in, Jogo *g, float dt)
 
     in->vel = Vector3MoveTowards(in->vel, desejada, ACELERACAO_IA * dt);
     in->pos = Vector3Add(in->pos, Vector3Scale(in->vel, dt));
+    bombardearDestroier(in, g, dt);
 }
