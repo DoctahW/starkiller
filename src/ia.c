@@ -4,6 +4,7 @@
 #include "destroier.h"
 #include "ia.h"
 #include "inimigos.h"
+#include "jogo.h"
 #include "raymath.h"
 
 /* Distância mínima para normalizar o rumo; evita divisão por zero com o alvo em cima. */
@@ -26,6 +27,30 @@ static float velocidadeMaxima(TipoNave tipo)
     default:
         return VEL_XWING;
     }
+}
+
+/* IA-05: progresso da partida em [0, 1]; fora do intervalo, fica nos extremos. */
+float progressoDificuldade(float tempoDecorrido)
+{
+    float progresso = tempoDecorrido / DURACAO_PARTIDA;
+
+    if (progresso < 0.0f)
+        return 0.0f;
+    if (progresso > 1.0f)
+        return 1.0f;
+    return progresso;
+}
+
+/* IA-05: velocidade dos caças sobe de 1,0 para FATOR_VELOCIDADE_MAX. */
+float fatorVelocidadeIA(float tempoDecorrido)
+{
+    return 1.0f + (FATOR_VELOCIDADE_MAX - 1.0f) * progressoDificuldade(tempoDecorrido);
+}
+
+/* IA-05: cooldown de tiro cai de 1,0 para FATOR_COOLDOWN_MIN. */
+float fatorCooldownIA(float tempoDecorrido)
+{
+    return 1.0f + (FATOR_COOLDOWN_MIN - 1.0f) * progressoDificuldade(tempoDecorrido);
 }
 
 /*
@@ -111,12 +136,13 @@ void ia_atualizar(Inimigo *in, Jogo *g, float dt)
                        : alvoDoEstado(in, g);
     Vector3 rumo = Vector3Subtract(alvo, in->pos);
     float dist = Vector3Length(rumo);
+    float fatorVel = fatorVelocidadeIA(g->tempoDecorrido);
     Vector3 desejada = { 0.0f, 0.0f, 0.0f };
 
     if (dist > DIST_MINIMA)
-        desejada = Vector3Scale(rumo, velocidadeMaxima(in->tipo) / dist);
+        desejada = Vector3Scale(rumo, velocidadeMaxima(in->tipo) * fatorVel / dist);
 
-    in->vel = Vector3MoveTowards(in->vel, desejada, ACELERACAO_IA * dt);
+    in->vel = Vector3MoveTowards(in->vel, desejada, ACELERACAO_IA * fatorVel * dt);
     in->pos = Vector3Add(in->pos, Vector3Scale(in->vel, dt));
     desviarCasco(in);
     bombardearDestroier(in, g, dt);
