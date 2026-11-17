@@ -15,6 +15,12 @@ static Estrela estrelas[NUM_ESTRELAS];
 static Vector3 poeira[NUM_POEIRA];   /* posições no mundo, em [0, LADO_POEIRA)^3 */
 static unsigned int semente;
 
+static Model estrelaMorte;
+static Shader sombraEstrelaMorte;
+static int temEstrelaMorte;
+static Vector3 posEstrelaMorte, eixoEstrelaMorte;
+static float anguloEstrelaMorte;     /* graus */
+
 /* LCG próprio: o céu é sempre o mesmo e não mexe no rand() dos outros módulos. Devolve [0, 1). */
 static float aleatorio(void)
 {
@@ -49,13 +55,97 @@ static void sortearEstrelasEPoeira(void)
         poeira[i] = (Vector3){ aleatorio() * LADO_POEIRA, aleatorio() * LADO_POEIRA, aleatorio() * LADO_POEIRA };
 }
 
+/* Carrega PASTA_SHADERS<nome>.vs/.fs. Devolve 0 se faltar arquivo ou não compilar (a raylib devolveria o padrão). */
+static int carregarShader(const char *nome, Shader *s)
+{
+    char vs[128], fs[128];
+
+    TextCopy(vs, TextFormat(PASTA_SHADERS "%s.vs", nome));
+    TextCopy(fs, TextFormat(PASTA_SHADERS "%s.fs", nome));
+    if (!FileExists(vs) || !FileExists(fs)) {
+        TraceLog(LOG_WARNING, "ESPACO: shader %s ausente", nome);
+        return 0;
+    }
+    *s = LoadShader(vs, fs);
+    if (s->id == rlGetShaderIdDefault()) {
+        TraceLog(LOG_WARNING, "ESPACO: shader %s não compilou", nome);
+        return 0;
+    }
+    return 1;
+}
+
+static void carregarEstrelaMorte(void)
+{
+    /* Acima e à direita da visão inicial do jogador (frente +Z, direita -X). */
+    Vector3 dir = Vector3Normalize((Vector3){ -0.38f, 0.26f, 1.0f });
+    /* Base com o +Z do modelo (lado do prato) virado para a câmera e o +Y para o alto: equador na horizontal. */
+    Vector3 z = Vector3Negate(dir);
+    Vector3 x = Vector3Normalize(Vector3CrossProduct((Vector3){ 0.0f, 1.0f, 0.0f }, z));
+    Vector3 y = Vector3CrossProduct(z, x);
+    Matrix base = { x.x, y.x, z.x, 0.0f,
+                    x.y, y.y, z.y, 0.0f,
+                    x.z, y.z, z.z, 0.0f,
+                    0.0f, 0.0f, 0.0f, 1.0f };
+    /* Gira um pouco em torno do próprio eixo para o prato sair do centro do disco. */
+    Quaternion q = QuaternionMultiply(QuaternionFromMatrix(base),
+                                      QuaternionFromAxisAngle((Vector3){ 0.0f, 1.0f, 0.0f }, 30.0f * DEG2RAD));
+
+    temEstrelaMorte = 0;
+    if (!FileExists(ARQUIVO_ESTRELA_MORTE)) {
+        TraceLog(LOG_WARNING, "ESPACO: %s ausente, céu sem Estrela da Morte", ARQUIVO_ESTRELA_MORTE);
+        return;
+    }
+    estrelaMorte = LoadModel(ARQUIVO_ESTRELA_MORTE);
+    if (!IsModelValid(estrelaMorte))
+        return;
+    temEstrelaMorte = 1;
+
+    /* Sem o shader ela fica chapada, mas aparece. */
+    if (carregarShader("estrela_morte", &sombraEstrelaMorte)) {
+        /* Sol à esquerda e acima de quem olha da arena, quase de lado: terminador atravessa o disco. */
+        Vector3 luz = Vector3Normalize(Vector3Add((Vector3){ 0.85f, 0.5f, 0.0f }, Vector3Scale(z, 0.15f)));
+
+        SetShaderValue(sombraEstrelaMorte, GetShaderLocation(sombraEstrelaMorte, "dirLuz"), &luz, SHADER_UNIFORM_VEC3);
+        for (int i = 0; i < estrelaMorte.materialCount; i++)
+            estrelaMorte.materials[i].shader = sombraEstrelaMorte;
+    }
+
+    /* Objeto distante: sem mipmaps a textura cintila ao girar. */
+    for (int i = 0; i < estrelaMorte.materialCount; i++) {
+        Texture2D *t = &estrelaMorte.materials[i].maps[MATERIAL_MAP_ALBEDO].texture;
+
+        if (t->id != 0 && t->id != rlGetTextureIdDefault()) {
+            GenTextureMipmaps(t);
+            SetTextureFilter(*t, TEXTURE_FILTER_TRILINEAR);
+        }
+    }
+
+    posEstrelaMorte = Vector3Scale(dir, DISTANCIA_ESTRELA_MORTE);
+    QuaternionToAxisAngle(q, &eixoEstrelaMorte, &anguloEstrelaMorte);
+    anguloEstrelaMorte *= RAD2DEG;
+}
+
 void iniciarEspaco(void)
 {
     sortearEstrelasEPoeira();
+    carregarEstrelaMorte();
 }
 
 void encerrarEspaco(void)
 {
+    /* UnloadModel não libera texturas nem shaders dos materiais; UnloadShader ignora o padrão. */
+    if (temEstrelaMorte) {
+        for (int i = 0; i < estrelaMorte.materialCount; i++)
+            for (int m = 0; m <= MATERIAL_MAP_BRDF; m++) {
+                Texture2D t = estrelaMorte.materials[i].maps[m].texture;
+
+                if (t.id != 0 && t.id != rlGetTextureIdDefault())
+                    UnloadTexture(t);
+            }
+        UnloadShader(sombraEstrelaMorte);
+        UnloadModel(estrelaMorte);
+        temEstrelaMorte = 0;
+    }
 }
 
 void desenharFundo(const Jogador *j)
@@ -86,8 +176,14 @@ void desenharFundo(const Jogador *j)
         rlVertex3f(c.x - dx.x + dy.x, c.y - dx.y + dy.y, c.z - dx.z + dy.z);
     }
     rlEnd();
-    /* O rlgl acumula vértices: desenha as estrelas agora, antes da troca de estado. */
+    /* O rlgl acumula vértices: desenha as estrelas agora, antes do modelo e da troca de estado. */
     rlDrawRenderBatchActive();
+
+    /* Sem profundidade, vale a ordem das malhas no arquivo: casco por último, o prato fica num recorte dele. */
+    if (temEstrelaMorte)
+        DrawModelEx(estrelaMorte, posEstrelaMorte, eixoEstrelaMorte, anguloEstrelaMorte,
+                    (Vector3){ ESCALA_ESTRELA_MORTE, ESCALA_ESTRELA_MORTE, ESCALA_ESTRELA_MORTE },
+                    WHITE);
 
     rlEnableDepthMask();
     EndMode3D();
