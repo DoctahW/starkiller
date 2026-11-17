@@ -2,10 +2,45 @@
 
 #define TAM_TITULO 40
 #define TAM_TEXTO  20
+#define TAM_MENU   24
+#define TAM_DICA   18
+
+#define MENU_CENTRO_X 0.28f /* fração da largura; cai na área escura da arte */
+#define MENU_TOPO_Y   342
+#define MENU_ESPACO   42
+#define MENU_SOMBRA   2
+
+static Texture2D fundoMenu;
+static int fundoMenuCarregado;
 
 static void textoCentralizado(const char *texto, int y, int tamanho, Color cor)
 {
     DrawText(texto, (GetScreenWidth() - MeasureText(texto, tamanho)) / 2, y, tamanho, cor);
+}
+
+static void textoNoMenu(const char *texto, int centroX, int y, int tamanho, Color cor)
+{
+    int x = centroX - MeasureText(texto, tamanho) / 2;
+
+    DrawText(texto, x + MENU_SOMBRA, y + MENU_SOMBRA, tamanho, Fade(BLACK, 0.75f));
+    DrawText(texto, x, y, tamanho, cor);
+}
+
+static void desenharFundoMenu(void)
+{
+    if (!fundoMenuCarregado) {
+        fundoMenu = LoadTexture("assets/img/Img_menu.png");
+        if (fundoMenu.id != 0)
+            SetTextureFilter(fundoMenu, TEXTURE_FILTER_BILINEAR);
+        fundoMenuCarregado = 1;
+    }
+
+    if (fundoMenu.id != 0) {
+        DrawTexturePro(fundoMenu,
+                       (Rectangle){ 0.0f, 0.0f, (float)fundoMenu.width, (float)fundoMenu.height },
+                       (Rectangle){ 0.0f, 0.0f, (float)GetScreenWidth(), (float)GetScreenHeight() },
+                       (Vector2){ 0.0f, 0.0f }, 0.0f, WHITE);
+    }
 }
 
 EstadoJogo telaMenu(Jogo *g, const Comandos *cmd)
@@ -14,6 +49,8 @@ EstadoJogo telaMenu(Jogo *g, const Comandos *cmd)
     static const EstadoJogo destinos[] = { EST_COMBATE, EST_PLACAR, EST_CONTROLES, EST_SAIR };
     enum { QTD_OPCOES = sizeof opcoes / sizeof opcoes[0] };
     static int selecionada = 0;
+    int centroX = (int)(GetScreenWidth() * MENU_CENTRO_X);
+    int i;
     (void)g;
 
     if (cmd->menuCima)
@@ -21,9 +58,20 @@ EstadoJogo telaMenu(Jogo *g, const Comandos *cmd)
     if (cmd->menuBaixo)
         selecionada = (selecionada + 1) % QTD_OPCOES;
 
-    textoCentralizado("Starkiller", 160, TAM_TITULO, RAYWHITE);
-    for (int i = 0; i < QTD_OPCOES; i++)
-        textoCentralizado(opcoes[i], 300 + i * 40, TAM_TEXTO, i == selecionada ? YELLOW : GRAY);
+    desenharFundoMenu();
+
+    for (i = 0; i < QTD_OPCOES; i++) {
+        int y = MENU_TOPO_Y + i * MENU_ESPACO;
+
+        if (i == selecionada) {
+            int largura = MeasureText(opcoes[i], TAM_MENU);
+            DrawText(">", centroX - largura / 2 - 22, y, TAM_MENU, YELLOW);
+        }
+        textoNoMenu(opcoes[i], centroX, y, TAM_MENU, i == selecionada ? YELLOW : LIGHTGRAY);
+    }
+
+    textoNoMenu("Setas: navegar   Enter/A: selecionar",
+                centroX, MENU_TOPO_Y + QTD_OPCOES * MENU_ESPACO + 24, TAM_DICA, GRAY);
 
     return cmd->confirmar ? destinos[selecionada] : EST_MENU;
 }
