@@ -159,3 +159,5 @@ make preview-modelo
 ```
 
 A inspeção carrega o GLB com `LoadModel`, verifica suas dimensões e textura embutida e o desenha junto aos eixos do mundo. Esc/Start encerra a janela. O manifesto em `assets/models/manifesto.json` registra a contagem de triângulos e o raio.
+
+Para inspecionar as formas provisórias de X-Wing, Y-Wing e A-Wing, `make preview-inimigos` usa o mesmo desenho da partida, com as três naves e amostras de lasers em movimento — verdes para o TIE do jogador e vermelhos para os rebeldes, conforme VIS-04. Esc encerra a janela; `./build/preview_inimigos --capturar` salva `build/inimigos.png`.

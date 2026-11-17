@@ -22,7 +22,7 @@ OBJ     := $(SRC:src/%.c=build/%.o)
 MODULOS := $(filter-out build/main.o,$(OBJ))
 TESTES  := $(patsubst src/tests/%.c,build/tests/%,$(wildcard src/tests/test_*.c))
 
-.PHONY: all run test valgrind preview-modelo clean
+.PHONY: all run test valgrind preview-modelo preview-inimigos clean
 
 all: $(BIN)
 
@@ -64,3 +64,9 @@ build/preview_modelo: tools/preview_modelo.c $(MODULOS) | build $(DLL)
 
 preview-modelo: build/preview_modelo
 	./build/preview_modelo
+
+build/preview_inimigos: tools/preview_inimigos.c $(MODULOS) | build $(DLL)
+	$(CC) $(CFLAGS) $< $(MODULOS) -o $@ $(LDLIBS)
+
+preview-inimigos: build/preview_inimigos
+	./build/preview_inimigos

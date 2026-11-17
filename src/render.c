@@ -1,7 +1,9 @@
 #include "render.h"
 
 #include <math.h>
+#include <stddef.h>
 
+#include "combate.h"
 #include "destroier.h"
 #include "espaco.h"
 #include "raymath.h"
@@ -258,12 +260,112 @@ static void desenharDestroier(void)
         desenharPrimitivas();
 }
 
+/* Primitivas em coordenadas locais: frente +Z, cima +Y e raio próximo de 1.
+ * A escala de cada caça acompanha seu raio de colisão. */
+static void desenharXWing(void)
+{
+    Color cor = {235, 105, 80, 255};
+    DrawCylinderEx((Vector3){0, 0, -0.5f}, (Vector3){0, 0, 0.8f},
+                   0.16f, 0.04f, 8, LIGHTGRAY);
+    DrawCube((Vector3){0, 0.13f, 0.05f}, 0.17f, 0.12f, 0.32f, DARKBLUE);
+    for (int x = -1; x <= 1; x += 2) {
+        for (int y = -1; y <= 1; y += 2) {
+            Vector3 ponta = {x * 0.72f, y * 0.35f, -0.2f};
+            DrawCylinderEx((Vector3){0, 0, -0.2f}, ponta, 0.09f, 0.06f, 4, cor);
+            DrawCylinderEx((Vector3){ponta.x, ponta.y, -0.45f},
+                           (Vector3){ponta.x, ponta.y, 0.4f},
+                           0.045f, 0.025f, 6, LIGHTGRAY);
+        }
+    }
+}
+
+static void desenharYWing(void)
+{
+    Color cor = {245, 195, 65, 255};
+    DrawCube((Vector3){0, 0, 0.35f}, 0.36f, 0.22f, 0.65f, cor);
+    DrawCube((Vector3){0, 0.14f, 0.4f}, 0.22f, 0.1f, 0.25f, DARKBLUE);
+    DrawCube((Vector3){0, 0, -0.15f}, 1.1f, 0.12f, 0.18f, LIGHTGRAY);
+    for (int lado = -1; lado <= 1; lado += 2) {
+        float x = lado * 0.52f;
+        DrawCylinderEx((Vector3){x, 0, -0.7f}, (Vector3){x, 0, 0.35f},
+                       0.14f, 0.14f, 8, cor);
+        DrawSphereEx((Vector3){x, 0, -0.7f}, 0.1f, 4, 8, SKYBLUE);
+    }
+}
+
+static void desenharAWing(void)
+{
+    Color cor = {85, 195, 130, 255};
+    /* Cone achatado: silhueta de cunha, com a ponta voltada para +Z. */
+    rlPushMatrix();
+    rlScalef(1.0f, 0.35f, 1.0f);
+    DrawCylinderEx((Vector3){0, 0, -0.5f}, (Vector3){0, 0, 0.85f},
+                   0.55f, 0.0f, 4, cor);
+    rlPopMatrix();
+    DrawCube((Vector3){0, 0.12f, -0.05f}, 0.2f, 0.15f, 0.35f, DARKBLUE);
+    for (int lado = -1; lado <= 1; lado += 2) {
+        float x = lado * 0.4f;
+        DrawCylinderEx((Vector3){x, 0, -0.55f}, (Vector3){x, 0, 0.25f},
+                       0.07f, 0.04f, 6, LIGHTGRAY);
+    }
+}
+
+static void desenharInimigo(const Inimigo *inimigo)
+{
+    Vector3 frente = {0, 0, 1};
+    if (Vector3LengthSqr(inimigo->vel) > 0.000001f)
+        frente = Vector3Normalize(inimigo->vel);
+
+    /* Rotação de +Z para a velocidade. O eixo Y resolve também a direção -Z;
+     * parado, o caça conserva a orientação padrão, sem normalizar vetor zero. */
+    Vector3 eixo = {-frente.y, frente.x, 0};
+    if (Vector3LengthSqr(eixo) < 0.000001f)
+        eixo = (Vector3){0, 1, 0};
+    float angulo = acosf(Clamp(frente.z, -1.0f, 1.0f)) * RAD2DEG;
+    float raio = raioInimigo(inimigo->tipo);
+
+    rlPushMatrix();
+    rlTranslatef(inimigo->pos.x, inimigo->pos.y, inimigo->pos.z);
+    rlRotatef(angulo, eixo.x, eixo.y, eixo.z);
+    rlScalef(raio, raio, raio);
+    switch (inimigo->tipo) {
+        case XWING: desenharXWing(); break;
+        case YWING: desenharYWing(); break;
+        case AWING: desenharAWing(); break;
+    }
+    rlPopMatrix();
+}
+
+static void desenharLasers(const Jogo *g)
+{
+    /* A posição da simulação é a ponta do tiro; a cauda fica atrás dela.
+     * Comprimento visual fixo, independente da velocidade e do frame. */
+    const float comprimento = 12.0f;
+    const float raio = 0.22f;
+    for (int i = 0; i < MAX_LASERS; i++) {
+        const Laser *laser = &g->lasers[i];
+        if (!laser->ativo)
+            continue;
+        Color cor = laser->doJogador ? GREEN : RED; /* VIS-04: TIE imperial verde, rebeldes vermelhos. */
+        if (Vector3LengthSqr(laser->vel) < 0.000001f) {
+            DrawSphereEx(laser->pos, raio, 4, 6, cor);
+            continue;
+        }
+        Vector3 cauda = Vector3Subtract(laser->pos,
+            Vector3Scale(Vector3Normalize(laser->vel), comprimento));
+        DrawCylinderEx(cauda, laser->pos, raio, raio, 6, cor);
+    }
+}
+
 void render_cena(const Jogo *g, Camera3D cam)
 {
     desenharFundo(&g->jogador);
 
     BeginMode3D(cam);
     desenharDestroier();
+    for (const NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox)
+        desenharInimigo(&no->dado);
+    desenharLasers(g);
     /* A poeira não grava profundidade: vem depois dos objetos opacos da arena. */
     desenharPoeira(&g->jogador);
     EndMode3D();
