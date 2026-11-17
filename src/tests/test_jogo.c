@@ -6,9 +6,15 @@
 #include "jogo.h"
 #include "nave.h"
 #include "raymath.h"
+#include "reforcos.h"
 #include "teste.h"
 
 #define QUASE(a, b) (fabsf((a) - (b)) < 1e-4f)
+
+static float comprimento(Vector3 v)
+{
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+}
 
 static Jogo jogo;
 static RelogioCombate relogio;
@@ -111,6 +117,32 @@ static void testarComandosDeCombate(void)
     liberarListaInimigos(&jogo.inimigos);
 }
 
+/* Seção 3.4, passo 3: o grupo de 3 s só nasce no passo 180, e não antes. */
+static void testarReforcosNoLoop(void)
+{
+    novaPartida(0);
+    gerarReforcos(&jogo.reforcos, DURACAO_PARTIDA);
+    VERIFICA(jogo.reforcos.tamanho == 15);
+    VERIFICA(jogo.reforcos.inicio->tempoChegada == 3.0f);
+    VERIFICA(jogo.reforcos.inicio->qtdX == 2);
+
+    for (int i = 0; i < 179; i++)
+        simular(PASSO_FIXO);
+    VERIFICA(jogo.inimigos.tamanho == 0);
+    VERIFICA(jogo.reforcos.tamanho == 15);
+
+    simular(PASSO_FIXO);
+    VERIFICA(jogo.inimigos.tamanho == 2);
+    VERIFICA(jogo.reforcos.tamanho == 14);
+    VERIFICA(jogo.inimigos.inicio->dado.tipo == XWING);
+    VERIFICA(jogo.inimigos.fim->dado.tipo == XWING);
+    VERIFICA(comprimento(jogo.inimigos.inicio->dado.pos) > 1700.0f);
+    VERIFICA(comprimento(jogo.inimigos.inicio->dado.pos) < 1900.0f);
+
+    liberarListaInimigos(&jogo.inimigos);
+    liberarFila(&jogo.reforcos);
+}
+
 int main(void)
 {
     /* roda só os passos inteiros que cabem e guarda a sobra para o próximo frame */
@@ -209,6 +241,7 @@ int main(void)
     }
 
     testarComandosDeCombate();
+    testarReforcosNoLoop();
 
     return RESULTADO_TESTES();
 }

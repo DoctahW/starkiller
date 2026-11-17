@@ -52,10 +52,17 @@ static int verificarFim(Jogo *g)
     return 0;
 }
 
-/* Seção 3.4, passos 2 a 5; processarReforcos e atualizarInimigos entram entre a nave e o combate. */
+/* Seção 3.4, passos 2 a 5; atualizarInimigos (LST-07) entra entre os reforços e o combate. */
 static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
 {
     avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
+
+    /* O tempo do passo entra antes dos reforços: o grupo de t = 3 s nasce no passo 180. */
+    r->passos++;
+    g->tempoDecorrido = r->passos * PASSO_FIXO;
+    g->tempoRestante = (PASSOS_PARTIDA - r->passos) * PASSO_FIXO;
+
+    processarReforcos(g);   /* seção 3.4, passo 3 */
 
     /* disparar vale enquanto segurado; o cooldown é contado em passos, então o disparo fica no passo.
      * resolverLasers roda logo depois de atualizarLasers: o segmento do laser é pos - vel * dt → pos. */
@@ -64,10 +71,6 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
     atualizarLasers(g, PASSO_FIXO);
     resolverLasers(g, PASSO_FIXO);
     atualizarExplosoes(g, PASSO_FIXO);
-
-    r->passos++;
-    g->tempoDecorrido = r->passos * PASSO_FIXO;
-    g->tempoRestante = (PASSOS_PARTIDA - r->passos) * PASSO_FIXO;
 }
 
 /* Seção 3.4, passo 1: ações de borda valem uma vez por frame, mesmo em frames sem passo ou com vários. */

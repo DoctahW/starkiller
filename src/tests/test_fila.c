@@ -1,4 +1,9 @@
+#include <math.h>
+
+#include "inimigos.h"
 #include "jogo.h"
+#include "nave.h"
+#include "raymath.h"
 #include "reforcos.h"
 #include "teste.h"
 
@@ -153,6 +158,101 @@ static void testarGerarReforcos(void)
     VERIFICA(f.tamanho == 0);
 }
 
+static int contarTipo(const ListaInimigos *l, TipoNave tipo)
+{
+    int n = 0;
+
+    for (const NoInimigo *no = l->inicio; no != NULL; no = no->prox)
+        if (no->dado.tipo == tipo)
+            n++;
+    return n;
+}
+
+static float comprimento(Vector3 v)
+{
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+static float distancia(Vector3 a, Vector3 b)
+{
+    return comprimento((Vector3){ a.x - b.x, a.y - b.y, a.z - b.z });
+}
+
+/*
+ * REF-04: processarReforcos desenfileira o que já venceu e faz o grupo nascer junto,
+ * na borda (~1800) e em formação. A distância ao jogador já sai preenchida.
+ */
+static void testarProcessarReforcos(void)
+{
+    Jogo jogo = { 0 };
+    const Vector3 *primeiro;
+
+    iniciarJogador(&jogo.jogador);
+    jogo.proximoId = 1;
+
+    /* Fila vazia: nada acontece. */
+    processarReforcos(&jogo);
+    VERIFICA(jogo.inimigos.tamanho == 0);
+
+    /* Antes do tempo do grupo, ele continua na fila. */
+    enfileirarReforco(&jogo.reforcos, 3.0f, 2, 1, 1);
+    jogo.tempoDecorrido = 2.999f;
+    processarReforcos(&jogo);
+    VERIFICA(jogo.reforcos.tamanho == 1);
+    VERIFICA(jogo.inimigos.tamanho == 0);
+
+    /* No tempo, o grupo inteiro sai da fila e nasce de uma vez. */
+    jogo.tempoDecorrido = 3.0f;
+    processarReforcos(&jogo);
+    VERIFICA(jogo.reforcos.tamanho == 0);
+    VERIFICA(jogo.inimigos.tamanho == 4);
+    VERIFICA(contarTipo(&jogo.inimigos, XWING) == 2);
+    VERIFICA(contarTipo(&jogo.inimigos, YWING) == 1);
+    VERIFICA(contarTipo(&jogo.inimigos, AWING) == 1);
+
+    /* ids únicos, na ordem de inserção */
+    {
+        int esperado = 1;
+
+        for (const NoInimigo *no = jogo.inimigos.inicio; no != NULL; no = no->prox, esperado++)
+            VERIFICA(no->dado.id == esperado);
+    }
+
+    /* todos na borda, perto uns dos outros (formação) e com a distância ao jogador certa */
+    primeiro = &jogo.inimigos.inicio->dado.pos;
+    VERIFICA(comprimento(*primeiro) > 1700.0f && comprimento(*primeiro) < 1900.0f);
+    for (const NoInimigo *no = jogo.inimigos.inicio; no != NULL; no = no->prox) {
+        VERIFICA(comprimento(no->dado.pos) > 1700.0f && comprimento(no->dado.pos) < 1900.0f);
+        VERIFICA(distancia(no->dado.pos, *primeiro) <= 100.0f);
+        VERIFICA(fabsf(no->dado.distancia - distancia(no->dado.pos, jogo.jogador.pos)) < 0.001f);
+    }
+    VERIFICA(distancia(jogo.inimigos.inicio->dado.pos, jogo.inimigos.inicio->prox->dado.pos) > 1.0f);
+
+    liberarListaInimigos(&jogo.inimigos);
+
+    /* Dois grupos vencidos no mesmo passo saem na ordem da fila, cada um com seus caças. */
+    jogo.proximoId = 1;
+    enfileirarReforco(&jogo.reforcos, 3.0f, 1, 0, 0);
+    enfileirarReforco(&jogo.reforcos, 3.0f, 2, 0, 0);
+    jogo.tempoDecorrido = 3.0f;
+    processarReforcos(&jogo);
+    VERIFICA(jogo.reforcos.tamanho == 0);
+    VERIFICA(jogo.inimigos.tamanho == 3);
+    VERIFICA(jogo.inimigos.inicio->dado.id == 1 && jogo.inimigos.inicio->dado.tipo == XWING);
+    VERIFICA(jogo.inimigos.fim->dado.id == 3 && jogo.inimigos.fim->dado.tipo == XWING);
+    liberarListaInimigos(&jogo.inimigos);
+
+    /* Grupo que ainda não venceu não é tocado. */
+    enfileirarReforco(&jogo.reforcos, 10.0f, 1, 0, 0);
+    jogo.tempoDecorrido = 9.9f;
+    processarReforcos(&jogo);
+    VERIFICA(jogo.inimigos.tamanho == 0 && jogo.reforcos.tamanho == 1);
+
+    liberarFila(&jogo.reforcos);
+    liberarListaInimigos(&jogo.inimigos);
+    VERIFICA(jogo.reforcos.tamanho == 0 && jogo.inimigos.tamanho == 0);
+}
+
 int main(void)
 {
     testarVazia();
@@ -160,6 +260,7 @@ int main(void)
     testarOrdemFifo();
     testarLiberar();
     testarGerarReforcos();
+    testarProcessarReforcos();
 
     return RESULTADO_TESTES();
 }
