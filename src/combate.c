@@ -334,7 +334,7 @@ int colidirLasersInimigos(Jogo *g, float dt)
             registrarDanoJogador(g);
             acertosTie++;
         } else {
-            g->cascoDestroier -= l->dano;
+            g->cascoDestroier -= l->dano * FRACAO_DANO_DESTROIER;
             if (g->cascoDestroier < 0.0f)
                 g->cascoDestroier = 0.0f;
         }
