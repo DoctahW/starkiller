@@ -1,23 +1,22 @@
 #include "render.h"
 
 #include "espaco.h"
-#include "nave.h"
 
-void iniciarRender(void)
+void carregarAssets(void)
 {
     iniciarEspaco();
 }
 
-void encerrarRender(void)
+void descarregarAssets(void)
 {
     encerrarEspaco();
 }
 
-void desenharCena(const Jogo *g)
+void render_cena(const Jogo *g, Camera3D cam)
 {
     desenharFundo(&g->jogador);
 
-    BeginMode3D(cameraDoJogador(&g->jogador));
+    BeginMode3D(cam);
     /* A poeira não grava profundidade: vem depois dos objetos opacos da arena. */
     desenharPoeira(&g->jogador);
     EndMode3D();
