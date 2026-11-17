@@ -42,6 +42,70 @@ static char ultimoNome[PLACAR_MAX_NOME + 1];
 static int ultimosPontos;
 static int destacarUltima;
 
+static EstadoJogo telaAnterior = EST_SAIR;
+static int aguardandoTeclasSoltas;
+static double fimBloqueadoAte;
+static int erroSalvarPlacar;
+
+static int entrouEm(EstadoJogo tela)
+{
+    if (telaAnterior == tela)
+        return 0;
+    telaAnterior = tela;
+    return 1;
+}
+
+/* Teclas que produzem texto (espaço, letras e pontuação) ainda pressionadas. */
+static int algumaTeclaDeTextoPressionada(void)
+{
+    int k;
+
+    for (k = 32; k <= 96; k++)
+        if (IsKeyDown(k))
+            return 1;
+    return 0;
+}
+
+/* Translitera Latin-1 para ASCII: o placar guarda no máximo 15 bytes. */
+static int letraAscii(int c)
+{
+    if (c >= 32 && c <= 126)
+        return c;
+    if (c >= 0xC0 && c <= 0xC5)
+        return 'A';
+    if (c == 0xC7)
+        return 'C';
+    if (c >= 0xC8 && c <= 0xCB)
+        return 'E';
+    if (c >= 0xCC && c <= 0xCF)
+        return 'I';
+    if (c == 0xD1)
+        return 'N';
+    if (c >= 0xD2 && c <= 0xD6)
+        return 'O';
+    if (c >= 0xD9 && c <= 0xDC)
+        return 'U';
+    if (c == 0xDD)
+        return 'Y';
+    if (c >= 0xE0 && c <= 0xE5)
+        return 'a';
+    if (c == 0xE7)
+        return 'c';
+    if (c >= 0xE8 && c <= 0xEB)
+        return 'e';
+    if (c >= 0xEC && c <= 0xEF)
+        return 'i';
+    if (c == 0xF1)
+        return 'n';
+    if (c >= 0xF2 && c <= 0xF6)
+        return 'o';
+    if (c >= 0xF9 && c <= 0xFC)
+        return 'u';
+    if (c == 0xFD || c == 0xFF)
+        return 'y';
+    return 0;
+}
+
 /* Carrega a fonte uma única vez, com ASCII e Latin-1 para os acentos. */
 static Font fonteDoMenu(void)
 {
@@ -60,7 +124,9 @@ static Font fonteDoMenu(void)
         for (c = 0x2190; c <= 0x2193; c++) /* ← ↑ → ↓ */
             pontos[quantidade++] = c;
 
-        fonteMenu = LoadFontEx(FONTE_MENU, 32, pontos, quantidade);
+        fonteMenu = LoadFontEx(FONTE_MENU, 48, pontos, quantidade);
+        if (fonteMenu.texture.id != 0)
+            SetTextureFilter(fonteMenu.texture, TEXTURE_FILTER_BILINEAR);
         fonteMenuCarregada = 1;
     }
 
@@ -117,6 +183,8 @@ EstadoJogo telaMenu(Jogo *g, const Comandos *cmd)
     static int selecionada = 0;
     int centroX = (int)(GetScreenWidth() * MENU_CENTRO_X);
     int i;
+
+    (void)entrouEm(EST_MENU);
     (void)g;
 
     if (cmd->menuCima)
@@ -197,13 +265,43 @@ static void inserirLetraNome(char c)
     nomeCursor++;
 }
 
+static const char *nomeFinalFim(void)
+{
+    static char limpo[PLACAR_MAX_NOME + 1];
+    int ini = 0;
+    int fim = nomeTam;
+    int n;
+
+    while (ini < fim && nomeFim[ini] == ' ')
+        ini++;
+    while (fim > ini && nomeFim[fim - 1] == ' ')
+        fim--;
+
+    n = fim - ini;
+    if (n == 0)
+        return PLACAR_NOME_ANONIMO;
+
+    memcpy(limpo, &nomeFim[ini], (size_t)n);
+    limpo[n] = '\0';
+    return limpo;
+}
+
 static void atualizarNomeFim(const Comandos *cmd)
 {
     int c;
 
+    if (aguardandoTeclasSoltas) {
+        while (GetCharPressed() != 0) { }
+        if (GetTime() >= fimBloqueadoAte && !algumaTeclaDeTextoPressionada())
+            aguardandoTeclasSoltas = 0;
+        return;
+    }
+
     while ((c = GetCharPressed()) != 0) {
-        if (c >= 32 && c <= 126)
-            inserirLetraNome((char)c);
+        int ascii = letraAscii(c);
+
+        if (ascii != 0 && ascii != ';')
+            inserirLetraNome((char)ascii);
     }
 
     if (IsKeyPressed(KEY_BACKSPACE) || (cmd->usandoControle && cmd->voltar))
@@ -261,7 +359,7 @@ static void desenharSeletorLetras(void)
     }
 }
 
-static void desenharNomeFim(int usandoControle)
+static void desenharNomeFim(void)
 {
     Font fonte = fonteDoMenu();
     int x = (GetScreenWidth() - LARGURA_NOME) / 2;
@@ -280,13 +378,6 @@ static void desenharNomeFim(int usandoControle)
     antes[nomeCursor] = '\0';
     xCursor = (float)tx + MeasureTextEx(fonte, antes, TAM_FIM_NOME, ESPACO_FONTE).x;
 
-    if (usandoControle && nomeCursor == nomeTam && nomeTam < PLACAR_MAX_NOME) {
-        char previa[2] = { letraAtual, '\0' };
-
-        DrawTextEx(fonte, previa, (Vector2){ xCursor, (float)ty },
-                   TAM_FIM_NOME, ESPACO_FONTE, YELLOW);
-    }
-
     if (((int)(GetTime() * 2.0)) % 2 == 0)
         DrawRectangle((int)xCursor, ty, 2, TAM_FIM_NOME, YELLOW);
 }
@@ -296,6 +387,12 @@ EstadoJogo telaFim(Jogo *g, const Comandos *cmd)
     int centro = GetScreenWidth() / 2;
     int bonus = bonusCasco(g);
     int total = calcularPontuacao(g);
+
+    if (entrouEm(EST_FIM)) {
+        while (GetCharPressed() != 0) { } /* descarta o que estava na fila */
+        fimBloqueadoAte = GetTime() + 0.45;
+        aguardandoTeclasSoltas = 1;
+    }
 
     atualizarNomeFim(cmd);
 
@@ -307,7 +404,7 @@ EstadoJogo telaFim(Jogo *g, const Comandos *cmd)
     textoNoMenu(TextFormat("Total: %d", total), centro, 274, TAM_FIM_TEXTO, YELLOW);
 
     textoNoMenu("Digite seu nome:", centro, 336, 22, LIGHTGRAY);
-    desenharNomeFim(cmd->usandoControle);
+    desenharNomeFim();
 
     if (cmd->usandoControle) {
         desenharSeletorLetras();
@@ -318,17 +415,13 @@ EstadoJogo telaFim(Jogo *g, const Comandos *cmd)
                     centro, Y_NOME + ALTURA_NOME + 40, TAM_FIM_DICA, LIGHTGRAY);
     }
 
-    if (cmd->confirmar) {
-        const char *nomeFinal = nomeTam > 0 ? nomeFim : PLACAR_NOME_ANONIMO;
-        size_t len = strlen(nomeFinal);
+    if (cmd->confirmar && !aguardandoTeclasSoltas) {
+        const char *nomeFinal = nomeFinalFim();
 
         g->placar = inserirPontuacao(g->placar, nomeFinal, total);
-        salvarPlacar(g->placar, CAMINHO_PLACAR);
+        erroSalvarPlacar = salvarPlacar(g->placar, CAMINHO_PLACAR) ? 0 : 1;
 
-        if (len >= sizeof ultimoNome)
-            len = sizeof ultimoNome - 1;
-        memcpy(ultimoNome, nomeFinal, len);
-        ultimoNome[len] = '\0';
+        memcpy(ultimoNome, nomeFinal, strlen(nomeFinal) + 1);
         ultimosPontos = total;
         destacarUltima = 1;
 
@@ -350,6 +443,7 @@ EstadoJogo telaPlacar(Jogo *g, const Comandos *cmd)
     int centro = GetScreenWidth() / 2;
     int i;
 
+    (void)entrouEm(EST_PLACAR);
     textoNoMenu("Placar de Pilotos", centro, 40, 40, RAYWHITE);
 
     if (total == 0) {
@@ -378,8 +472,12 @@ EstadoJogo telaPlacar(Jogo *g, const Comandos *cmd)
 
     textoNoMenu("Esc/B: voltar", centro, 640, 20, LIGHTGRAY);
 
+    if (erroSalvarPlacar)
+        textoNoMenu("Falha ao salvar o placar em disco.", centro, 610, 18, RED);
+
     if (cmd->voltar || cmd->confirmar) {
         destacarUltima = 0;
+        erroSalvarPlacar = 0;
         return EST_MENU;
     }
     return EST_PLACAR;
@@ -410,6 +508,8 @@ enum { QTD_CONTROLES = (int)(sizeof CONTROLES / sizeof CONTROLES[0]) };
 static const char *ROTULOS_CONFIG[] = {
     "Sensibilidade", "Zona morta", "Inverter eixo Y", "Vibração"
 };
+
+enum { QTD_CONFIG = (int)(sizeof ROTULOS_CONFIG / sizeof ROTULOS_CONFIG[0]) };
 
 static void ajustarConfig(ConfigEntrada *cfg, int selecionada, int direcao)
 {
@@ -457,10 +557,12 @@ EstadoJogo telaControles(ConfigEntrada *cfg, const Comandos *cmd)
     int centro = GetScreenWidth() / 2;
     int i;
 
+    (void)entrouEm(EST_CONTROLES);
+
     if (cmd->menuCima)
-        selecionada = (selecionada + 3) % 4;
+        selecionada = (selecionada + QTD_CONFIG - 1) % QTD_CONFIG;
     if (cmd->menuBaixo)
-        selecionada = (selecionada + 1) % 4;
+        selecionada = (selecionada + 1) % QTD_CONFIG;
 
     if (cmd->menuEsquerda)
         ajustarConfig(cfg, selecionada, -1);
@@ -487,7 +589,7 @@ EstadoJogo telaControles(ConfigEntrada *cfg, const Comandos *cmd)
     DrawLine(110, 402, 1170, 402, DARKGRAY);
     textoNoMenu("Configurações", centro, 414, 24, RAYWHITE);
 
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < QTD_CONFIG; i++) {
         int y = 454 + i * 34;
         const char *valor;
         Color cor = i == selecionada ? YELLOW : LIGHTGRAY;
@@ -517,4 +619,18 @@ EstadoJogo telaControles(ConfigEntrada *cfg, const Comandos *cmd)
                 centro, 640, 18, LIGHTGRAY);
 
     return cmd->voltar ? EST_MENU : EST_CONTROLES;
+}
+
+/* Libera fonte e textura antes de o contexto OpenGL ser destruído. */
+void descarregarTelas(void)
+{
+    if (fundoMenu.id != 0)
+        UnloadTexture(fundoMenu);
+    if (fonteMenu.texture.id != 0)
+        UnloadFont(fonteMenu);
+
+    fundoMenu = (Texture2D){ 0 };
+    fonteMenu = (Font){ 0 };
+    fundoMenuCarregado = 0;
+    fonteMenuCarregada = 0;
 }

@@ -157,5 +157,6 @@ void jogo_executar(void)
     encerrarPartida(&jogo);
     liberarPlacar(jogo.placar);
     jogo.placar = NULL;
+    descarregarTelas();
     CloseWindow();
 }

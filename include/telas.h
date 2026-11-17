@@ -9,4 +9,7 @@ EstadoJogo telaFim(Jogo *g, const Comandos *cmd);
 EstadoJogo telaPlacar(Jogo *g, const Comandos *cmd);
 EstadoJogo telaControles(ConfigEntrada *cfg, const Comandos *cmd);
 
+/* Libera a fonte e a textura da interface; chamar antes de CloseWindow. */
+void descarregarTelas(void);
+
 #endif
