@@ -224,7 +224,6 @@ void atualizarExplosoes(Jogo *g, float dt)
     }
 }
 
-
 float progressoExplosao(const Explosao *e)
 {
     float p;
