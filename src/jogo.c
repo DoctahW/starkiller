@@ -77,7 +77,7 @@ static EstadoJogo combate(Jogo *g, const Comandos *cmd, int controleCaiu)
     if (!cmd->pausa && !controleCaiu)
         proximo = simularCombate(g, &relogio, cmd, GetFrameTime());
 
-    desenharCena(g);   /* também no frame que entra em pausa: sem piscar preto */
+    render_cena(g, cameraDoJogador(&g->jogador));   /* também no frame que entra em pausa: sem piscar preto */
     DrawText(TextFormat("COMBATE  %3.0f s", g->tempoRestante), 20, 20, 20, RAYWHITE);
     DrawText("Esc/Start: pausa", 20, 50, 20, GRAY);
     return proximo;
@@ -86,7 +86,7 @@ static EstadoJogo combate(Jogo *g, const Comandos *cmd, int controleCaiu)
 /* A cena fica congelada atrás do aviso. */
 static EstadoJogo pausa(const Jogo *g, const Comandos *cmd)
 {
-    desenharCena(g);
+    render_cena(g, cameraDoJogador(&g->jogador));
     DrawText("PAUSA", 20, 20, 40, RAYWHITE);
     DrawText("Esc/Start: continuar   Enter/A: voltar ao menu", 20, 70, 20, GRAY);
 
@@ -141,7 +141,7 @@ void jogo_executar(void)
     SetTargetFPS(60);
 
     iniciarEntrada(&cfg);
-    iniciarRender();
+    carregarAssets();
     jogo.estado = EST_MENU;
 
     while (jogo.estado != EST_SAIR && !WindowShouldClose()) {
@@ -159,7 +159,7 @@ void jogo_executar(void)
     }
 
     encerrarPartida(&jogo);
-    encerrarRender();
+    descarregarAssets();
     liberarPlacar(jogo.placar);
     jogo.placar = NULL;
     CloseWindow();
