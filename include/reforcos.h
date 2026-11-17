@@ -9,7 +9,7 @@ void gerarReforcos(FilaReforcos *f, float duracao);
 /*
  * Seção 3.4, passo 3: desenfileira todos os grupos cujo tempoChegada já passou
  * (tempoChegada <= g->tempoDecorrido) e insere os caças de cada grupo na lista de
- * inimigos, juntos, num ponto aleatório da borda da arena e em formação.
+ * inimigos, juntos, num ponto aleatório da borda da arena, longe do jogador, e em formação.
  */
 void processarReforcos(Jogo *g);
 void liberarFila(FilaReforcos *f);
