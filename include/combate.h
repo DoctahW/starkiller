@@ -69,8 +69,16 @@ int resolverLasers(Jogo *g, float dt);
 #define FRACAO_DANO_DESTROIER 0.1f
 
 /*
+ * Onde um projétil de velocidade `velProjetil`, saindo de `origem` agora, encontra um alvo em `alvo`
+ * que voa reto com `velAlvo`. Sem solução (alvo mais rápido que o projétil), devolve `alvo`.
+ * Serve à mira dos rebeldes e ao indicador de tiro adiantado do HUD.
+ */
+Vector3 pontoDeInterceptacao(Vector3 origem, float velProjetil, Vector3 alvo, Vector3 velAlvo);
+
+/*
  * Dispara um laser inimigo (doJogador = 0) da posição de `in` rumo ao alvo do seu estadoIA:
- * IA_ATACAR_JOGADOR mira a posição do jogador; IA_ATACAR_DESTROIER mira a origem (centro do Destróier).
+ * IA_ATACAR_JOGADOR mira o ponto de interceptação do TIE (pontoDeInterceptacao com a frente * velocidade
+ * dele), então acerta quem voa reto; IA_ATACAR_DESTROIER mira a origem (centro do Destróier).
  * IA_FUGIR não atira. Devolve 1 se disparou; 0 se fugindo, com o pool cheio ou sem direção (inimigo
  * exatamente sobre o alvo). O cooldownTiro é da IA (IA-03): esta função não o lê nem o altera.
  */

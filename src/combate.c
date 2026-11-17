@@ -249,6 +249,24 @@ float raioExplosao(const Explosao *e)
     return e->raioMax * p * (2.0f - p);   /* ease-out: abre rápido, desacelera no fim */
 }
 
+Vector3 pontoDeInterceptacao(Vector3 origem, float velProjetil, Vector3 alvo, Vector3 velAlvo)
+{
+    /* |rel + v t| = s t; com s > |v| há uma raiz positiva. */
+    Vector3 rel = Vector3Subtract(alvo, origem);
+    float a = Vector3DotProduct(velAlvo, velAlvo) - velProjetil * velProjetil;
+    float b = 2.0f * Vector3DotProduct(rel, velAlvo);
+    float c = Vector3DotProduct(rel, rel);
+    float disc = b * b - 4.0f * a * c;
+    float t;
+
+    if (a >= 0.0f || disc < 0.0f)
+        return alvo;
+    t = (-b - sqrtf(disc)) / (2.0f * a);
+    if (t <= 0.0f)
+        return alvo;
+    return Vector3Add(alvo, Vector3Scale(velAlvo, t));
+}
+
 int dispararLaserInimigo(Jogo *g, const Inimigo *in)
 {
     Vector3 alvo, dir;
@@ -256,7 +274,8 @@ int dispararLaserInimigo(Jogo *g, const Inimigo *in)
     Laser *l;
 
     if (in->estadoIA == IA_ATACAR_JOGADOR)
-        alvo = g->jogador.pos;
+        alvo = pontoDeInterceptacao(in->pos, VEL_LASER_INIMIGO, g->jogador.pos,
+                                    Vector3Scale(g->jogador.frente, g->jogador.velocidade));
     else if (in->estadoIA == IA_ATACAR_DESTROIER)
         alvo = (Vector3){ 0.0f, 0.0f, 0.0f };
     else
