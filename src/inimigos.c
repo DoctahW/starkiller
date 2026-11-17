@@ -1,6 +1,8 @@
 #include <stdlib.h>
 
 #include "inimigos.h"
+#include "nave.h"
+#include "raymath.h"
 
 Inimigo criarInimigo(TipoNave tipo, Vector3 pos, int id)
 {
@@ -91,6 +93,26 @@ void removerInimigo(ListaInimigos *l, NoInimigo *no){
 
     free(no);
     l->tamanho--;
+}
+
+
+void atualizarInimigos(Jogo *g, float dt){
+    NoInimigo *no = g->inimigos.inicio;
+
+    (void) dt; //so a ia_atualizar usa dt, e ela entra com a IA-01 (#49)
+
+    while(no != NULL){
+        NoInimigo *prox = no->prox; //secao 3.5: guardar antes, o despawn libera o no
+
+        no->dado.distancia = Vector3Distance(no->dado.pos, g->jogador.pos);
+
+        //arena e em torno do Destroier na origem, nao do jogador
+        if(Vector3Length(no->dado.pos) > RAIO_ARENA){
+            removerInimigo(&g->inimigos, no);
+        }
+
+        no = prox;
+    }
 }
 
 void ordenarPorDistancia(ListaInimigos *l){

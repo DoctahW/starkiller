@@ -30,6 +30,10 @@ int inserirInimigo(ListaInimigos *l, Inimigo in);
 //Pre-condicao: o no tem que pertencer a l; nao confere porque custaria O(n)
 void removerInimigo(ListaInimigos *l, NoInimigo *no);
 
+//Recalcula a distancia de cada no ate o jogador e despawna quem saiu da arena
+//Despawn nao e abate: nao pontua nem explode. Falta so chamar a ia_atualizar (#49)
+void atualizarInimigos(Jogo *g, float dt);
+
 //Insertion sort que so religa ponteiro de no, sem copiar Inimigo
 //Fica do mais perto pro mais longe; alvo e tamanho nao mudam
 void ordenarPorDistancia(ListaInimigos *l);
