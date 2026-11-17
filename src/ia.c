@@ -1,5 +1,7 @@
 #include <math.h>
 
+#include "combate.h"
+#include "destroier.h"
 #include "ia.h"
 #include "inimigos.h"
 #include "raymath.h"
@@ -12,7 +14,6 @@
 #define DANO_BOMBA_YWING    8.0f
 #define RAIO_ORBITA_YWING   550.0f
 #define AVANCO_ORBITA       185.0f
-#define FOLGA_ORBITA        90.0f   /* além do anel por mais que isto, volta direto para ele */
 
 static float velocidadeMaxima(TipoNave tipo)
 {
@@ -45,25 +46,49 @@ static Vector3 alvoDoEstado(const Inimigo *in, const Jogo *g)
 }
 
 /*
- * Alvo do Y-Wing em bombardeio: um ponto do anel de órbita em volta do Destróier,
- * avançado no sentido tangencial. Longe do anel, volta direto para o raio de órbita.
+ * Alvo do Y-Wing em bombardeio: um ponto do anel no plano z = 0, perpendicular ao eixo
+ * do casco, deslocado no sentido tangencial. Nesse plano o anel fica fora do casco em
+ * qualquer ângulo; longe da altura do anel, o caça sobe ou desce até ele.
  */
 static Vector3 alvoOrbita(const Inimigo *in)
 {
-    Vector3 raio = in->pos;
-    float dist = Vector3Length(raio);
-    Vector3 eixo, tangente;
+    Vector3 radial = { in->pos.x, in->pos.y, 0.0f };
+    float dist = Vector3Length(radial);
+    const Vector3 eixo = { 0.0f, 0.0f, 1.0f };
+    Vector3 tangente;
 
     if (dist < DIST_MINIMA)
-        return (Vector3){ RAIO_ORBITA_YWING, 0.0f, 0.0f };
+        radial = (Vector3){ 1.0f, 0.0f, 0.0f };
+    else
+        radial = Vector3Scale(radial, 1.0f / dist);
 
-    raio = Vector3Scale(raio, 1.0f / dist);
-    if (dist > RAIO_ORBITA_YWING + FOLGA_ORBITA)
-        return Vector3Scale(raio, RAIO_ORBITA_YWING);
+    tangente = Vector3CrossProduct(eixo, radial);
+    return Vector3Add(Vector3Scale(radial, RAIO_ORBITA_YWING), Vector3Scale(tangente, AVANCO_ORBITA));
+}
 
-    eixo = fabsf(raio.y) > 0.9f ? (Vector3){ 1.0f, 0.0f, 0.0f } : (Vector3){ 0.0f, 1.0f, 0.0f };
-    tangente = Vector3Normalize(Vector3CrossProduct(eixo, raio));
-    return Vector3Add(Vector3Scale(raio, RAIO_ORBITA_YWING), Vector3Scale(tangente, AVANCO_ORBITA));
+/*
+ * IA-04: o caça não fica dentro do casco. A API é a mesma da colisão do jogador
+ * (afastarDoDestroier, de destroier.h). O empurrão é a normal aproximada da superfície,
+ * então tira de `vel` a componente que aponta para dentro e o caça desliza no casco.
+ */
+static void desviarCasco(Inimigo *in)
+{
+    Vector3 antes = in->pos;
+    Vector3 empurrao;
+    float dist;
+
+    if (!afastarDoDestroier(&in->pos, raioInimigo(in->tipo)))
+        return;
+
+    empurrao = Vector3Subtract(in->pos, antes);
+    dist = Vector3Length(empurrao);
+    if (dist > 1e-6f) {
+        Vector3 normal = Vector3Scale(empurrao, 1.0f / dist);
+        float entrada = Vector3DotProduct(in->vel, normal);
+
+        if (entrada < 0.0f)
+            in->vel = Vector3Subtract(in->vel, Vector3Scale(normal, entrada));
+    }
 }
 
 /* IA-02: 8 de dano/s no casco do Destróier enquanto o Y-Wing estiver no alcance. */
@@ -93,5 +118,6 @@ void ia_atualizar(Inimigo *in, Jogo *g, float dt)
 
     in->vel = Vector3MoveTowards(in->vel, desejada, ACELERACAO_IA * dt);
     in->pos = Vector3Add(in->pos, Vector3Scale(in->vel, dt));
+    desviarCasco(in);
     bombardearDestroier(in, g, dt);
 }
