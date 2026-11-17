@@ -544,9 +544,10 @@ static void testarDisparoInimigo(void)
     Laser *l;
     int i;
 
-    /* Mira o jogador: laser vermelho na direção dele, a VEL_LASER_INIMIGO, saindo do inimigo. */
+    /* Mira o jogador parado: laser vermelho na direção dele, a VEL_LASER_INIMIGO, saindo do inimigo. */
     novoJogo();
     jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
+    jogo.jogador.velocidade = 0.0f;
     in = inimigoEm((Vector3){ 1500.0f, 0.0f, 3000.0f }, IA_ATACAR_JOGADOR);
     VERIFICA(dispararLaserInimigo(&jogo, &in) == 1);
     VERIFICA(primeiroLaserInimigo() >= 0);
@@ -556,6 +557,27 @@ static void testarDisparoInimigo(void)
     VERIFICA(proximo(Vector3Length(l->vel), VEL_LASER_INIMIGO));
     VERIFICA(proximo(Vector3DotProduct(Vector3Normalize(l->vel),
                                         Vector3Normalize(Vector3Subtract(jogo.jogador.pos, in.pos))), 1.0f));
+
+    /* Jogador voando reto: o laser sai adiantado e o acerta em movimento. */
+    novoJogo();
+    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
+    jogo.jogador.frente = (Vector3){ 1.0f, 0.0f, 0.0f };
+    jogo.jogador.velocidade = 400.0f;
+    in = inimigoEm((Vector3){ 0.0f, 0.0f, 3000.0f }, IA_ATACAR_JOGADOR);
+    VERIFICA(dispararLaserInimigo(&jogo, &in) == 1);
+    l = &jogo.lasers[primeiroLaserInimigo()];
+    VERIFICA(l->vel.x > 0.0f);   /* à frente do TIE, não onde ele está */
+    {
+        float dt = 1.0f / 60.0f;
+        int acertou = 0;
+
+        for (i = 0; i < 120 && !acertou; i++) {
+            jogo.jogador.pos.x += jogo.jogador.velocidade * dt;
+            atualizarLasers(&jogo, dt);
+            acertou = colidirLasersInimigos(&jogo, dt);
+        }
+        VERIFICA(acertou == 1);
+    }
 
     /* Mira o Destróier: direção da origem. */
     novoJogo();
