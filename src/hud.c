@@ -1,8 +1,10 @@
 #include "hud.h"
 
 #include <math.h>
+#include <stddef.h>
 
 #include "raymath.h"
+#include "combate.h"
 #include "jogo.h"
 #include "nave.h"
 #include "pontuacao.h"
@@ -66,6 +68,20 @@
 #define COR_DESTROIER (Color){ 70, 170, 255, 255 }
 #define COR_ALERTA    (Color){ 240, 200, 40, 255 }
 #define COR_CRITICA   (Color){ 235, 50, 40, 255 }
+#define COR_ALVO      (Color){ 255, 120, 60, 255 }
+
+/*
+ * Alvo travado. No vidro: colchetes em volta do caça, com tipo e distância, e o indicador de tiro
+ * adiantado (onde mirar para o laser encontrar o caça); fora do vidro, uma seta em volta da retícula.
+ * No visor: escopo com a direção do alvo (centro = à frente, anel do meio = 90°, borda = atrás).
+ */
+#define MARCA_MIN       14.0f   /* meia largura mínima dos colchetes (px) */
+#define MARCA_ESCALA    1.6f    /* colchetes um pouco maiores que o caça */
+#define MARGEM_VIDRO    20.0f   /* px; mais perto da borda da tela, vira seta */
+#define RAIO_SETA       200.0f  /* círculo em torno da retícula onde fica a seta */
+#define PIPPER_RAIO     7.0f
+#define ESCOPO_RAIO     40.0f
+#define ESCOPO_Y        (VISOR_Y - 14.0f)
 
 static Font fonteHud;
 
@@ -216,6 +232,129 @@ static void desenharReticula(void)
     DrawLine(cx, cy + RETICULA_VAO, cx, cy + RETICULA_VAO + RETICULA_TRACO / 2, cor);
 }
 
+static const char *nomeDoTipo(TipoNave t)
+{
+    switch (t) {
+    case YWING: return "Y-WING";
+    case AWING: return "A-WING";
+    case XWING:
+    default:    return "X-WING";
+    }
+}
+
+/* Ponto no espaço da nave: x para a direita, y para cima, z para a frente. */
+static Vector3 noEspacoDaNave(const Jogador *j, Vector3 p)
+{
+    Vector3 rel = Vector3Subtract(p, j->pos);
+
+    return (Vector3){ Vector3DotProduct(rel, j->direita), Vector3DotProduct(rel, j->cima),
+                      Vector3DotProduct(rel, j->frente) };
+}
+
+/* Projeta `p` na tela; 0 se está atrás da nave ou fora do vidro (acima do painel). */
+static int noVidro(const Jogador *j, Vector3 p, Vector2 *tela)
+{
+    if (noEspacoDaNave(j, p).z < 1.0f)
+        return 0;
+    *tela = GetWorldToScreen(p, cameraDoJogador(j));
+    return tela->x >= MARGEM_VIDRO && tela->x <= LARGURA_TELA - MARGEM_VIDRO
+        && tela->y >= MARGEM_VIDRO && tela->y <= COLUNA_TOPO - MARGEM_VIDRO;
+}
+
+static void colchetes(Vector2 c, float m, Color cor)
+{
+    float traco = m * 0.5f;
+
+    for (int sx = -1; sx <= 1; sx += 2)
+        for (int sy = -1; sy <= 1; sy += 2) {
+            Vector2 canto = { c.x + sx * m, c.y + sy * m };
+
+            DrawLineEx(canto, (Vector2){ canto.x - sx * traco, canto.y }, 2.0f, cor);
+            DrawLineEx(canto, (Vector2){ canto.x, canto.y - sy * traco }, 2.0f, cor);
+        }
+}
+
+/* Seta em volta da retícula, apontando para o alvo fora do vidro, com a distância. */
+static void setaParaOAlvo(const Jogador *j, const Inimigo *alvo, float dist)
+{
+    Vector3 local = noEspacoDaNave(j, alvo->pos);
+    Vector2 dir = { local.x, -local.y };
+    Vector2 centro = { LARGURA_TELA / 2.0f, ALTURA_TELA / 2.0f };
+    Vector2 p, lado;
+
+    dir = Vector2Length(dir) > 1e-3f ? Vector2Normalize(dir) : (Vector2){ 0.0f, 1.0f };
+    p = Vector2Add(centro, Vector2Scale(dir, RAIO_SETA));
+    lado = (Vector2){ -dir.y * 9.0f, dir.x * 9.0f };
+    triangulo(Vector2Add(p, Vector2Scale(dir, 12.0f)),
+              Vector2Add(Vector2Subtract(p, Vector2Scale(dir, 6.0f)), lado),
+              Vector2Subtract(Vector2Subtract(p, Vector2Scale(dir, 6.0f)), lado), COR_ALVO);
+    texto(TextFormat("%d u", (int)lroundf(dist)), (int)(p.x - dir.x * 26.0f), (int)(p.y - dir.y * 26.0f) - 8,
+          14, 0.5f, COR_ALVO);
+}
+
+/*
+ * Alvo travado no vidro. O indicador de tiro adiantado fica onde o caça estará quando o laser
+ * chegar, se ele voar reto; com o indicador dentro da retícula, o tiro acerta (fica verde).
+ */
+static void desenharAlvoNoVidro(const Jogo *g)
+{
+    const Jogador *j = &g->jogador;
+    const Inimigo *alvo;
+    Vector2 tela, pipper;
+    float dist, focal, m;
+    Vector3 adiantado;
+
+    if (g->inimigos.alvo == NULL)
+        return;
+    alvo = &g->inimigos.alvo->dado;
+    dist = Vector3Distance(alvo->pos, j->pos);
+
+    if (!noVidro(j, alvo->pos, &tela)) {
+        setaParaOAlvo(j, alvo, dist);
+        return;
+    }
+
+    focal = (ALTURA_TELA * 0.5f) / tanf(FOV_JOGADOR * 0.5f * DEG2RAD);
+    m = fmaxf(MARCA_MIN, raioInimigo(alvo->tipo) * MARCA_ESCALA * focal / noEspacoDaNave(j, alvo->pos).z);
+    colchetes(tela, m, COR_ALVO);
+    texto(TextFormat("%s  %d u", nomeDoTipo(alvo->tipo), (int)lroundf(dist)), (int)tela.x, (int)(tela.y + m + 4.0f),
+          14, 0.5f, COR_ALVO);
+
+    if (dist > VEL_LASER * VIDA_LASER)
+        return;
+    adiantado = pontoDeInterceptacao(j->pos, VEL_LASER, alvo->pos, alvo->vel);
+    if (noVidro(j, adiantado, &pipper)) {
+        Vector2 centro = { LARGURA_TELA / 2.0f, ALTURA_TELA / 2.0f };
+        int naMira = Vector2Distance(pipper, centro) <= RETICULA_RAIO;
+        Color cor = naMira ? COR_HUD : COR_ALVO;
+
+        DrawLineEx(tela, pipper, 1.0f, Fade(cor, 0.5f));
+        DrawCircleLinesV(pipper, PIPPER_RAIO, cor);
+        if (naMira)
+            DrawCircleV(pipper, PIPPER_RAIO - 3.0f, cor);
+    }
+}
+
+/* Escopo no visor: direção do alvo travado; o ponto pisca quando o alvo está atrás. */
+static void desenharEscopo(const Jogador *j, const Inimigo *alvo)
+{
+    Vector2 c = { JANELA_X, ESCOPO_Y };
+    Vector3 local = Vector3Normalize(noEspacoDaNave(j, alvo->pos));
+    float ang = acosf(Clamp(local.z, -1.0f, 1.0f));
+    Vector2 dir = { local.x, -local.y };
+    Vector2 ponto;
+
+    dir = Vector2Length(dir) > 1e-3f ? Vector2Normalize(dir) : (Vector2){ 0.0f, 0.0f };
+    ponto = Vector2Add(c, Vector2Scale(dir, ang / PI * ESCOPO_RAIO));
+
+    DrawCircleLinesV(c, ESCOPO_RAIO, Fade(COR_NEON, 0.8f));
+    DrawCircleLinesV(c, ESCOPO_RAIO * 0.5f, Fade(COR_NEON, 0.4f));
+    DrawLineV((Vector2){ c.x - ESCOPO_RAIO, c.y }, (Vector2){ c.x + ESCOPO_RAIO, c.y }, Fade(COR_NEON, 0.3f));
+    DrawLineV((Vector2){ c.x, c.y - ESCOPO_RAIO }, (Vector2){ c.x, c.y + ESCOPO_RAIO }, Fade(COR_NEON, 0.3f));
+    if (ang <= PI * 0.5f || piscaAceso())
+        DrawCircleV(ponto, 4.0f, COR_ALVO);
+}
+
 /* Barra horizontal em segmentos que esvazia da direita para a esquerda. */
 static void barra(Rectangle r, float f, Color cor)
 {
@@ -351,6 +490,7 @@ static void desenharColuna(const Jogo *g, int foraDaArena)
     Rectangle acel = { 592, COLUNA_TOPO + 10, 96, 28 };
     Rectangle luz = { 694, COLUNA_TOPO + 10, 54, 28 };
     Vector2 visor = { JANELA_X, VISOR_Y };
+    const Inimigo *alvo = g->inimigos.alvo != NULL ? &g->inimigos.alvo->dado : NULL;
     float casco = fracao(g->jogador.casco, CASCO_JOGADOR);
     float f = fracao(g->jogador.velocidade - VEL_MIN, VEL_MAX - VEL_MIN);
     int aceso = foraDaArena && piscaAceso();
@@ -384,12 +524,29 @@ static void desenharColuna(const Jogo *g, int foraDaArena)
     texto("ARENA", (int)(luz.x + luz.width / 2), (int)luz.y + 6, 15, 0.5f, aceso ? WHITE : Fade(COR_CRITICA, 0.6f));
 
     DrawRectangleRec((Rectangle){ 560, COLUNA_TOPO + 46, 160, 26 }, COR_TELA);
-    texto("ALFA 1", (int)JANELA_X, (int)COLUNA_TOPO + 48, 20, 0.5f, COR_VALOR);
+    if (alvo != NULL) {
+        /* Alvo travado: tipo, distância e integridade (casco em verde, escudo em azul). */
+        float total = alvo->escudoMax + alvo->cascoMax;
+        float largura = 156.0f;
+        float escudo = largura * alvo->escudo / total;
+        float cascoAlvo = largura * alvo->casco / total;
+        float base = COLUNA_TOPO + 46 + 23;
+
+        texto(TextFormat("%s  %d u", nomeDoTipo(alvo->tipo), (int)lroundf(Vector3Distance(alvo->pos, g->jogador.pos))),
+              (int)JANELA_X, (int)COLUNA_TOPO + 49, 17, 0.5f, COR_ALVO);
+        DrawRectangleRec((Rectangle){ 562, base, cascoAlvo, 2 }, COR_TIE);
+        DrawRectangleRec((Rectangle){ 562 + cascoAlvo, base, escudo, 2 }, COR_DESTROIER);
+    } else {
+        texto("SEM ALVO", (int)JANELA_X, (int)COLUNA_TOPO + 48, 20, 0.5f, Fade(COR_ROTULO, 0.6f));
+    }
 
     DrawCircleV(visor, VISOR_RAIO + 6.0f, COR_BRILHO);
     DrawCircleV(visor, VISOR_RAIO, COR_TELA);
     DrawCircleLinesV(visor, VISOR_RAIO - 6.0f, Fade(COR_NEON, 0.7f));
-    silhuetaTie((int)visor.x, (int)visor.y - 18, corDoNivel(casco, COR_ALERTA));
+    if (alvo != NULL)
+        desenharEscopo(&g->jogador, alvo);
+    else
+        silhuetaTie((int)visor.x, (int)visor.y - 18, corDoNivel(casco, COR_ALERTA));
     if (corEstado.r != COR_CRITICA.r || piscaAceso())
         texto(estado, (int)visor.x, (int)visor.y + 30, 15, 0.5f, corEstado);
 }
@@ -412,6 +569,7 @@ void hud_desenhar(const Jogo *g, int foraDaArena)
     desenharReticula();
     if (foraDaArena)
         desenharAvisoArena();
+    desenharAlvoNoVidro(g);
     desenharTabletPartida(g);
     desenharTabletNave(g);
     desenharColuna(g, foraDaArena);
