@@ -1,3 +1,4 @@
+#include "jogo.h"
 #include "reforcos.h"
 #include "teste.h"
 
@@ -98,12 +99,67 @@ static void testarLiberar(void)
     VERIFICA(f.inicio == NULL && f.fim == NULL && f.tamanho == 0);
 }
 
+/* gerarReforcos da seção 2.2: ondas em ordem crescente, tamanho 2 + t/40 e A-Wings crescendo. */
+static void testarGerarReforcos(void)
+{
+    FilaReforcos f = { 0 };
+    NoReforco grupo;
+    float t = 3.0f;
+    int onda = 0, totalAnterior = 0, qtdAAnterior = 0;
+
+    gerarReforcos(&f, DURACAO_PARTIDA);
+    VERIFICA(f.tamanho == 15);
+
+    while (desenfileirarReforco(&f, &grupo) == 1) {
+        int total = 2 + (int)(grupo.tempoChegada / 40.0f);
+
+        VERIFICA(grupo.tempoChegada == t);
+        VERIFICA(grupo.qtdX >= 1);
+        VERIFICA(grupo.qtdX + grupo.qtdY + grupo.qtdA == total);
+
+        if (onda == 0)
+            VERIFICA(grupo.qtdY == 0);
+        else
+            VERIFICA(grupo.qtdY >= 1);
+
+        /* A quantidade de A-Wings e sua proporção não diminuem de uma onda para a seguinte. */
+        if (onda > 0) {
+            VERIFICA(grupo.qtdA >= qtdAAnterior);
+            VERIFICA(grupo.qtdA * totalAnterior >= qtdAAnterior * total);
+        }
+
+        totalAnterior = total;
+        qtdAAnterior = grupo.qtdA;
+        t += 20.0f;
+        onda++;
+    }
+
+    VERIFICA(onda == 15);
+    VERIFICA(qtdAAnterior > 0);
+    VERIFICA(f.tamanho == 0 && f.inicio == NULL && f.fim == NULL);
+
+    /* Partida que acaba antes da primeira onda não gera nada. */
+    gerarReforcos(&f, 2.9f);
+    VERIFICA(f.tamanho == 0);
+    gerarReforcos(&f, 3.0f);
+    VERIFICA(f.tamanho == 0);
+
+    /* Com 23 s cabe só a onda de t = 3. */
+    gerarReforcos(&f, 23.0f);
+    VERIFICA(f.tamanho == 1);
+    VERIFICA(desenfileirarReforco(&f, &grupo) == 1 && grupo.tempoChegada == 3.0f);
+
+    liberarFila(&f);
+    VERIFICA(f.tamanho == 0);
+}
+
 int main(void)
 {
     testarVazia();
     testarUmElemento();
     testarOrdemFifo();
     testarLiberar();
+    testarGerarReforcos();
 
     return RESULTADO_TESTES();
 }
