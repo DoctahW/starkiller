@@ -546,32 +546,32 @@ static void testarDisparoInimigo(void)
 
     /* Mira o jogador: laser vermelho na direção dele, a VEL_LASER_INIMIGO, saindo do inimigo. */
     novoJogo();
-    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 300.0f };
-    in = inimigoEm((Vector3){ 300.0f, 0.0f, 700.0f }, IA_ATACAR_JOGADOR);
+    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
+    in = inimigoEm((Vector3){ 1500.0f, 0.0f, 3000.0f }, IA_ATACAR_JOGADOR);
     VERIFICA(dispararLaserInimigo(&jogo, &in) == 1);
     VERIFICA(primeiroLaserInimigo() >= 0);
     l = &jogo.lasers[primeiroLaserInimigo()];
     VERIFICA(l->doJogador == 0 && proximo(l->dano, DANO_LASER_INIMIGO) && proximo(l->vida, VIDA_LASER_INIMIGO));
-    VERIFICA(proximo(l->pos.x, 300.0f) && proximo(l->pos.z, 700.0f));
+    VERIFICA(proximo(l->pos.x, 1500.0f) && proximo(l->pos.z, 3000.0f));
     VERIFICA(proximo(Vector3Length(l->vel), VEL_LASER_INIMIGO));
     VERIFICA(proximo(Vector3DotProduct(Vector3Normalize(l->vel),
                                         Vector3Normalize(Vector3Subtract(jogo.jogador.pos, in.pos))), 1.0f));
 
     /* Mira o Destróier: direção da origem. */
     novoJogo();
-    jogo.jogador.pos = (Vector3){ 900.0f, 0.0f, 0.0f };
-    in = inimigoEm((Vector3){ 0.0f, 0.0f, 1000.0f }, IA_ATACAR_DESTROIER);
+    jogo.jogador.pos = (Vector3){ 4000.0f, 0.0f, 0.0f };
+    in = inimigoEm((Vector3){ 0.0f, 0.0f, 3000.0f }, IA_ATACAR_DESTROIER);
     VERIFICA(dispararLaserInimigo(&jogo, &in) == 1);
     l = &jogo.lasers[primeiroLaserInimigo()];
     VERIFICA(proximo(l->vel.x, 0.0f) && proximo(l->vel.y, 0.0f) && proximo(l->vel.z, -VEL_LASER_INIMIGO));
 
     /* Fugindo não atira; sobre o alvo não há direção; pool cheio não atira. */
     novoJogo();
-    in = inimigoEm((Vector3){ 0.0f, 0.0f, 1000.0f }, IA_FUGIR);
+    in = inimigoEm((Vector3){ 0.0f, 0.0f, 3000.0f }, IA_FUGIR);
     VERIFICA(dispararLaserInimigo(&jogo, &in) == 0 && contarAtivos(&jogo) == 0);
     in = inimigoEm((Vector3){ 0.0f, 0.0f, 0.0f }, IA_ATACAR_DESTROIER);
     VERIFICA(dispararLaserInimigo(&jogo, &in) == 0 && contarAtivos(&jogo) == 0);
-    in = inimigoEm((Vector3){ 0.0f, 0.0f, 1000.0f }, IA_ATACAR_DESTROIER);
+    in = inimigoEm((Vector3){ 0.0f, 0.0f, 3000.0f }, IA_ATACAR_DESTROIER);
     for (i = 0; i < MAX_LASERS; i++)
         VERIFICA(dispararLaserInimigo(&jogo, &in) == 1);
     VERIFICA(dispararLaserInimigo(&jogo, &in) == 0);
@@ -579,7 +579,7 @@ static void testarDisparoInimigo(void)
 
     /* O disparo não mexe no cooldownTiro (é da IA). */
     novoJogo();
-    in = inimigoEm((Vector3){ 0.0f, 0.0f, 1000.0f }, IA_ATACAR_DESTROIER);
+    in = inimigoEm((Vector3){ 0.0f, 0.0f, 3000.0f }, IA_ATACAR_DESTROIER);
     in.cooldownTiro = 0.7f;
     dispararLaserInimigo(&jogo, &in);
     VERIFICA(proximo(in.cooldownTiro, 0.7f));
@@ -606,9 +606,9 @@ static void testarColisaoLasersInimigos(void)
 
     /* Acerto no TIE: casco cai, sequência zera, laser some. */
     novoJogo();
-    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 300.0f };
+    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
     jogo.sequenciaSemDano = 4;
-    in = inimigoEm((Vector3){ 0.0f, 0.0f, 900.0f }, IA_ATACAR_JOGADOR);
+    in = inimigoEm((Vector3){ 0.0f, 0.0f, 3000.0f }, IA_ATACAR_JOGADOR);
     dispararLaserInimigo(&jogo, &in);
     VERIFICA(voarLasersInimigos(dt, 600, &passos) == 1);
     VERIFICA(proximo(jogo.jogador.casco, 100.0f - DANO_LASER_INIMIGO));
@@ -619,8 +619,8 @@ static void testarColisaoLasersInimigos(void)
     /* Acerto no Destróier (proa): cascoDestroier cai, o casco do TIE não. */
     novoJogo();
     jogo.cascoDestroier = 100.0f;
-    jogo.jogador.pos = (Vector3){ 900.0f, 0.0f, 0.0f };
-    in = inimigoEm((Vector3){ 0.0f, 0.0f, 1000.0f }, IA_ATACAR_DESTROIER);
+    jogo.jogador.pos = (Vector3){ 4000.0f, 0.0f, 0.0f };
+    in = inimigoEm((Vector3){ 0.0f, 0.0f, 3000.0f }, IA_ATACAR_DESTROIER);
     dispararLaserInimigo(&jogo, &in);
     voarLasersInimigos(dt, 600, &passos);
     VERIFICA(proximo(jogo.cascoDestroier, 100.0f - DANO_LASER_INIMIGO));
@@ -629,19 +629,19 @@ static void testarColisaoLasersInimigos(void)
 
     /* Passo grande: o segmento evita o túnel pelo TIE (esfera pequena). */
     novoJogo();
-    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 300.0f };
-    in = inimigoEm((Vector3){ 0.0f, 0.0f, 600.0f }, IA_ATACAR_JOGADOR);
+    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
+    in = inimigoEm((Vector3){ 0.0f, 0.0f, 2750.0f }, IA_ATACAR_JOGADOR);
     dispararLaserInimigo(&jogo, &in);
-    atualizarLasers(&jogo, 1.0f);                     /* anda 400 u: de 600 a 200, atravessando o TIE em 300 */
+    atualizarLasers(&jogo, 1.0f);                     /* anda 1840 u: de 2750 a 910, atravessando o TIE em 1370 */
     VERIFICA(colidirLasersInimigos(&jogo, 1.0f) == 1);
 
     /* Segmento que atravessa o TIE e depois o Destróier: só o primeiro leva o dano. */
     novoJogo();
     jogo.cascoDestroier = 100.0f;
-    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 300.0f };
-    jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 100.0f }, .vel = { 0.0f, 0.0f, -400.0f }, .vida = 1.0f,
-                              .ativo = 1, .doJogador = 0, .dano = 5.0f };
-    VERIFICA(colidirLasersInimigos(&jogo, 1.0f) == 1);   /* segmento de z = 500 a 100 */
+    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
+    jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 100.0f }, .vel = { 0.0f, 0.0f, -VEL_LASER_INIMIGO },
+                              .vida = 1.0f, .ativo = 1, .doJogador = 0, .dano = 5.0f };
+    VERIFICA(colidirLasersInimigos(&jogo, 1.0f) == 1);   /* segmento de z = 1940 a 100 */
     VERIFICA(proximo(jogo.jogador.casco, 95.0f));
     VERIFICA(proximo(jogo.cascoDestroier, 100.0f));
     VERIFICA(contarAtivos(&jogo) == 0);
@@ -649,10 +649,10 @@ static void testarColisaoLasersInimigos(void)
     /* Segmento curto que só cruza o Destróier: o TIE não leva dano. */
     novoJogo();
     jogo.cascoDestroier = 100.0f;
-    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 300.0f };
-    jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 100.0f }, .vel = { 0.0f, 0.0f, -400.0f }, .vida = 1.0f,
-                              .ativo = 1, .doJogador = 0, .dano = 5.0f };
-    VERIFICA(colidirLasersInimigos(&jogo, 0.25f) == 0);  /* segmento de z = 200 a 100 */
+    jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
+    jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 700.0f }, .vel = { 0.0f, 0.0f, -VEL_LASER_INIMIGO },
+                              .vida = 1.0f, .ativo = 1, .doJogador = 0, .dano = 5.0f };
+    VERIFICA(colidirLasersInimigos(&jogo, 0.1f) == 0);  /* segmento de z = 884 a 700, cruzando a proa em 823 */
     VERIFICA(proximo(jogo.jogador.casco, 100.0f));
     VERIFICA(proximo(jogo.cascoDestroier, 95.0f));
     VERIFICA(contarAtivos(&jogo) == 0);
@@ -660,13 +660,13 @@ static void testarColisaoLasersInimigos(void)
     /* Erra os dois: continua ativo e sem dano. Lasers do jogador e inativos são ignorados. */
     novoJogo();
     jogo.cascoDestroier = 100.0f;
-    jogo.jogador.pos = (Vector3){ 900.0f, 0.0f, 0.0f };
-    jogo.lasers[0] = (Laser){ .pos = { 500.0f, 500.0f, 0.0f }, .vel = { 0.0f, 0.0f, -400.0f }, .vida = 1.0f,
-                              .ativo = 1, .doJogador = 0, .dano = 5.0f };
-    jogo.lasers[1] = (Laser){ .pos = { 0.0f, 0.0f, 0.0f }, .vel = { 0.0f, 0.0f, 600.0f }, .vida = 1.0f,
-                              .ativo = 1, .doJogador = 1, .dano = 5.0f };   /* do jogador, dentro do Destróier */
-    jogo.lasers[2] = (Laser){ .pos = { 900.0f, 0.0f, 0.0f }, .vel = { 0 }, .vida = 1.0f,
-                              .ativo = 0, .doJogador = 0, .dano = 5.0f };   /* inativo, sobre o TIE */
+    jogo.jogador.pos = (Vector3){ 4000.0f, 0.0f, 0.0f };
+    jogo.lasers[0] = (Laser){ .pos = { 5000.0f, 5000.0f, 0.0f }, .vel = { 0.0f, 0.0f, -VEL_LASER_INIMIGO },
+                              .vida = 1.0f, .ativo = 1, .doJogador = 0, .dano = 5.0f };
+    jogo.lasers[1] = (Laser){ .pos = { 0.0f, 0.0f, 0.0f }, .vel = { 0.0f, 0.0f, VEL_LASER },
+                              .vida = 1.0f, .ativo = 1, .doJogador = 1, .dano = 5.0f };
+    jogo.lasers[2] = (Laser){ .pos = { 4000.0f, 0.0f, 0.0f }, .vel = { 0 },
+                              .vida = 1.0f, .ativo = 0, .doJogador = 0, .dano = 5.0f };
     VERIFICA(colidirLasersInimigos(&jogo, dt) == 0);
     VERIFICA(jogo.lasers[0].ativo && jogo.lasers[1].ativo);
     VERIFICA(proximo(jogo.jogador.casco, 100.0f));
