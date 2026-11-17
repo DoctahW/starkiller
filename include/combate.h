@@ -58,6 +58,27 @@ int aplicarDano(Inimigo *in, float dano);
  */
 int resolverLasers(Jogo *g, float dt);
 
+/* Laser inimigo (vermelho): mesma escala do mundo (×4,6); 5 s cobrem a arena de 9000 u. */
+#define VEL_LASER_INIMIGO   1840.0f  /* u/s */
+#define VIDA_LASER_INIMIGO  5.0f
+#define DANO_LASER_INIMIGO  8.0f     /* tirado do casco do TIE ou de cascoDestroier */
+
+/*
+ * Dispara um laser inimigo (doJogador = 0) da posição de `in` rumo ao alvo do seu estadoIA:
+ * IA_ATACAR_JOGADOR mira a posição do jogador; IA_ATACAR_DESTROIER mira a origem (centro do Destróier).
+ * IA_FUGIR não atira. Devolve 1 se disparou; 0 se fugindo, com o pool cheio ou sem direção (inimigo
+ * exatamente sobre o alvo). O cooldownTiro é da IA (IA-03): esta função não o lê nem o altera.
+ */
+int dispararLaserInimigo(Jogo *g, const Inimigo *in);
+/*
+ * Colisão dos lasers inimigos × TIE (esfera RAIO_JOGADOR) e × Destróier (casco de destroier.h,
+ * amostrando o segmento). Roda logo depois de atualizarLasers, com o mesmo segmento
+ * (pos - vel * dt → pos). Cada laser atinge só o primeiro alvo que atravessa e é desativado.
+ * No TIE: casco -= dano e registrarDanoJogador. No Destróier: cascoDestroier -= dano.
+ * Devolve quantos acertos no TIE houve neste passo (quem chama vibra o controle).
+ */
+int colidirLasersInimigos(Jogo *g, float dt);
+
 #define DURACAO_EXPLOSAO 0.8f    /* s de vida de uma explosão */
 #define RAIO_EXPLOSAO    20.0f   /* raio máximo (chute; ajustar com o visual) */
 

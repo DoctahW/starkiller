@@ -74,6 +74,7 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
         dispararLaser(g);
     atualizarLasers(g, PASSO_FIXO);
     resolverLasers(g, PASSO_FIXO);
+    colidirLasersInimigos(g, PASSO_FIXO);   /* TODO CMB-04: vibrar(&cfg, 0.8f, 0.4f) no acerto, quando o cfg chegar aqui */
     atualizarExplosoes(g, PASSO_FIXO);
 }
 

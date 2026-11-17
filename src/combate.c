@@ -4,6 +4,8 @@
 
 #include "raymath.h"
 #include "pontuacao.h"
+#include "destroier.h"
+#include "nave.h"
 #include "inimigos.h"
 
 /* Índice do primeiro slot livre a partir de `de`, ou -1. */
@@ -245,4 +247,97 @@ float raioExplosao(const Explosao *e)
     float p = progressoExplosao(e);
 
     return e->raioMax * p * (2.0f - p);   /* ease-out: abre rápido, desacelera no fim */
+}
+
+int dispararLaserInimigo(Jogo *g, const Inimigo *in)
+{
+    Vector3 alvo, dir;
+    int slot;
+    Laser *l;
+
+    if (in->estadoIA == IA_ATACAR_JOGADOR)
+        alvo = g->jogador.pos;
+    else if (in->estadoIA == IA_ATACAR_DESTROIER)
+        alvo = (Vector3){ 0.0f, 0.0f, 0.0f };
+    else
+        return 0;
+
+    dir = Vector3Subtract(alvo, in->pos);
+    if (Vector3Length(dir) < 1e-6f)
+        return 0;
+    slot = proximoLivre(g, 0);
+    if (slot < 0)
+        return 0;
+
+    l = &g->lasers[slot];
+    ativarLaser(l, in->pos, Vector3Scale(Vector3Normalize(dir), VEL_LASER_INIMIGO));
+    l->doJogador = 0;
+    l->vida = VIDA_LASER_INIMIGO;
+    l->dano = DANO_LASER_INIMIGO;
+    return 1;
+}
+
+/* Passo de amostragem do segmento no casco: menor que meia célula (8 u), nada é pulado. */
+#define PASSO_CASCO 4.0f
+
+/* Fração [0, 1] onde o segmento entra no casco; 0 se já começa dentro. Devolve 0 se não entra. */
+static int segmentoEntraNoCasco(Vector3 a, Vector3 b, float *t)
+{
+    Vector3 d = Vector3Subtract(b, a);
+    float comprimento = Vector3Length(d);
+    int passos, i;
+
+    if (tocaDestroier(a, 0.0f)) {
+        *t = 0.0f;
+        return 1;
+    }
+    if (comprimento < 1e-6f)
+        return 0;
+    passos = (int)ceilf(comprimento / PASSO_CASCO);
+
+    for (i = 1; i <= passos; i++) {
+        float f = (float)i / (float)passos;
+
+        if (tocaDestroier(Vector3Add(a, Vector3Scale(d, f)), 0.0f)) {
+            *t = f;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int colidirLasersInimigos(Jogo *g, float dt)
+{
+    int i, acertosTie = 0;
+
+    for (i = 0; i < MAX_LASERS; i++) {
+        Laser *l = &g->lasers[i];
+        Vector3 anterior;
+        float tTie = 2.0f, tCasco = 2.0f, t;
+
+        if (!l->ativo || l->doJogador)
+            continue;
+
+        anterior = Vector3Subtract(l->pos, Vector3Scale(l->vel, dt));
+        if (segmentoAcertaEsfera(anterior, l->pos, g->jogador.pos, RAIO_JOGADOR, &t))
+            tTie = t;
+        if (segmentoEntraNoCasco(anterior, l->pos, &t))
+            tCasco = t;
+        if (tTie > 1.0f && tCasco > 1.0f)
+            continue;
+
+        l->ativo = 0;
+        if (tTie <= tCasco) {
+            g->jogador.casco -= l->dano;
+            if (g->jogador.casco < 0.0f)
+                g->jogador.casco = 0.0f;
+            registrarDanoJogador(g);
+            acertosTie++;
+        } else {
+            g->cascoDestroier -= l->dano;
+            if (g->cascoDestroier < 0.0f)
+                g->cascoDestroier = 0.0f;
+        }
+    }
+    return acertosTie;
 }
