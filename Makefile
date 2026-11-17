@@ -8,10 +8,12 @@ ifeq ($(OS),Windows_NT)
     SDL3_PATH   ?= C:/SDL3/x86_64-w64-mingw32
     DLL         := SDL3.dll
     LDLIBS      := -L$(RAYLIB_PATH) -lraylib -L$(SDL3_PATH)/lib -lSDL3 -lopengl32 -lgdi32 -lwinmm
+    CFLAGS      += -I$(SDL3_PATH)/include
 else
     BIN         := starkiller
     RAYLIB_PATH ?= $(HOME)/raylib/src
     LDLIBS      := -L$(RAYLIB_PATH) -lraylib $(shell pkg-config --libs sdl3) -lGL -lm -lpthread -ldl -lrt
+    CFLAGS      += $(shell pkg-config --cflags sdl3)
 endif
 CFLAGS += -I$(RAYLIB_PATH)
 

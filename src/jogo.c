@@ -1,6 +1,8 @@
 #include <math.h>
 #include <string.h>
 
+#include <SDL3/SDL.h>
+
 #include "jogo.h"
 #include "combate.h"
 #include "entrada.h"
@@ -171,6 +173,13 @@ void jogo_executar(void)
     ConfigEntrada cfg;
     int controleAntes = 0;
 
+    /*
+     * O backend SDL da raylib não pede profundidade e a SDL cria o framebuffer com 16 bits: as
+     * camadas quase coplanares do casco do Destróier brigam no z-buffer e serrilham em movimento.
+     * O atributo vale para a janela criada pelo InitWindow; o SDL_Quit do CloseWindow encerra o vídeo.
+     */
+    if (!SDL_InitSubSystem(SDL_INIT_VIDEO) || !SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24))
+        TraceLog(LOG_WARNING, "JOGO: sem profundidade de 24 bits: %s", SDL_GetError());
     InitWindow(LARGURA_TELA, ALTURA_TELA, "TIE Fighter: Esquadrão Imperial");
     ChangeDirectory(GetApplicationDirectory());
     jogo.placar = carregarPlacar(CAMINHO_PLACAR);
