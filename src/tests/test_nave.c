@@ -425,6 +425,7 @@ int main(void)
     {
         Jogo g;
         Camera3D tr;
+        float dx, dy, dz, cheio, meio;
 
         memset(&g, 0, sizeof g);
         iniciarJogador(&g.jogador);
@@ -439,8 +440,21 @@ int main(void)
         VERIFICA(proximo(tr.target.x - tr.position.x, cam.target.x - cam.position.x));
         VERIFICA(proximo(tr.target.y - tr.position.y, cam.target.y - cam.position.y));
         VERIFICA(proximo(tr.target.z - tr.position.z, cam.target.z - cam.position.z));
-        VERIFICA(fabsf(tr.position.x - cam.position.x) + fabsf(tr.position.y - cam.position.y) +
-                     fabsf(tr.position.z - cam.position.z) <= AMPLITUDE_TREMOR * 3.0f);
+        /* direita e cima são unitários e ortogonais, e cada eixo vai até AMPLITUDE_TREMOR: |desloc| <= A·√2. */
+        dx = tr.position.x - cam.position.x;
+        dy = tr.position.y - cam.position.y;
+        dz = tr.position.z - cam.position.z;
+        cheio = sqrtf(dx * dx + dy * dy + dz * dz);
+        VERIFICA(cheio <= AMPLITUDE_TREMOR * sqrtf(2.0f) + EPS);
+
+        /* Decai linearmente: na metade do tempo, com o mesmo tempoDecorrido, o deslocamento é a metade. */
+        g.tempoDano = DURACAO_FEEDBACK_DANO * 0.5f;
+        tr = cameraComTremor(&g);
+        dx = tr.position.x - cam.position.x;
+        dy = tr.position.y - cam.position.y;
+        dz = tr.position.z - cam.position.z;
+        meio = sqrtf(dx * dx + dy * dy + dz * dz);
+        VERIFICA(fabsf(meio - cheio * 0.5f) < 1e-4f);
 
         g.tempoDano = 0.0f;
         tr = cameraComTremor(&g);

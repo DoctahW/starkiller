@@ -15,7 +15,7 @@ void hud_descarregar(void);
  * Com alvo travado: colchetes, tipo e distância sobre o caça, indicador de tiro adiantado (verde
  * dentro da retícula) e seta quando ele está fora do vidro; no console, tipo, distância e
  * integridade, e no visor um escopo com a direção dele.
- * Enquanto g->tempoDano > 0 (dano recente), cobre a tela com um flash vermelho que se apaga em DURACAO_FEEDBACK_DANO.
+ * Enquanto g->tempoDano > 0 (dano recente), tinge o vidro com um flash vermelho que se apaga em DURACAO_FEEDBACK_DANO.
  * `foraDaArena` (retorno de atualizarJogador) liga o aviso de limite da arena. Não altera o jogo.
  */
 void hud_desenhar(const Jogo *g, int foraDaArena);

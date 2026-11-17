@@ -66,16 +66,17 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
 {
     int tinhaAlvo, idAlvo;
 
-    avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
-    colidirDestroier(g, PASSO_FIXO);
-
-    /* O tempo do passo entra antes dos reforços: o grupo de t = 3 s nasce no passo 180. */
+    /* Antes de qualquer dano do passo: colisão e laser armam o feedback inteiro (DURACAO_FEEDBACK_DANO). */
     if (g->tempoDano > 0.0f) {
         g->tempoDano -= PASSO_FIXO;
         if (g->tempoDano < 0.0f)
             g->tempoDano = 0.0f;
     }
 
+    avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
+    colidirDestroier(g, PASSO_FIXO);
+
+    /* O tempo do passo entra antes dos reforços: o grupo de t = 3 s nasce no passo 180. */
     r->passos++;
     g->tempoDecorrido = r->passos * PASSO_FIXO;
     g->tempoRestante = (PASSOS_PARTIDA - r->passos) * PASSO_FIXO;
