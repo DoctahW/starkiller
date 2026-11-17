@@ -6,6 +6,7 @@
 #include "nave.h"
 #include "placar.h"
 #include "reforcos.h"
+#include "render.h"
 #include "telas.h"
 
 static RelogioCombate relogio;
@@ -71,18 +72,21 @@ EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd, float
 
 static EstadoJogo combate(Jogo *g, const Comandos *cmd, int controleCaiu)
 {
-    if (cmd->pausa || controleCaiu)
-        return EST_PAUSA;
+    EstadoJogo proximo = EST_PAUSA;
 
-    EstadoJogo proximo = simularCombate(g, &relogio, cmd, GetFrameTime());
+    if (!cmd->pausa && !controleCaiu)
+        proximo = simularCombate(g, &relogio, cmd, GetFrameTime());
 
+    desenharCena(g);   /* também no frame que entra em pausa: sem piscar preto */
     DrawText(TextFormat("COMBATE  %3.0f s", g->tempoRestante), 20, 20, 20, RAYWHITE);
     DrawText("Esc/Start: pausa", 20, 50, 20, GRAY);
     return proximo;
 }
 
-static EstadoJogo pausa(const Comandos *cmd)
+/* A cena fica congelada atrás do aviso. */
+static EstadoJogo pausa(const Jogo *g, const Comandos *cmd)
 {
+    desenharCena(g);
     DrawText("PAUSA", 20, 20, 40, RAYWHITE);
     DrawText("Esc/Start: continuar   Enter/A: voltar ao menu", 20, 70, 20, GRAY);
 
@@ -107,7 +111,7 @@ static EstadoJogo atualizarEstado(Jogo *g, ConfigEntrada *cfg, const Comandos *c
     switch (g->estado) {
     case EST_MENU:      return telaMenu(g, cmd);
     case EST_COMBATE:   return combate(g, cmd, controleCaiu);
-    case EST_PAUSA:     return pausa(cmd);
+    case EST_PAUSA:     return pausa(g, cmd);
     case EST_FIM:       return telaFim(g, cmd);
     case EST_PLACAR:    return telaPlacar(g, cmd);
     case EST_CONTROLES: return telaControles(cfg, cmd);
@@ -137,6 +141,7 @@ void jogo_executar(void)
     SetTargetFPS(60);
 
     iniciarEntrada(&cfg);
+    iniciarRender();
     jogo.estado = EST_MENU;
 
     while (jogo.estado != EST_SAIR && !WindowShouldClose()) {
@@ -154,6 +159,7 @@ void jogo_executar(void)
     }
 
     encerrarPartida(&jogo);
+    encerrarRender();
     liberarPlacar(jogo.placar);
     jogo.placar = NULL;
     CloseWindow();
