@@ -223,3 +223,26 @@ void atualizarExplosoes(Jogo *g, float dt)
             g->explosoes[i].ativa = 0;
     }
 }
+
+
+float progressoExplosao(const Explosao *e)
+{
+    float p;
+
+    if (!e->ativa)
+        return 0.0f;
+
+    p = e->tempo / DURACAO_EXPLOSAO;
+    if (p < 0.0f)
+        p = 0.0f;
+    if (p > 1.0f)
+        p = 1.0f;
+    return p;
+}
+
+float raioExplosao(const Explosao *e)
+{
+    float p = progressoExplosao(e);
+
+    return e->raioMax * p * (2.0f - p);   /* ease-out: abre rápido, desacelera no fim */
+}
