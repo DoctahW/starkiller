@@ -16,8 +16,23 @@
  * a primeira troca pode ser menor se o caça nasce no meio do ciclo. O A-Wing persegue o
  * jogador. X-Wing e A-Wing atiram no cone de 15° a menos de ALCANCE_TIRO_INIMIGO,
  * respeitando `cooldownTiro`.
+ * Passagem de ataque: X-Wing e A-Wing não voam até o ponto do alvo. A menos de DIST_ROMPER_*
+ * dele, rompem (IA_FUGIR): afastam-se do alvo do seu estado de ataque, abrindo para o lado se
+ * vinham de frente e deslizando na borda da arena. Além de DIST_RETOMAR_*, voltam a atacar.
+ * Todos os tipos se afastam de outro caça a menos de DIST_SEPARACAO, para não se empilharem.
  */
 void ia_atualizar(Inimigo *in, Jogo *g, float dt);
+
+/* Passagem de ataque. O Destróier rompe a 1100 da origem: fora do casco (até ~900) e dentro do alcance. */
+#define DIST_ROMPER_JOGADOR    600.0f
+#define DIST_RETOMAR_JOGADOR   1600.0f
+#define DIST_ROMPER_DESTROIER  1100.0f
+#define DIST_RETOMAR_DESTROIER 2400.0f
+/* Na fuga, a menos disto da borda da arena o rumo perde a componente para fora. */
+#define MARGEM_BORDA_FUGA      500.0f
+/* Separação entre caças: alcance (u) e peso do empurrão no rumo unitário, no máximo PESO por vizinho. */
+#define DIST_SEPARACAO 60.0f
+#define PESO_SEPARACAO 1.5f
 
 /* IA-03: intervalo de troca de alvo do X-Wing; o id do caça varia entre MIN e MAX. */
 #define TROCA_XWING_MIN      8.0f

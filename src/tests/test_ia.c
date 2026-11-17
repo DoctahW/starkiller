@@ -90,7 +90,7 @@ static void testarPersegueJogador(void)
     VERIFICA(in.vel.z < 0.0f);
 }
 
-/* IA_FUGIR: o caça se afasta do jogador. */
+/* IA_FUGIR: o caça se afasta do alvo do seu estado de ataque (aqui o Destróier) e do jogador à frente dele. */
 static void testarFogeDoJogador(void)
 {
     Jogo g = { 0 };
@@ -341,6 +341,7 @@ static int lasersAtivos(const Jogo *g)
  * IA-03: o X-Wing troca de alvo com período de 8–12 s. A fase vem do relógio da partida
  * (a struct Inimigo é congelada e não tem tempo de spawn), então a primeira troca de quem
  * nasce no meio do ciclo pode ser menor; da segunda em diante o intervalo fica em 8–12 s.
+ * O caça fica parado longe dos dois alvos: perto deles a passagem de ataque o faria fugir.
  */
 static void testarAlternanciaXWing(void)
 {
@@ -362,6 +363,8 @@ static void testarAlternanciaXWing(void)
 
         for (i = 1; i <= 60 * 60; i++) {
             g.tempoDecorrido = i * DT;
+            in.pos = (Vector3){ 0.0f, 0.0f, 6000.0f };
+            in.vel = (Vector3){ 0.0f, 0.0f, 0.0f };
             ia_atualizar(&in, &g, DT);
             if (in.estadoIA != estado) {
                 float intervalo = g.tempoDecorrido - ultimaTroca;
@@ -402,9 +405,12 @@ static void testarTiroNoCone(void)
     ia_atualizar(&in, &g, DT);
     VERIFICA(lasersAtivos(&g) == 1);
 
-    /* Passado o cooldown, dispara outra vez. */
-    for (int i = 0; i < (int)(COOLDOWN_TIRO_INIMIGO / DT) + 1; i++)
+    /* Passado o cooldown, dispara outra vez (no mesmo ponto, longe de romper a passagem). */
+    for (int i = 0; i < (int)(COOLDOWN_TIRO_INIMIGO / DT) + 1; i++) {
+        in.pos = (Vector3){ 0.0f, 0.0f, 2500.0f };
+        in.vel = (Vector3){ 0.0f, 0.0f, -VEL_AWING };
         ia_atualizar(&in, &g, DT);
+    }
     VERIFICA(lasersAtivos(&g) == 2);
 
     /* Fora do cone (voando para longe do alvo): não dispara. */
@@ -448,6 +454,88 @@ static void testarTiroNoCone(void)
     VERIFICA(QUASE(in.cooldownTiro, COOLDOWN_TIRO_INIMIGO * FATOR_COOLDOWN_MIN));
 }
 
+/*
+ * Passagem de ataque: o A-Wing não voa até o jogador. Rompe antes de DIST_ROMPER_JOGADOR,
+ * nunca encosta no TIE, se afasta e volta a atacar várias vezes, atirando nas passagens.
+ */
+static void testarPassagemNoJogador(void)
+{
+    Jogo g;
+    Inimigo in;
+    EstadoIA antes;
+    float menor = 1e9f;
+    int voltas = 0, fugas = 0;
+
+    iniciarJogoVazio(&g);
+    in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 6000.0f }, IA_ATACAR_JOGADOR);
+    antes = in.estadoIA;
+
+    for (int i = 0; i < 60 * 60; i++) {
+        ia_atualizar(&in, &g, DT);
+        menor = fminf(menor, Vector3Distance(in.pos, g.jogador.pos));
+        if (in.estadoIA != antes) {
+            fugas += in.estadoIA == IA_FUGIR;
+            voltas += in.estadoIA == IA_ATACAR_JOGADOR;
+            antes = in.estadoIA;
+        }
+    }
+
+    VERIFICA(menor > 10.0f * (RAIO_AWING + RAIO_JOGADOR));
+    VERIFICA(fugas >= 3);
+    VERIFICA(voltas >= 3);
+    VERIFICA(lasersAtivos(&g) > 0);
+}
+
+/*
+ * Passagem de ataque no Destróier: o X-Wing atira de dentro do alcance e rompe a
+ * DIST_ROMPER_DESTROIER da origem, sem encostar nem parar no casco.
+ * id 1: os primeiros 8 s são de atacar o Destróier (IA-03).
+ */
+static void testarPassagemNoDestroier(void)
+{
+    Jogo g;
+    Inimigo in;
+    float menor = 1e9f;
+    int fugiu = 0, tocou = 0;
+
+    iniciarJogoVazio(&g);
+    g.jogador.pos = (Vector3){ 0.0f, 0.0f, -8000.0f };
+    in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_DESTROIER);
+
+    for (int i = 1; i < 8 * 60; i++) {
+        g.tempoDecorrido = i * DT;
+        ia_atualizar(&in, &g, DT);
+        menor = fminf(menor, Vector3Length(in.pos));
+        fugiu |= in.estadoIA == IA_FUGIR;
+        tocou |= tocaDestroier(in.pos, raioInimigo(XWING));
+    }
+
+    VERIFICA(fugiu);
+    VERIFICA(!tocou);
+    VERIFICA(menor > DIST_ROMPER_DESTROIER - 100.0f);
+    VERIFICA(Vector3Length(in.vel) > 0.5f * VEL_XWING);
+    VERIFICA(lasersAtivos(&g) > 0);
+}
+
+/* Separação: dois caças no mesmo ponto, com o mesmo alvo, se afastam em vez de se empilhar. */
+static void testarSeparacao(void)
+{
+    Jogo g;
+    Inimigo in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 7000.0f }, IA_ATACAR_JOGADOR);
+
+    iniciarJogoVazio(&g);
+    VERIFICA(inserirInimigo(&g.inimigos, in) == 1);
+    in.id = 2;
+    VERIFICA(inserirInimigo(&g.inimigos, in) == 1);
+
+    for (int i = 0; i < 120; i++)
+        atualizarInimigos(&g, DT);
+
+    VERIFICA(Vector3Distance(g.inimigos.inicio->dado.pos, g.inimigos.fim->dado.pos) >
+             RAIO_AWING + RAIO_AWING);
+    liberarListaInimigos(&g.inimigos);
+}
+
 int main(void)
 {
     testarAproximaDoDestroier();
@@ -465,6 +553,9 @@ int main(void)
     testarAceleracaoAcompanhaFator();
     testarAlternanciaXWing();
     testarTiroNoCone();
+    testarPassagemNoJogador();
+    testarPassagemNoDestroier();
+    testarSeparacao();
 
     return RESULTADO_TESTES();
 }

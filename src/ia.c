@@ -1,10 +1,12 @@
 #include <math.h>
+#include <stddef.h>
 
 #include "combate.h"
 #include "destroier.h"
 #include "ia.h"
 #include "inimigos.h"
 #include "jogo.h"
+#include "nave.h"
 #include "raymath.h"
 
 /* Distância mínima para normalizar o rumo; evita divisão por zero com o alvo em cima. */
@@ -68,21 +70,103 @@ static EstadoIA estadoDoXWing(const Inimigo *in, const Jogo *g)
     return fase < metade ? IA_ATACAR_DESTROIER : IA_ATACAR_JOGADOR;
 }
 
-/*
- * Alvo do estado atual, na convenção da seção 3.5: o Destróier fica fixo na origem
- * (tabela 2.2) e o jogador é o ponto perseguido ou a referência para fugir.
- */
-static Vector3 alvoDoEstado(const Inimigo *in, const Jogo *g)
+/* Posição do alvo de um estado de ataque: o jogador ou o Destróier, fixo na origem (tabela 2.2). */
+static Vector3 posicaoDoAlvo(EstadoIA estado, const Jogo *g)
 {
-    switch (in->estadoIA) {
-    case IA_ATACAR_JOGADOR:
+    if (estado == IA_ATACAR_JOGADOR)
         return g->jogador.pos;
-    case IA_FUGIR:
-        return Vector3Subtract(Vector3Scale(in->pos, 2.0f), g->jogador.pos);
-    case IA_ATACAR_DESTROIER:
+    return (Vector3){ 0.0f, 0.0f, 0.0f };
+}
+
+/* Estado de ataque a que o caça volta depois de fugir: o X-Wing segue a alternância da IA-03. */
+static EstadoIA estadoDeAtaque(const Inimigo *in, const Jogo *g)
+{
+    switch (in->tipo) {
+    case XWING:
+        return estadoDoXWing(in, g);
+    case AWING:
+        return IA_ATACAR_JOGADOR;
+    case YWING:
     default:
-        return (Vector3){ 0.0f, 0.0f, 0.0f };
+        return IA_ATACAR_DESTROIER;
     }
+}
+
+/*
+ * Passagem de ataque: perto do alvo o caça rompe (IA_FUGIR) em vez de voar até o ponto dele, e
+ * longe o bastante volta a atacar. O Y-Wing em bombardeio orbita e não rompe. Sem campo novo no
+ * Inimigo: a referência da fuga é o alvo do estado de ataque do tipo.
+ */
+static void atualizarPassagem(Inimigo *in, const Jogo *g)
+{
+    if (in->estadoIA == IA_FUGIR) {
+        EstadoIA ataque = estadoDeAtaque(in, g);
+        float retomar = ataque == IA_ATACAR_JOGADOR ? DIST_RETOMAR_JOGADOR : DIST_RETOMAR_DESTROIER;
+
+        if (Vector3Distance(in->pos, posicaoDoAlvo(ataque, g)) > retomar)
+            in->estadoIA = ataque;
+        return;
+    }
+
+    if (in->tipo == XWING)
+        in->estadoIA = estadoDoXWing(in, g);
+    if (in->tipo == YWING && in->estadoIA == IA_ATACAR_DESTROIER)
+        return;
+    {
+        float romper = in->estadoIA == IA_ATACAR_JOGADOR ? DIST_ROMPER_JOGADOR : DIST_ROMPER_DESTROIER;
+
+        if (Vector3Distance(in->pos, posicaoDoAlvo(in->estadoIA, g)) < romper)
+            in->estadoIA = IA_FUGIR;
+    }
+}
+
+/* Unitário perpendicular a `eixo`; o lado depende do id para os caças não romperem todos juntos. */
+static Vector3 perpendicular(Vector3 eixo, int id)
+{
+    Vector3 apoio = fabsf(eixo.y) < 0.9f ? (Vector3){ 0.0f, 1.0f, 0.0f } : (Vector3){ 1.0f, 0.0f, 0.0f };
+    Vector3 lado = Vector3Normalize(Vector3CrossProduct(eixo, apoio));
+
+    return id % 2 ? Vector3Negate(lado) : lado;
+}
+
+/*
+ * Rumo unitário da fuga, ou zero sem direção (caça exatamente sobre a referência). Para longe da
+ * referência; vindo de frente, abre também para o lado, então curva em vez de frear contra o
+ * alvo. Perto da borda da arena, não aponta para fora: desliza ao longo dela.
+ */
+static Vector3 rumoDeFuga(const Inimigo *in, Vector3 referencia)
+{
+    Vector3 longe = Vector3Subtract(in->pos, referencia);
+    float distBorda = Vector3Length(in->pos);
+    Vector3 rumo;
+
+    if (Vector3Length(longe) < DIST_MINIMA)
+        return (Vector3){ 0.0f, 0.0f, 0.0f };
+    longe = Vector3Normalize(longe);
+    rumo = longe;
+
+    if (Vector3Length(in->vel) > DIST_MINIMA) {
+        Vector3 frente = Vector3Normalize(in->vel);
+        float entrada = -Vector3DotProduct(frente, longe);
+
+        if (entrada > 0.0f) {
+            Vector3 lado = Vector3Add(frente, Vector3Scale(longe, entrada));
+
+            lado = Vector3Length(lado) > 0.1f ? Vector3Normalize(lado) : perpendicular(longe, in->id);
+            rumo = Vector3Add(rumo, Vector3Scale(lado, entrada));
+        }
+    }
+
+    if (distBorda > RAIO_ARENA - MARGEM_BORDA_FUGA) {
+        Vector3 radial = Vector3Scale(in->pos, 1.0f / distBorda);
+        float saida = Vector3DotProduct(rumo, radial);
+
+        if (saida > 0.0f)
+            rumo = Vector3Subtract(rumo, Vector3Scale(radial, saida));
+        if (Vector3Length(rumo) < 1e-3f)
+            rumo = perpendicular(radial, in->id);
+    }
+    return Vector3Normalize(rumo);
 }
 
 /*
@@ -182,25 +266,57 @@ static void bombardearDestroier(Inimigo *in, Jogo *g, float dt)
         g->cascoDestroier = 0.0f;
 }
 
+/*
+ * Separação: soma de empurrões para longe dos outros caças a menos de DIST_SEPARACAO, mais
+ * forte quanto mais perto. Sem ela, quem persegue o mesmo alvo ou orbita o mesmo anel se empilha.
+ */
+static Vector3 separacao(const Inimigo *in, const Jogo *g)
+{
+    Vector3 soma = { 0.0f, 0.0f, 0.0f };
+
+    for (const NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox) {
+        Vector3 longe;
+        float dist;
+
+        if (&no->dado == in)
+            continue;
+        longe = Vector3Subtract(in->pos, no->dado.pos);
+        dist = Vector3Length(longe);
+        if (dist >= DIST_SEPARACAO)
+            continue;
+        if (dist < DIST_MINIMA)
+            longe = perpendicular((Vector3){ 0.0f, 0.0f, 1.0f }, in->id);
+        else
+            longe = Vector3Scale(longe, 1.0f / dist);
+        soma = Vector3Add(soma, Vector3Scale(longe, PESO_SEPARACAO * (1.0f - dist / DIST_SEPARACAO)));
+    }
+    return soma;
+}
+
 void ia_atualizar(Inimigo *in, Jogo *g, float dt)
 {
-    Vector3 alvo;
-    Vector3 rumo;
-    float dist;
     float fatorVel = fatorVelocidadeIA(g->tempoDecorrido);
-    Vector3 desejada = { 0.0f, 0.0f, 0.0f };
+    Vector3 rumo = { 0.0f, 0.0f, 0.0f };
+    Vector3 desejada;
 
-    if (in->tipo == XWING && in->estadoIA != IA_FUGIR)
-        in->estadoIA = estadoDoXWing(in, g);
+    atualizarPassagem(in, g);
 
-    alvo = in->tipo == YWING && in->estadoIA == IA_ATACAR_DESTROIER
-               ? alvoOrbita(in)
-               : alvoDoEstado(in, g);
-    rumo = Vector3Subtract(alvo, in->pos);
-    dist = Vector3Length(rumo);
+    if (in->estadoIA == IA_FUGIR) {
+        rumo = rumoDeFuga(in, posicaoDoAlvo(estadoDeAtaque(in, g), g));
+    } else {
+        Vector3 alvo = in->tipo == YWING && in->estadoIA == IA_ATACAR_DESTROIER
+                           ? alvoOrbita(in)
+                           : posicaoDoAlvo(in->estadoIA, g);
+        Vector3 ate = Vector3Subtract(alvo, in->pos);
+        float dist = Vector3Length(ate);
 
-    if (dist > DIST_MINIMA)
-        desejada = Vector3Scale(rumo, velocidadeMaxima(in->tipo) * fatorVel / dist);
+        if (dist > DIST_MINIMA)
+            rumo = Vector3Scale(ate, 1.0f / dist);
+    }
+    rumo = Vector3Add(rumo, separacao(in, g));
+    if (Vector3Length(rumo) > 1.0f)
+        rumo = Vector3Normalize(rumo);
+    desejada = Vector3Scale(rumo, velocidadeMaxima(in->tipo) * fatorVel);
 
     /* O quadrado do fator mantém o raio de curva (v²/a) constante ao longo da partida. */
     in->vel = Vector3MoveTowards(in->vel, desejada, ACELERACAO_IA * fatorVel * fatorVel * dt);
