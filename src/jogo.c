@@ -133,6 +133,7 @@ void jogo_executar(void)
 
     InitWindow(LARGURA_TELA, ALTURA_TELA, "TIE Fighter: Esquadrão Imperial");
     ChangeDirectory(GetApplicationDirectory());
+    jogo.placar = carregarPlacar(CAMINHO_PLACAR);
     SetExitKey(KEY_NULL);   /* Esc é pausa/voltar, não fecha a janela */
     SetTargetFPS(60);
 

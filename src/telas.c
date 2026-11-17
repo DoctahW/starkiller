@@ -16,6 +16,7 @@
 
 #define FONTE_MENU   "assets/fonts/ChakraPetch-Bold.ttf"
 #define ESPACO_FONTE 1.0f
+#define RANKING_MAX  10
 
 #define TAM_FIM_TITULO 48
 #define TAM_FIM_TEXTO  26
@@ -69,17 +70,29 @@ static Font fonteDoMenu(void)
     return fonteMenu.texture.id != 0 ? fonteMenu : GetFontDefault();
 }
 
-static void textoNoMenu(const char *texto, int centroX, int y, int tamanho, Color cor)
+static void textoFonte(const char *texto, int x, int y, int tamanho, Color cor)
 {
     Font fonte = fonteDoMenu();
-    float largura = MeasureTextEx(fonte, texto, (float)tamanho, ESPACO_FONTE).x;
-    int x = centroX - (int)(largura / 2.0f);
 
     DrawTextEx(fonte, texto,
                (Vector2){ (float)(x + MENU_SOMBRA), (float)(y + MENU_SOMBRA) },
                (float)tamanho, ESPACO_FONTE, Fade(BLACK, 0.75f));
     DrawTextEx(fonte, texto, (Vector2){ (float)x, (float)y },
                (float)tamanho, ESPACO_FONTE, cor);
+}
+
+static void textoNoMenu(const char *texto, int centroX, int y, int tamanho, Color cor)
+{
+    float largura = MeasureTextEx(fonteDoMenu(), texto, (float)tamanho, ESPACO_FONTE).x;
+
+    textoFonte(texto, centroX - (int)(largura / 2.0f), y, tamanho, cor);
+}
+
+static void textoFonteDireita(const char *texto, int direita, int y, int tamanho, Color cor)
+{
+    float largura = MeasureTextEx(fonteDoMenu(), texto, (float)tamanho, ESPACO_FONTE).x;
+
+    textoFonte(texto, direita - (int)largura, y, tamanho, cor);
 }
 
 static void desenharFundoMenu(void)
@@ -335,10 +348,44 @@ EstadoJogo telaFim(Jogo *g, const Comandos *cmd)
 
 EstadoJogo telaPlacar(Jogo *g, const Comandos *cmd)
 {
-    (void)g;
-    textoCentralizado("Placar de Pilotos", 160, TAM_TITULO, RAYWHITE);
-    textoCentralizado("Esc: voltar", 400, TAM_TEXTO, GRAY);
-    return cmd->voltar || cmd->confirmar ? EST_MENU : EST_PLACAR;
+    NoPlacar ranking[RANKING_MAX];
+    int total = exibirRankingEmOrdem(g->placar, ranking, RANKING_MAX);
+    int centro = GetScreenWidth() / 2;
+    int i;
+
+    textoNoMenu("Placar de Pilotos", centro, 40, 40, RAYWHITE);
+
+    if (total == 0) {
+        textoNoMenu("Nenhuma partida registrada", centro, 300, 24, GRAY);
+    } else {
+        textoFonteDireita("#", 400, 140, 20, GRAY);
+        textoFonte("Piloto", 440, 140, 20, GRAY);
+        textoFonteDireita("Pontos", 900, 140, 20, GRAY);
+        DrawLine(360, 172, 920, 172, DARKGRAY);
+
+        for (i = 0; i < total; i++) {
+            int y = 190 + i * 38;
+            int recente = destacarUltima &&
+                          strcmp(ranking[i].nome, ultimoNome) == 0 &&
+                          ranking[i].pontos == ultimosPontos;
+            Color cor = recente ? YELLOW : LIGHTGRAY;
+
+            if (recente)
+                DrawRectangle(350, y - 5, 590, 34, Fade(YELLOW, 0.10f));
+
+            textoFonteDireita(TextFormat("%d", i + 1), 400, y, 26, cor);
+            textoFonte(ranking[i].nome, 440, y, 26, cor);
+            textoFonteDireita(TextFormat("%d", ranking[i].pontos), 900, y, 26, cor);
+        }
+    }
+
+    textoNoMenu("Esc/B: voltar", centro, 640, 20, LIGHTGRAY);
+
+    if (cmd->voltar || cmd->confirmar) {
+        destacarUltima = 0;
+        return EST_MENU;
+    }
+    return EST_PLACAR;
 }
 
 EstadoJogo telaControles(ConfigEntrada *cfg, const Comandos *cmd)
