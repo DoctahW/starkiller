@@ -20,7 +20,7 @@ OBJ     := $(SRC:src/%.c=build/%.o)
 MODULOS := $(filter-out build/main.o,$(OBJ))
 TESTES  := $(patsubst src/tests/%.c,build/tests/%,$(wildcard src/tests/test_*.c))
 
-.PHONY: all run test valgrind clean
+.PHONY: all run test valgrind preview-modelo clean
 
 all: $(BIN)
 
@@ -55,3 +55,10 @@ clean:
 	rm -rf build $(BIN) $(DLL)
 
 -include $(OBJ:.o=.d)
+
+# Inspeção isolada da sonda GLB, sem depender dos módulos de render/HUD.
+build/preview_modelo: tools/preview_modelo.c $(MODULOS) | build $(DLL)
+	$(CC) $(CFLAGS) $< $(MODULOS) -o $@ $(LDLIBS)
+
+preview-modelo: build/preview_modelo
+	./build/preview_modelo
