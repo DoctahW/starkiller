@@ -9,7 +9,7 @@
 /*
  * Seção 3.4, passo 4: direciona `vel` suavemente para o alvo do estado atual,
  * com a velocidade máxima da tabela 2.2 escalada pela dificuldade (IA-05); a aceleração
- * acompanha o fator para o raio de curva não abrir no fim da partida. Avança `pos` com `vel`.
+ * acompanha o quadrado do fator, então o raio de curva (v²/a) fica constante. Avança `pos` com `vel`.
  * Y-Wing em IA_ATACAR_DESTROIER orbita o Destróier e bombardeia a menos de 685.
  * O caça nunca fica dentro do casco: usa afastarDoDestroier (IA-04).
  * Não reescreve o estado: quem alterna entre atacar o Destróier e o jogador é a IA-03.
