@@ -38,18 +38,21 @@ static void testarDuracao(void){
     VERIFICA(contarAtivas() == 0);
 }
 
-//49 passos de 1/60, nao 48: o acumulo de float nao fecha 0.8 exato
+//a 60 Hz vive ~0,8 s: viva aos 46 passos, morta aos 50 (tolera o erro de float)
 static void testarDuracaoEmPassosDe60Hz(void){
     int i;
 
     novaPartida();
     criarExplosao(&jogo, (Vector3){0.0f, 0.0f, 0.0f}, RAIO_EXPLOSAO);
 
-    for(i = 0; i < 48; i++)
+    //ainda viva bem antes do fim (46 passos = 0,767 s)
+    for(i = 0; i < 46; i++)
         atualizarExplosoes(&jogo, 1.0f / 60.0f);
     VERIFICA(contarAtivas() == 1);
 
-    atualizarExplosoes(&jogo, 1.0f / 60.0f);
+    //morta logo depois (mais 4 passos = 50 passos = 0,833 s)
+    for(i = 0; i < 4; i++)
+        atualizarExplosoes(&jogo, 1.0f / 60.0f);
     VERIFICA(contarAtivas() == 0);
 }
 
