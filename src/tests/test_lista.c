@@ -745,15 +745,15 @@ static void testarArenaNaoEADistanciaDoJogador(void){
     liberarListaInimigos(&jogo.inimigos);
 }
 
-static void testarAtualizarNaoMoveNenhumInimigo(void){
+static void testarAtualizarMovePelaIA(void){
     memset(&jogo, 0, sizeof(jogo));
     porNaFrente(&jogo.inimigos, 1, 1000.0f);
-    Vector3 antes = jogo.inimigos.inicio->dado.pos;
 
     atualizarInimigos(&jogo, 1.0f / 60.0f);
 
-    VERIFICA(proximo(jogo.inimigos.inicio->dado.pos.z, antes.z));
-    VERIFICA(vetorNulo(jogo.inimigos.inicio->dado.vel));
+    //IA-01 (#49): o X-Wing anda na direcao do Destroier, na origem
+    VERIFICA(jogo.inimigos.inicio->dado.pos.z < 1000.0f);
+    VERIFICA(!vetorNulo(jogo.inimigos.inicio->dado.vel));
 
     liberarListaInimigos(&jogo.inimigos);
 }
@@ -801,7 +801,7 @@ int main(void){
     testarDespawnDeVariosSeguidos();
     testarAlvoDespawnado();
     testarArenaNaoEADistanciaDoJogador();
-    testarAtualizarNaoMoveNenhumInimigo();
+    testarAtualizarMovePelaIA();
 
     return RESULTADO_TESTES();
 }
