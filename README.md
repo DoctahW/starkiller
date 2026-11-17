@@ -96,7 +96,8 @@ src/
   inimigos.c     lista duplamente encadeada e computador de mira
   reforcos.c     fila de reforços
   ia.c           comportamento dos caças rebeldes
-  render.c       cena 3D
+  render.c       cena 3D: ordem de desenho e objetos da arena
+  espaco.c       fundo: estrelas, nebulosa, Estrela da Morte e poeira
   hud.c          HUD da cabine
   placar.c       árvore binária de busca do placar
   pontuacao.c    pontuação
