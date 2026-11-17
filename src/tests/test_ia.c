@@ -116,6 +116,7 @@ static void testarAlvoNaMesmaPosicao(void)
     Inimigo noJogador;
 
     iniciarJogador(&g.jogador);
+    /* A-Wing porque o X-Wing tem o estado sobrescrito pela IA-03 antes de mirar. */
     noJogador = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 5000.0f }, IA_ATACAR_JOGADOR);
     g.jogador.pos = noJogador.pos;
 
@@ -336,35 +337,49 @@ static int lasersAtivos(const Jogo *g)
     return n;
 }
 
-/* IA-03: o X-Wing troca de alvo a cada 8–12 s, com o intervalo variando pelo id. */
+/*
+ * IA-03: o X-Wing troca de alvo com período de 8–12 s. A fase vem do relógio da partida
+ * (a struct Inimigo é congelada e não tem tempo de spawn), então a primeira troca de quem
+ * nasce no meio do ciclo pode ser menor; da segunda em diante o intervalo fica em 8–12 s.
+ */
 static void testarAlternanciaXWing(void)
 {
-    Jogo g;
-    Inimigo in;
-    EstadoIA estado;
-    float ultimaTroca = 0.0f;
-    int trocas = 0;
-    int i;
+    const int ids[] = { 1, 6 };   /* 1: primeira troca em 8 s; 6: em 3 s */
+    int k;
 
-    iniciarJogoVazio(&g);
-    in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 6000.0f }, IA_ATACAR_DESTROIER);
-    in.id = 1;   /* 9 s por estado */
-    estado = in.estadoIA;
+    for (k = 0; k < (int)(sizeof ids / sizeof ids[0]); k++) {
+        Jogo g;
+        Inimigo in;
+        EstadoIA estado;
+        float ultimaTroca = 0.0f;
+        int trocas = 0;
+        int i, primeira = 1;
 
-    for (i = 1; i <= 60 * 60; i++) {
-        g.tempoDecorrido = i * DT;
-        ia_atualizar(&in, &g, DT);
-        if (in.estadoIA != estado) {
-            float intervalo = g.tempoDecorrido - ultimaTroca;
+        iniciarJogoVazio(&g);
+        in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 6000.0f }, IA_ATACAR_DESTROIER);
+        in.id = ids[k];
+        estado = in.estadoIA;
 
-            VERIFICA(intervalo >= TROCA_XWING_MIN - DT);
-            VERIFICA(intervalo <= TROCA_XWING_MIN + TROCA_XWING_VARIACAO - 1 + DT);
-            ultimaTroca = g.tempoDecorrido;
-            estado = in.estadoIA;
-            trocas++;
+        for (i = 1; i <= 60 * 60; i++) {
+            g.tempoDecorrido = i * DT;
+            ia_atualizar(&in, &g, DT);
+            if (in.estadoIA != estado) {
+                float intervalo = g.tempoDecorrido - ultimaTroca;
+
+                if (primeira) {
+                    VERIFICA(intervalo > 0.0f && intervalo <= TROCA_XWING_MIN + TROCA_XWING_VARIACAO + DT);
+                    primeira = 0;
+                } else {
+                    VERIFICA(intervalo >= TROCA_XWING_MIN - DT);
+                    VERIFICA(intervalo <= TROCA_XWING_MIN + TROCA_XWING_VARIACAO - 1 + DT);
+                }
+                ultimaTroca = g.tempoDecorrido;
+                estado = in.estadoIA;
+                trocas++;
+            }
         }
+        VERIFICA(trocas >= 4);
     }
-    VERIFICA(trocas >= 4);
 }
 
 /* IA-03: X-Wing e A-Wing atiram no cone de 15° e respeitam o cooldown. */
