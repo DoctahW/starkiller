@@ -2,16 +2,21 @@
 #include <math.h>
 
 #include "raymath.h"
+#include "destroier.h"
+#include "pontuacao.h"
 
 #define VELOCIDADE_INICIAL VEL_MIN
 #define CASCO_JOGADOR      100.0f
 
 /* Velocidade angular atual (rad/s) em x = arfagem, y = guinada, z = rolagem. Só existe um jogador. */
 static Vector3 velAng;
+/* Tempo restante (s) sem novo dano de colisão. Só existe um jogador; iniciarJogador zera. */
+static float recargaColisao;
 
 void iniciarJogador(Jogador *j)
 {
     velAng = (Vector3){ 0.0f, 0.0f, 0.0f };
+    recargaColisao = 0.0f;
     j->pos = (Vector3){ 0.0f, 0.0f, 300.0f };
     j->rot = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f };
     j->frente = (Vector3){ 0.0f, 0.0f, 1.0f };
@@ -78,4 +83,47 @@ Camera3D cameraDoJogador(const Jogador *j)
     cam.fovy = FOV_JOGADOR;
     cam.projection = CAMERA_PERSPECTIVE;
     return cam;
+}
+
+/* Empurra a nave para a superfície da esfera `e` se estiver dentro (centro a centro < raio + RAIO_JOGADOR). */
+static int empurrarParaFora(Jogador *j, const EsferaDestroier *e)
+{
+    Vector3 d = Vector3Subtract(j->pos, e->centro);
+    float dist = Vector3Length(d);
+    float minimo = e->raio + RAIO_JOGADOR;
+
+    if (dist >= minimo)
+        return 0;
+    /* No centro exato a normal é indefinida: sai pela proa. */
+    d = dist > 1e-6f ? Vector3Scale(d, 1.0f / dist) : (Vector3){ 0.0f, 0.0f, 1.0f };
+    j->pos = Vector3Add(e->centro, Vector3Scale(d, minimo));
+    return 1;
+}
+
+int colidirDestroier(Jogo *g, float dt)
+{
+    int i, passada, contato = 0;
+
+    if (recargaColisao > 0.0f)
+        recargaColisao -= dt;
+
+    /* Empurrar para fora de uma esfera pode entrar noutra (esferas se sobrepõem): repete até assentar. */
+    for (passada = 0; passada < NUM_ESFERAS_DESTROIER; passada++) {
+        int moveu = 0;
+
+        for (i = 0; i < NUM_ESFERAS_DESTROIER; i++)
+            moveu |= empurrarParaFora(&g->jogador, &ESFERAS_DESTROIER[i]);
+        if (!moveu)
+            break;
+        contato = 1;
+    }
+
+    if (contato && recargaColisao <= 0.0f) {
+        g->jogador.casco -= DANO_COLISAO_DESTROIER;
+        if (g->jogador.casco < 0.0f)
+            g->jogador.casco = 0.0f;
+        registrarDanoJogador(g);
+        recargaColisao = RECARGA_COLISAO;
+    }
+    return contato;
 }

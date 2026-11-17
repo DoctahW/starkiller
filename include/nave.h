@@ -33,6 +33,21 @@ void iniciarJogador(Jogador *j);
  * devolve 1 (aviso de limite da arena para o HUD); caso contrário, 0.
  */
 int atualizarJogador(Jogador *j, const Comandos *cmd, float dt);
+
+/* Esfera de colisão do TIE (chute; ajustar com o modelo) e dano de um contato com o casco do Destróier. */
+#define RAIO_JOGADOR            6.0f
+#define DANO_COLISAO_DESTROIER  10.0f
+/* Depois de um dano, os contatos seguintes só empurram a nave durante este tempo (s), sem novo dano. */
+#define RECARGA_COLISAO         0.5f
+
+/*
+ * Colisão do TIE com o Destróier (esferas de destroier.h). Encostar no casco empurra a nave para
+ * fora, ao longo da normal esfera → nave, até a superfície, e tira DANO_COLISAO_DESTROIER do casco
+ * do jogador chamando registrarDanoJogador (zera a sequência sem dano). Durante RECARGA_COLISAO
+ * depois de um dano só empurra, para a nave encostada não perder casco a cada passo.
+ * Roda depois de atualizarJogador. Devolve 1 se houve contato neste passo; 0 caso contrário.
+ */
+int colidirDestroier(Jogo *g, float dt);
 /* Câmera de cabine: position = pos, target = pos + frente, up = cima. */
 Camera3D cameraDoJogador(const Jogador *j);
 

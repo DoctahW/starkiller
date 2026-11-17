@@ -56,6 +56,7 @@ static int verificarFim(Jogo *g)
 static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
 {
     avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
+    colidirDestroier(g, PASSO_FIXO);
 
     /* O tempo do passo entra antes dos reforços: o grupo de t = 3 s nasce no passo 180. */
     r->passos++;
