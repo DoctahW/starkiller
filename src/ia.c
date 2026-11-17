@@ -142,7 +142,8 @@ void ia_atualizar(Inimigo *in, Jogo *g, float dt)
     if (dist > DIST_MINIMA)
         desejada = Vector3Scale(rumo, velocidadeMaxima(in->tipo) * fatorVel / dist);
 
-    in->vel = Vector3MoveTowards(in->vel, desejada, ACELERACAO_IA * fatorVel * dt);
+    /* O quadrado do fator mantém o raio de curva (v²/a) constante ao longo da partida. */
+    in->vel = Vector3MoveTowards(in->vel, desejada, ACELERACAO_IA * fatorVel * fatorVel * dt);
     in->pos = Vector3Add(in->pos, Vector3Scale(in->vel, dt));
     desviarCasco(in);
     bombardearDestroier(in, g, dt);
