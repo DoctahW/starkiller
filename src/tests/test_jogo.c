@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "combate.h"
+#include "ia.h"
 #include "inimigos.h"
 #include "jogo.h"
 #include "nave.h"
@@ -89,10 +90,11 @@ static void testarComandosDeCombate(void)
     VERIFICA(jogo.inimigos.alvo == jogo.inimigos.inicio);
     /*
      * 6 passos desde o spawn: o jogador andou 6 passos a VEL_MIN em +z e cada caça, medido antes de
-     * andar, 5 passos acelerando a ACELERACAO_IA (550 u/s²) em -z: 550 * (1+2+3+4+5) / 60² u.
+     * andar, 5 passos acelerando a ACELERACAO_IA em -z: ACELERACAO_IA * (1+2+3+4+5) / 60² u.
      */
     {
-        float aproximacao = 6.0f * VEL_MIN * PASSO_FIXO + 550.0f * 15.0f * PASSO_FIXO * PASSO_FIXO;
+        float aproximacao = 6.0f * VEL_MIN * PASSO_FIXO
+                            + ACELERACAO_IA * 15.0f * PASSO_FIXO * PASSO_FIXO;
 
         VERIFICA(fabsf(jogo.inimigos.inicio->dado.distancia - (50.0f - aproximacao)) < 1e-3f);
         VERIFICA(fabsf(jogo.inimigos.fim->dado.distancia - (250.0f - aproximacao)) < 1e-3f);

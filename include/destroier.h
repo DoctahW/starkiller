@@ -28,7 +28,8 @@ int tocaDestroier(Vector3 centro, float raio);
 /*
  * Se a esfera (centro, raio) entra no casco, leva `centro` para fora pelo caminho mais curto entre
  * os seis sentidos dos eixos (em cima do convés, para cima; na parede lateral, para o lado) e
- * devolve 1; senão não mexe e devolve 0.
+ * devolve 1; senão não mexe e devolve 0. Se nenhum eixo conseguir sair (não deveria acontecer),
+ * empurra para cima e devolve 0, para não contar como contato.
  */
 int afastarDoDestroier(Vector3 *centro, float raio);
 

@@ -109,7 +109,21 @@ int afastarDoDestroier(Vector3 *centro, float raio)
             escolhido = i;
         }
     }
-    if (escolhido >= 0)
+    if (escolhido >= 0) {
         *centro = Vector3Add(*centro, Vector3Scale(SENTIDOS[escolhido], melhor));
-    return 1;
+        return 1;
+    }
+
+    /*
+     * Nenhum eixo saiu dentro de BUSCA_MAXIMA, o que não deveria acontecer (o casco tem menos
+     * de BUSCA_MAXIMA em qualquer sentido). Não conta como contato — evita dano a cada recarga
+     * com a nave presa —, mas empurra para cima para não deixar a nave dentro do casco.
+     */
+    {
+        float d = distanciaAteSair(*centro, raio, SENTIDOS[0], 2.0f * BUSCA_MAXIMA);
+
+        if (d <= 2.0f * BUSCA_MAXIMA)
+            *centro = Vector3Add(*centro, Vector3Scale(SENTIDOS[0], d));
+    }
+    return 0;
 }

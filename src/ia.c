@@ -4,8 +4,7 @@
 #include "inimigos.h"
 #include "raymath.h"
 
-/* Aceleração com que o rumo é corrigido: sem virar no mesmo frame, como pede a IA-01. */
-#define ACELERACAO_IA 550.0f
+/* Distância mínima para normalizar o rumo; evita divisão por zero com o alvo em cima. */
 #define DIST_MINIMA   1e-4f
 
 /* IA-02: o Y-Wing bombardeia a menos de 685 do Destróier e orbita a ~550. */
