@@ -83,12 +83,13 @@ A CI (`.github/workflows/ci.yml`) roda `make` e `make test` em `ubuntu-latest` c
 ## Estrutura
 
 ```
-assets/          models/, shaders/ (GLSL 330), textures/, sounds/
+assets/          models/ (fontes/: scripts do Blender), shaders/ (GLSL 330), textures/, sounds/
 include/         headers públicos de cada módulo
   tipos.h        contrato compartilhado entre os módulos
   teste.h        verificações dos testes de console
 src/
   main.c         ponto de entrada
+  destroier.c    medidas do Destróier e colisão com o casco (mapa de alturas em casco_destroier.inc)
   jogo.c         janela, máquina de estados e loop de combate
   entrada.c      teclado e controle -> Comandos
   nave.c         voo e câmera de cabine
@@ -96,7 +97,7 @@ src/
   inimigos.c     lista duplamente encadeada e computador de mira
   reforcos.c     fila de reforços
   ia.c           comportamento dos caças rebeldes
-  render.c       cena 3D: ordem de desenho e objetos da arena
+  render.c       cena 3D: ordem de desenho, Destróier e carga de modelos e shaders
   espaco.c       fundo: estrelas, nebulosa, Estrela da Morte e poeira
   hud.c          HUD da cabine
   placar.c       árvore binária de busca do placar
@@ -107,6 +108,26 @@ src/
 ```
 
 Cada módulo tem um `include/<modulo>.h` e um `src/<modulo>.c`, criados pelo dono na primeira story do módulo. A pasta `dados/` (placar e configuração) é criada pelo jogo no primeiro salvamento e não é versionada.
+
+## Modelos 3D
+
+Pipeline: Blender → `.glb` (glTF binário) → `LoadModel` da raylib. Os modelos ficam em `assets/models/`; scripts que geram ou adaptam um modelo, ou dados derivados dele, ficam em `assets/models/fontes/`.
+
+| Item              | Convenção                                                                                                             |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Unidade           | 1 m do Blender = 1 u do jogo = 1 m canônico (TIE ~6 m, Destróier 1600 m). O modelo já vem no tamanho final: o jogo desenha com escala 1 e sem rotação |
+| Eixos no jogo     | Frente +Z, cima +Y, direita -X (os mesmos do TIE em `nave.c`)                                                         |
+| Eixos no Blender  | Frente -Y (o modelo olha para a vista Front, tecla 1), cima +Z. O exportador glTF com "+Y Up" leva isso para o jogo    |
+| Origem            | Centro da nave; o Destróier fica com a origem na origem do mundo                                                      |
+| Escala do mundo   | Com o Destróier em 1600 u, arena (raio 9000), velocidades e distâncias de IA e reforços foram multiplicadas por ~4,6; o tamanho dos caças não mudou |
+| Orçamento         | 2–5k triângulos por caça; o Destróier, peça única sempre em cena, até ~60k                                             |
+| Exportação        | Formato glTF Binary, "+Y Up", "Apply Modifiers", transformações aplicadas, só os objetos da nave, sem animação         |
+| Malhas            | Até 65.535 vértices por malha: a raylib converte índices de 32 bits para 16 e quebra malhas maiores                    |
+| Texturas          | Embutidas no `.glb` em PNG (a raylib padrão não lê JPEG), só o primeiro mapa UV. A raylib usa a cor base e a textura de cor |
+| Emissivo          | A raylib só lê o emissivo com textura: material emissivo leva cor base = cor do emissivo e uma textura emissiva 1x1, e o jogo o desenha sem luz |
+| Colisão           | Destróier: mapa de alturas gerado do modelo (`src/casco_destroier.inc`); mudou o modelo, rodar `python3 assets/models/fontes/casco_destroier.py` |
+
+O `assets/models/destroier.glb` sai do modelo do Sketchfab (link nos créditos) com `blender -b --factory-startup -P assets/models/fontes/destroier.py -- <star_wars_imperial_ii_star_destroyer.glb>`, rodado na raiz do repositório: escala para 1600 u de comprimento (o canônico), Decimate só nos detalhes pesados sem textura (235k → 60k triângulos) e os ajustes de textura e emissivo da tabela. Depois, `python3 assets/models/fontes/casco_destroier.py` gera o casco de colisão. Sem o `.glb`, o jogo desenha uma cunha de primitivas nas mesmas medidas.
 
 ## Estruturas de dados
 
@@ -119,6 +140,7 @@ Cada módulo tem um `include/<modulo>.h` e um `src/<modulo>.c`, criados pelo don
 
 ## Créditos
 
+- `assets/models/destroier.glb`: adaptado de ["Star Wars: Imperial II Star Destroyer"](https://sketchfab.com/3d-models/star-wars-imperial-ii-star-destroyer-b8bd2d35f7604670ab85242c06c6d280), de [Daniel](https://sketchfab.com/DanielAndersson), licença [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Alterações: escala, menos polígonos nos detalhes, mapas de normal e UVs extras removidos, texturas convertidas para PNG e materiais emissivos adaptados à raylib (`assets/models/fontes/destroier.py`).
 - `assets/models/death_star.glb`: adaptado de ["Death Star - Star Wars"](https://sketchfab.com/3d-models/death-star-star-wars-423fb92f677f4448aef407112a1fc032), de [Quiznos323](https://sketchfab.com/quiznos323), licença [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0/). Alterações: superlaser e esqueleto removidos, mapas de normal e emissivo removidos, casco com metade dos polígonos e texturas com metade da resolução. A versão adaptada é distribuída sob a mesma licença.
 
 ## Pipeline de modelos — VIS-01 (#55)

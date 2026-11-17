@@ -296,81 +296,96 @@ static void novoJogoEm(Vector3 pos)
     jogoDestroier.jogador.pos = pos;
 }
 
+/* Primeira altura, descendo de cima em passos de 0,5 u, em que a nave em (x, ?, z) encosta no casco. */
+static float alturaDeContato(float x, float z)
+{
+    float y;
+
+    for (y = 600.0f; y > -600.0f; y -= 0.5f)
+        if (tocaDestroier((Vector3){ x, y, z }, RAIO_JOGADOR))
+            return y;
+    return -1000.0f;
+}
+
 static void testarColisaoDestroier(void)
 {
     Jogo *g = &jogoDestroier;
-    float casco0;
-    float minimo = ESFERAS_DESTROIER[5].raio + RAIO_JOGADOR;
+    float casco0, conves, lado;
+    Jogador inicio;
 
-    /* Longe do casco: nada acontece (posição inicial z = 300). */
-    novoJogoEm((Vector3){ 0.0f, 0.0f, 300.0f });
+    /* Longe do casco: nada acontece (posição inicial do jogador). */
+    iniciarJogador(&inicio);
+    novoJogoEm(inicio.pos);
     g->sequenciaSemDano = 5;
     casco0 = g->jogador.casco;
     VERIFICA(colidirDestroier(g, 1.0f / 60.0f) == 0);
-    VERIFICA(proximo(g->jogador.pos.z, 300.0f) && proximo(g->jogador.casco, casco0));
+    VERIFICA(proximo(g->jogador.pos.z, inicio.pos.z) && proximo(g->jogador.casco, casco0));
     VERIFICA(g->sequenciaSemDano == 5);
 
-    /* Encostou na proa: empurrada ao longo da normal até a superfície, perde casco e zera a sequência. */
-    novoJogoEm((Vector3){ 0.0f, 0.0f, ESFERAS_DESTROIER[5].centro.z + 8.0f });
+    /* Rente ao casco: na proa (z = 700) ele tem ~20 u de meia espessura; 40 u acima do eixo é livre. */
+    VERIFICA(tocaDestroier((Vector3){ 0.0f, 0.0f, 700.0f }, 0.0f));
+    VERIFICA(!tocaDestroier((Vector3){ 0.0f, 40.0f, 700.0f }, RAIO_JOGADOR));
+    VERIFICA(!tocaDestroier((Vector3){ 0.0f, -40.0f, 700.0f }, RAIO_JOGADOR));
+
+    /* Desceu 2 u para dentro do conves: sobe de volta (x e z iguais), perde casco e zera a sequência. */
+    conves = alturaDeContato(0.0f, 200.0f);
+    VERIFICA(conves > 0.0f && conves < 200.0f);
+    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f });
     g->sequenciaSemDano = 5;
     VERIFICA(colidirDestroier(g, 1.0f / 60.0f) == 1);
-    VERIFICA(proximo(g->jogador.pos.z, ESFERAS_DESTROIER[5].centro.z + minimo));
+    VERIFICA(g->jogador.pos.y > conves - 2.0f && g->jogador.pos.y < conves + 0.51f);
+    VERIFICA(proximo(g->jogador.pos.x, 0.0f) && proximo(g->jogador.pos.z, 200.0f));
+    VERIFICA(!tocaDestroier(g->jogador.pos, RAIO_JOGADOR));
     VERIFICA(proximo(g->jogador.casco, casco0 - DANO_COLISAO_DESTROIER));
     VERIFICA(g->sequenciaSemDano == 0);
 
-    /* Encostada na superfície (distância exatamente o raio somado) não é contato. */
+    /* Assentada na superfície não é contato. */
     VERIFICA(colidirDestroier(g, 1.0f / 60.0f) == 0);
 
-    /* Pelo lado: a normal é lateral, então o empurrão também. */
-    novoJogoEm((Vector3){ 30.0f, 0.0f, ESFERAS_DESTROIER[2].centro.z });
+    /* Pela parede lateral da popa: o empurrão é para o lado. */
+    for (lado = 600.0f; lado > 0.0f && !tocaDestroier((Vector3){ lado, 0.0f, -600.0f }, RAIO_JOGADOR); lado -= 0.5f)
+        ;
+    VERIFICA(lado > MEIA_BOCA_DESTROIER - 60.0f);
+    novoJogoEm((Vector3){ lado - 2.0f, 0.0f, -600.0f });
     VERIFICA(colidirDestroier(g, 1.0f / 60.0f) == 1);
-    VERIFICA(proximo(g->jogador.pos.x, ESFERAS_DESTROIER[2].raio + RAIO_JOGADOR));
-    VERIFICA(proximo(g->jogador.pos.z, ESFERAS_DESTROIER[2].centro.z));
+    VERIFICA(g->jogador.pos.x > lado - 2.0f && g->jogador.pos.x < lado + 0.51f);
+    VERIFICA(proximo(g->jogador.pos.y, 0.0f) && proximo(g->jogador.pos.z, -600.0f));
 
-    /* No centro exato a normal é indefinida: sai pela proa, sem NaN. */
-    novoJogoEm(ESFERAS_DESTROIER[5].centro);
+    /* Bem no meio do casco: sai mesmo assim, sem ficar dentro. */
+    novoJogoEm((Vector3){ 0.0f, 0.0f, 0.0f });
     VERIFICA(colidirDestroier(g, 1.0f / 60.0f) == 1);
-    VERIFICA(proximo(g->jogador.pos.z, ESFERAS_DESTROIER[5].centro.z + minimo));
+    VERIFICA(!tocaDestroier(g->jogador.pos, RAIO_JOGADOR));
 
     /* Encostada contra o casco: empurra todo passo, mas o dano só volta depois de RECARGA_COLISAO. */
-    novoJogoEm((Vector3){ 0.0f, 0.0f, ESFERAS_DESTROIER[5].centro.z + 8.0f });
+    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f });
     casco0 = g->jogador.casco;
     colidirDestroier(g, 0.1f);
-    g->jogador.pos.z = ESFERAS_DESTROIER[5].centro.z + 8.0f;
+    g->jogador.pos.y = conves - 2.0f;
     VERIFICA(colidirDestroier(g, 0.1f) == 1);
     VERIFICA(proximo(g->jogador.casco, casco0 - DANO_COLISAO_DESTROIER));
-    VERIFICA(proximo(g->jogador.pos.z, ESFERAS_DESTROIER[5].centro.z + minimo));
-    g->jogador.pos.z = ESFERAS_DESTROIER[5].centro.z + 8.0f;
+    g->jogador.pos.y = conves - 2.0f;
     VERIFICA(colidirDestroier(g, RECARGA_COLISAO) == 1);
     VERIFICA(proximo(g->jogador.casco, casco0 - 2.0f * DANO_COLISAO_DESTROIER));
 
     /* iniciarJogador zera a recarga: a partida seguinte não herda o intervalo da anterior. */
-    novoJogoEm((Vector3){ 0.0f, 0.0f, ESFERAS_DESTROIER[5].centro.z + 8.0f });
+    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f });
     colidirDestroier(g, 1.0f / 60.0f);
-    novoJogoEm((Vector3){ 0.0f, 0.0f, ESFERAS_DESTROIER[5].centro.z + 8.0f });
+    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f });
     casco0 = g->jogador.casco;
     colidirDestroier(g, 1.0f / 60.0f);
     VERIFICA(proximo(g->jogador.casco, casco0 - DANO_COLISAO_DESTROIER));
 
-    /* Voando de frente contra o casco a 120 u/s por 3 s: nunca termina dentro de nenhuma esfera. */
-    novoJogoEm((Vector3){ 0.0f, 0.0f, 300.0f });
+    /* Voando de frente contra a proa por 3 s: bate e nunca termina um passo dentro do casco. */
+    novoJogoEm((Vector3){ 0.0f, 0.0f, Z_PROA_DESTROIER + 300.0f });
     g->jogador.rot = (Quaternion){ 0.0f, 1.0f, 0.0f, 0.0f };   /* 180° em Y: olha para -Z, rumo ao Destróier */
     {
         Comandos acelera = { .aceleracao = 1.0f };
         int i, dentro = 0, bateu = 0;
 
         for (i = 0; i < 180; i++) {
-            int k;
-
             atualizarJogador(&g->jogador, &acelera, 1.0f / 60.0f);
             bateu |= colidirDestroier(g, 1.0f / 60.0f);
-            for (k = 0; k < NUM_ESFERAS_DESTROIER; k++) {
-                Vector3 d = { g->jogador.pos.x - ESFERAS_DESTROIER[k].centro.x,
-                              g->jogador.pos.y - ESFERAS_DESTROIER[k].centro.y,
-                              g->jogador.pos.z - ESFERAS_DESTROIER[k].centro.z };
-                if (tam(d) < ESFERAS_DESTROIER[k].raio + RAIO_JOGADOR - 1e-3f)
-                    dentro = 1;
-            }
+            dentro |= tocaDestroier(g->jogador.pos, RAIO_JOGADOR);
         }
         VERIFICA(bateu == 1);
         VERIFICA(dentro == 0);

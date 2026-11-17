@@ -3,6 +3,7 @@
 #include "espaco.h"
 
 #include "nave.h"
+#include "render.h"
 #include "raymath.h"
 #include "rlgl.h"
 
@@ -60,23 +61,16 @@ static void sortearEstrelasEPoeira(void)
         poeira[i] = (Vector3){ aleatorio() * LADO_POEIRA, aleatorio() * LADO_POEIRA, aleatorio() * LADO_POEIRA };
 }
 
-/* Carrega PASTA_SHADERS<nome>.vs/.fs. Devolve 0 se faltar arquivo ou não compilar (a raylib devolveria o padrão). */
-static int carregarShader(const char *nome, Shader *s)
+/* Acima e à direita da visão inicial do jogador (frente +Z, direita -X). */
+static Vector3 rumoEstrelaMorte(void)
 {
-    char vs[128], fs[128];
+    return Vector3Normalize((Vector3){ -0.38f, 0.26f, 1.0f });
+}
 
-    TextCopy(vs, TextFormat(PASTA_SHADERS "%s.vs", nome));
-    TextCopy(fs, TextFormat(PASTA_SHADERS "%s.fs", nome));
-    if (!FileExists(vs) || !FileExists(fs)) {
-        TraceLog(LOG_WARNING, "ESPACO: shader %s ausente", nome);
-        return 0;
-    }
-    *s = LoadShader(vs, fs);
-    if (s->id == rlGetShaderIdDefault()) {
-        TraceLog(LOG_WARNING, "ESPACO: shader %s não compilou", nome);
-        return 0;
-    }
-    return 1;
+Vector3 direcaoSol(void)
+{
+    /* À esquerda e acima de quem olha para a Estrela da Morte, quase de lado: o terminador atravessa o disco. */
+    return Vector3Normalize(Vector3Add((Vector3){ 0.85f, 0.5f, 0.0f }, Vector3Scale(rumoEstrelaMorte(), -0.15f)));
 }
 
 static void carregarNebulosa(void)
@@ -91,8 +85,7 @@ static void carregarNebulosa(void)
 
 static void carregarEstrelaMorte(void)
 {
-    /* Acima e à direita da visão inicial do jogador (frente +Z, direita -X). */
-    Vector3 dir = Vector3Normalize((Vector3){ -0.38f, 0.26f, 1.0f });
+    Vector3 dir = rumoEstrelaMorte();
     /* Base com o +Z do modelo (lado do prato) virado para a câmera e o +Y para o alto: equador na horizontal. */
     Vector3 z = Vector3Negate(dir);
     Vector3 x = Vector3Normalize(Vector3CrossProduct((Vector3){ 0.0f, 1.0f, 0.0f }, z));
@@ -117,23 +110,13 @@ static void carregarEstrelaMorte(void)
 
     /* Sem o shader ela fica chapada, mas aparece. */
     if (carregarShader("estrela_morte", &sombraEstrelaMorte)) {
-        /* Sol à esquerda e acima de quem olha da arena, quase de lado: terminador atravessa o disco. */
-        Vector3 luz = Vector3Normalize(Vector3Add((Vector3){ 0.85f, 0.5f, 0.0f }, Vector3Scale(z, 0.15f)));
+        Vector3 luz = direcaoSol();
 
         SetShaderValue(sombraEstrelaMorte, GetShaderLocation(sombraEstrelaMorte, "dirLuz"), &luz, SHADER_UNIFORM_VEC3);
         for (int i = 0; i < estrelaMorte.materialCount; i++)
             estrelaMorte.materials[i].shader = sombraEstrelaMorte;
     }
-
-    /* Objeto distante: sem mipmaps a textura cintila ao girar. */
-    for (int i = 0; i < estrelaMorte.materialCount; i++) {
-        Texture2D *t = &estrelaMorte.materials[i].maps[MATERIAL_MAP_ALBEDO].texture;
-
-        if (t->id != 0 && t->id != rlGetTextureIdDefault()) {
-            GenTextureMipmaps(t);
-            SetTextureFilter(*t, TEXTURE_FILTER_TRILINEAR);
-        }
-    }
+    suavizarTexturas(&estrelaMorte);
 
     posEstrelaMorte = Vector3Scale(dir, DISTANCIA_ESTRELA_MORTE);
     QuaternionToAxisAngle(q, &eixoEstrelaMorte, &anguloEstrelaMorte);
@@ -149,22 +132,15 @@ void iniciarEspaco(void)
 
 void encerrarEspaco(void)
 {
-    /* UnloadModel não libera texturas nem shaders dos materiais; UnloadShader ignora o padrão. */
+    /* UnloadModel não libera shaders dos materiais; UnloadShader ignora o padrão. */
     if (temNebulosa) {
         UnloadShader(sombraNebulosa);
         UnloadModel(nebulosa);   /* textura do material é a padrão: nada a liberar */
         temNebulosa = 0;
     }
     if (temEstrelaMorte) {
-        for (int i = 0; i < estrelaMorte.materialCount; i++)
-            for (int m = 0; m <= MATERIAL_MAP_BRDF; m++) {
-                Texture2D t = estrelaMorte.materials[i].maps[m].texture;
-
-                if (t.id != 0 && t.id != rlGetTextureIdDefault())
-                    UnloadTexture(t);
-            }
         UnloadShader(sombraEstrelaMorte);
-        UnloadModel(estrelaMorte);
+        descarregarModelo(estrelaMorte);
         temEstrelaMorte = 0;
     }
 }

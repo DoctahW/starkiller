@@ -45,8 +45,8 @@ int atualizarJogador(Jogador *j, const Comandos *cmd, float dt);
 #define RECARGA_COLISAO         0.5f
 
 /*
- * Colisão do TIE com o Destróier (esferas de destroier.h). Encostar no casco empurra a nave para
- * fora, ao longo da normal esfera → nave, até a superfície, e tira DANO_COLISAO_DESTROIER do casco
+ * Colisão do TIE com o Destróier (casco de destroier.h). Encostar no casco empurra a nave para
+ * fora pelo caminho mais curto (afastarDoDestroier) e tira DANO_COLISAO_DESTROIER do casco
  * do jogador chamando registrarDanoJogador (zera a sequência sem dano). Durante RECARGA_COLISAO
  * depois de um dano só empurra, para a nave encostada não perder casco a cada passo.
  * Roda depois de atualizarJogador. Devolve 1 se houve contato neste passo; 0 caso contrário.
