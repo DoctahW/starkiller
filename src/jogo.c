@@ -74,7 +74,7 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
         dispararLaser(g);
     atualizarLasers(g, PASSO_FIXO);
     resolverLasers(g, PASSO_FIXO);
-    colidirLasersInimigos(g, PASSO_FIXO);   /* TODO CMB-04: vibrar(&cfg, 0.8f, 0.4f) no acerto, quando o cfg chegar aqui */
+    colidirLasersInimigos(g, PASSO_FIXO);
     atualizarExplosoes(g, PASSO_FIXO);
 }
 
@@ -105,12 +105,21 @@ EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd, float
     return EST_COMBATE;
 }
 
-static EstadoJogo combate(Jogo *g, const Comandos *cmd, int controleCaiu)
+static EstadoJogo combate(Jogo *g, const ConfigEntrada *cfg, const Comandos *cmd, int controleCaiu)
 {
     EstadoJogo proximo = EST_PAUSA;
 
-    if (!cmd->pausa && !controleCaiu)
+    if (!cmd->pausa && !controleCaiu) {
+        float cascoAntes = g->jogador.casco;
+        int abatesAntes = g->abates;
+
         proximo = simularCombate(g, &relogio, cmd, GetFrameTime());
+        /* Dano ao jogador pesa mais que o abate; o abate só vibra se não houve dano no frame. */
+        if (g->jogador.casco < cascoAntes)
+            vibrar(cfg, 0.8f, 0.4f);
+        else if (g->abates > abatesAntes)
+            vibrar(cfg, 0.6f, 0.3f);
+    }
 
     render_cena(g, cameraDoJogador(&g->jogador));   /* também no frame que entra em pausa: sem piscar preto */
     hud_desenhar(g, avisoArena);
@@ -148,7 +157,7 @@ static EstadoJogo atualizarEstado(Jogo *g, ConfigEntrada *cfg, const Comandos *c
 {
     switch (g->estado) {
     case EST_MENU:      return telaMenu(g, cmd);
-    case EST_COMBATE:   return combate(g, cmd, controleCaiu);
+    case EST_COMBATE:   return combate(g, cfg, cmd, controleCaiu);
     case EST_PAUSA:     return pausa(g, cmd);
     case EST_FIM:       return telaFim(g, cmd);
     case EST_PLACAR:    return telaPlacar(g, cmd);
