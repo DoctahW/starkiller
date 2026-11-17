@@ -12,15 +12,26 @@
  * acompanha o quadrado do fator, então o raio de curva (v²/a) fica constante. Avança `pos` com `vel`.
  * Y-Wing em IA_ATACAR_DESTROIER orbita o Destróier e bombardeia a menos de 685.
  * O caça nunca fica dentro do casco: usa afastarDoDestroier (IA-04).
- * Não reescreve o estado: quem alterna entre atacar o Destróier e o jogador é a IA-03.
+ * IA-03: o X-Wing alterna entre atacar o Destróier e o jogador a cada 8–12 s; o A-Wing
+ * persegue o jogador. X-Wing e A-Wing atiram no cone de 15° a menos de ALCANCE_TIRO_INIMIGO,
+ * respeitando `cooldownTiro`.
  */
 void ia_atualizar(Inimigo *in, Jogo *g, float dt);
+
+/* IA-03: intervalo de troca de alvo do X-Wing; o id do caça varia entre MIN e MAX. */
+#define TROCA_XWING_MIN      8.0f
+#define TROCA_XWING_VARIACAO 5     /* id % 5 -> 8..12 s por estado */
+
+/* IA-03: tiro inimigo no cone de 15° e a menos de 1840 (400 × 4,6, a escala do mundo). */
+#define ALCANCE_TIRO_INIMIGO  1840.0f
+#define COSSENO_CONE_TIRO     0.9659258f   /* cos(15°) */
+#define COOLDOWN_TIRO_INIMIGO 1.5f
 
 /*
  * IA-05: a dificuldade cresce ao longo da partida, com os extremos em constantes.
  * A velocidade dos caças vai de 1,0 até FATOR_VELOCIDADE_MAX e o cooldown de tiro de
- * 1,0 até FATOR_COOLDOWN_MIN. A IA-03 (#51) multiplica o cooldown base por
- * fatorCooldownIA ao recarregar `cooldownTiro`; até lá o fator só aparece nos testes.
+ * 1,0 até FATOR_COOLDOWN_MIN. A IA-03 multiplica o cooldown base por fatorCooldownIA
+ * ao recarregar `cooldownTiro`.
  */
 #define FATOR_VELOCIDADE_MAX 1.3f
 #define FATOR_COOLDOWN_MIN   0.7f
