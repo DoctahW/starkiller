@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "inimigos.h"
+#include "nave.h"
 #include "teste.h"
 
 #define EPS 1e-5f
@@ -94,6 +95,11 @@ static int estaCrescente(const ListaInimigos *l){
         }
     }
     return 1;
+}
+
+static void porNaFrente(ListaInimigos *l, int id, float z){
+    Vector3 pos = {0.0f, 0.0f, z};
+    inserirInimigo(l, criarInimigo(XWING, pos, id));
 }
 
 // ==================== LST-01: criarInimigo ====================
@@ -640,6 +646,118 @@ static void testarOrdenacaoEstavel(void){
     liberarListaInimigos(&lista);
 }
 
+static void testarAtualizarRecalculaDistancia(void){
+    memset(&jogo, 0, sizeof(jogo));
+    jogo.jogador.pos = (Vector3){0.0f, 0.0f, 0.0f};
+    porNaFrente(&jogo.inimigos, 1, 100.0f);
+    porNaFrente(&jogo.inimigos, 2, 200.0f);
+    porNaFrente(&jogo.inimigos, 3, 300.0f);
+
+    atualizarInimigos(&jogo, 1.0f / 60.0f);
+
+    VERIFICA(proximo(jogo.inimigos.inicio->dado.distancia, 100.0f));
+    VERIFICA(proximo(jogo.inimigos.inicio->prox->dado.distancia, 200.0f));
+    VERIFICA(proximo(jogo.inimigos.fim->dado.distancia, 300.0f));
+    VERIFICA(jogo.inimigos.tamanho == 3);
+
+    liberarListaInimigos(&jogo.inimigos);
+}
+
+static void testarAtualizarListaVazia(void){
+    memset(&jogo, 0, sizeof(jogo));
+
+    atualizarInimigos(&jogo, 1.0f / 60.0f);
+
+    VERIFICA(jogo.inimigos.inicio == NULL);
+    VERIFICA(jogo.inimigos.fim == NULL);
+    VERIFICA(jogo.inimigos.alvo == NULL);
+    VERIFICA(jogo.inimigos.tamanho == 0);
+}
+
+static void testarDespawnForaDaArena(void){
+    int i, ativas = 0;
+
+    memset(&jogo, 0, sizeof(jogo));
+    porNaFrente(&jogo.inimigos, 1, 500.0f);
+    porNaFrente(&jogo.inimigos, 2, RAIO_ARENA + 500.0f);
+    porNaFrente(&jogo.inimigos, 3, 600.0f);
+
+    atualizarInimigos(&jogo, 1.0f / 60.0f);
+
+    conferirLista(&jogo.inimigos, 2);
+    VERIFICA(jogo.inimigos.inicio->dado.id == 1);
+    VERIFICA(jogo.inimigos.fim->dado.id == 3);
+    VERIFICA(jogo.inimigos.inicio->prox == jogo.inimigos.fim);
+
+
+    VERIFICA(jogo.abates == 0);
+    for(i = 0; i < MAX_EXPLOSOES; i++)
+        ativas += jogo.explosoes[i].ativa != 0;
+    VERIFICA(ativas == 0);
+
+    liberarListaInimigos(&jogo.inimigos);
+}
+
+static void testarDespawnDeVariosSeguidos(void){
+    memset(&jogo, 0, sizeof(jogo));
+    porNaFrente(&jogo.inimigos, 1, 500.0f);
+    porNaFrente(&jogo.inimigos, 2, RAIO_ARENA + 100.0f);
+    porNaFrente(&jogo.inimigos, 3, RAIO_ARENA + 200.0f);
+    porNaFrente(&jogo.inimigos, 4, 600.0f);
+
+    atualizarInimigos(&jogo, 1.0f / 60.0f);
+
+    conferirLista(&jogo.inimigos, 2);
+    VERIFICA(jogo.inimigos.inicio->dado.id == 1);
+    VERIFICA(jogo.inimigos.fim->dado.id == 4);
+
+    liberarListaInimigos(&jogo.inimigos);
+}
+
+static void testarAlvoDespawnado(void){
+    memset(&jogo, 0, sizeof(jogo));
+    porNaFrente(&jogo.inimigos, 1, 500.0f);
+    porNaFrente(&jogo.inimigos, 2, 600.0f);
+    porNaFrente(&jogo.inimigos, 3, RAIO_ARENA + 500.0f);
+    jogo.inimigos.alvo = buscarPorId(&jogo.inimigos, 3);
+
+    atualizarInimigos(&jogo, 1.0f / 60.0f);
+
+    conferirLista(&jogo.inimigos, 2);
+    VERIFICA(jogo.inimigos.alvo != NULL);
+    VERIFICA(jogo.inimigos.alvo->dado.id == 2);
+    VERIFICA(jogo.inimigos.alvo == jogo.inimigos.fim);
+
+    liberarListaInimigos(&jogo.inimigos);
+}
+
+static void testarArenaNaoEADistanciaDoJogador(void){
+    memset(&jogo, 0, sizeof(jogo));
+    jogo.jogador.pos = (Vector3){0.0f, 0.0f, -500.0f};
+    porNaFrente(&jogo.inimigos, 1, 1900.0f);
+
+    atualizarInimigos(&jogo, 1.0f / 60.0f);
+
+    VERIFICA(jogo.inimigos.tamanho == 1);
+    VERIFICA(jogo.inimigos.inicio->dado.id == 1);
+    VERIFICA(proximo(jogo.inimigos.inicio->dado.distancia, 2400.0f));
+
+    liberarListaInimigos(&jogo.inimigos);
+}
+
+static void testarAtualizarNaoMoveNenhumInimigo(void){
+    memset(&jogo, 0, sizeof(jogo));
+    porNaFrente(&jogo.inimigos, 1, 1000.0f);
+    Vector3 antes = jogo.inimigos.inicio->dado.pos;
+
+    atualizarInimigos(&jogo, 1.0f / 60.0f);
+
+    VERIFICA(proximo(jogo.inimigos.inicio->dado.pos.z, antes.z));
+    VERIFICA(vetorNulo(jogo.inimigos.inicio->dado.vel));
+
+    liberarListaInimigos(&jogo.inimigos);
+}
+
 int main(void){
     testarXWing();
     testarYWing();
@@ -676,6 +794,14 @@ int main(void){
     testarOrdenarInvertida();
     testarAlvoContinuaOMesmoNo();
     testarOrdenacaoEstavel();
+
+    testarAtualizarRecalculaDistancia();
+    testarAtualizarListaVazia();
+    testarDespawnForaDaArena();
+    testarDespawnDeVariosSeguidos();
+    testarAlvoDespawnado();
+    testarArenaNaoEADistanciaDoJogador();
+    testarAtualizarNaoMoveNenhumInimigo();
 
     return RESULTADO_TESTES();
 }
