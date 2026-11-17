@@ -98,20 +98,25 @@ void removerInimigo(ListaInimigos *l, NoInimigo *no){
 
 
 void atualizarInimigos(Jogo *g, float dt){
-    NoInimigo *no = g->inimigos.inicio;
+    for(NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox){
+        Inimigo *in = &no->dado;
+        float dist;
 
-    while(no != NULL){
-        NoInimigo *prox = no->prox; //secao 3.5: guardar antes, o despawn libera o no
-
-        no->dado.distancia = Vector3Distance(no->dado.pos, g->jogador.pos);
-        ia_atualizar(&no->dado, g, dt);
+        in->distancia = Vector3Distance(in->pos, g->jogador.pos);
+        ia_atualizar(in, g, dt);
 
         //arena e em torno do Destroier na origem, nao do jogador
-        if(Vector3Length(no->dado.pos) > RAIO_ARENA){
-            removerInimigo(&g->inimigos, no);
-        }
+        //quem passa da borda volta pra ela e perde a velocidade pra fora, como o TIE: nao some
+        dist = Vector3Length(in->pos);
+        if(dist > RAIO_ARENA){
+            Vector3 radial = Vector3Scale(in->pos, 1.0f / dist);
+            float saida = Vector3DotProduct(in->vel, radial);
 
-        no = prox;
+            in->pos = Vector3Scale(radial, RAIO_ARENA);
+            if(saida > 0.0f){
+                in->vel = Vector3Subtract(in->vel, Vector3Scale(radial, saida));
+            }
+        }
     }
 }
 
