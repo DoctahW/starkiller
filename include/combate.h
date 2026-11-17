@@ -58,7 +58,7 @@ int aplicarDano(Inimigo *in, float dano);
  */
 int resolverLasers(Jogo *g, float dt);
 
-#define DURACAO_EXPLOSAO 0.6f    /* s de vida de uma explosão */
+#define DURACAO_EXPLOSAO 0.8f    /* s de vida de uma explosão */
 #define RAIO_EXPLOSAO    20.0f   /* raio máximo (chute; ajustar com o visual) */
 
 /*
@@ -68,5 +68,13 @@ int resolverLasers(Jogo *g, float dt);
 int criarExplosao(Jogo *g, Vector3 pos, float raioMax);
 /* Avança o tempo das explosões ativas e desativa as que passaram de DURACAO_EXPLOSAO. */
 void atualizarExplosoes(Jogo *g, float dt);
+
+/*
+ * Curva da explosão para o render (VIS-10): progresso em [0, 1] e raio atual, que cresce
+ * rápido no começo e desacelera no fim. Explosão inativa devolve 0. Não muda estado,
+ * então serve para o `const Jogo *` do render_cena. O fade é 1 - progresso.
+ */
+float progressoExplosao(const Explosao *e);
+float raioExplosao(const Explosao *e);
 
 #endif
