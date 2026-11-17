@@ -2,28 +2,61 @@
 
 #define TAM_TITULO 40
 #define TAM_TEXTO  20
-#define TAM_MENU   24
-#define TAM_DICA   18
+#define TAM_MENU   30
+#define TAM_DICA   20
 
 #define MENU_CENTRO_X 0.28f /* fração da largura; cai na área escura da arte */
 #define MENU_TOPO_Y   342
 #define MENU_ESPACO   42
 #define MENU_SOMBRA   2
 
+#define FONTE_MENU   "assets/fonts/ChakraPetch-Bold.ttf"
+#define ESPACO_FONTE 1.0f
+
 static Texture2D fundoMenu;
 static int fundoMenuCarregado;
+static Font fonteMenu;
+static int fonteMenuCarregada;
 
 static void textoCentralizado(const char *texto, int y, int tamanho, Color cor)
 {
     DrawText(texto, (GetScreenWidth() - MeasureText(texto, tamanho)) / 2, y, tamanho, cor);
 }
 
+/* Carrega a fonte uma única vez, com ASCII e Latin-1 para os acentos. */
+static Font fonteDoMenu(void)
+{
+    if (!fonteMenuCarregada) {
+        static int pontos[0x60 + 0x60]; /* 0x20-0x7E e 0xA0-0xFF */
+        int quantidade = 0;
+        int c;
+
+        for (c = 0x20; c <= 0x7E; c++)
+            pontos[quantidade++] = c;
+        for (c = 0xA0; c <= 0xFF; c++) {
+            if (c == 0xB5) /* micro sign não existe na Chakra Petch */
+                continue;
+            pontos[quantidade++] = c;
+        }
+
+        fonteMenu = LoadFontEx(FONTE_MENU, 32, pontos, quantidade);
+        fonteMenuCarregada = 1;
+    }
+
+    return fonteMenu.texture.id != 0 ? fonteMenu : GetFontDefault();
+}
+
 static void textoNoMenu(const char *texto, int centroX, int y, int tamanho, Color cor)
 {
-    int x = centroX - MeasureText(texto, tamanho) / 2;
+    Font fonte = fonteDoMenu();
+    float largura = MeasureTextEx(fonte, texto, (float)tamanho, ESPACO_FONTE).x;
+    int x = centroX - (int)(largura / 2.0f);
 
-    DrawText(texto, x + MENU_SOMBRA, y + MENU_SOMBRA, tamanho, Fade(BLACK, 0.75f));
-    DrawText(texto, x, y, tamanho, cor);
+    DrawTextEx(fonte, texto,
+               (Vector2){ (float)(x + MENU_SOMBRA), (float)(y + MENU_SOMBRA) },
+               (float)tamanho, ESPACO_FONTE, Fade(BLACK, 0.75f));
+    DrawTextEx(fonte, texto, (Vector2){ (float)x, (float)y },
+               (float)tamanho, ESPACO_FONTE, cor);
 }
 
 static void desenharFundoMenu(void)
@@ -64,14 +97,21 @@ EstadoJogo telaMenu(Jogo *g, const Comandos *cmd)
         int y = MENU_TOPO_Y + i * MENU_ESPACO;
 
         if (i == selecionada) {
-            int largura = MeasureText(opcoes[i], TAM_MENU);
-            DrawText(">", centroX - largura / 2 - 22, y, TAM_MENU, YELLOW);
+            Font fonte = fonteDoMenu();
+            float largura = MeasureTextEx(fonte, opcoes[i], (float)TAM_MENU, ESPACO_FONTE).x;
+            float xMarcador = (float)centroX - largura / 2.0f - 26.0f;
+
+            DrawTextEx(fonte, ">",
+                       (Vector2){ xMarcador + MENU_SOMBRA, (float)(y + MENU_SOMBRA) },
+                       (float)TAM_MENU, ESPACO_FONTE, Fade(BLACK, 0.75f));
+            DrawTextEx(fonte, ">", (Vector2){ xMarcador, (float)y },
+                       (float)TAM_MENU, ESPACO_FONTE, YELLOW);
         }
         textoNoMenu(opcoes[i], centroX, y, TAM_MENU, i == selecionada ? YELLOW : LIGHTGRAY);
     }
 
     textoNoMenu("Setas: navegar   Enter/A: selecionar",
-                centroX, MENU_TOPO_Y + QTD_OPCOES * MENU_ESPACO + 24, TAM_DICA, GRAY);
+                centroX, MENU_TOPO_Y + QTD_OPCOES * MENU_ESPACO + 16, TAM_DICA, LIGHTGRAY);
 
     return cmd->confirmar ? destinos[selecionada] : EST_MENU;
 }
