@@ -12,8 +12,9 @@
  * acompanha o quadrado do fator, então o raio de curva (v²/a) fica constante. Avança `pos` com `vel`.
  * Y-Wing em IA_ATACAR_DESTROIER orbita o Destróier e bombardeia a menos de 685.
  * O caça nunca fica dentro do casco: usa afastarDoDestroier (IA-04).
- * IA-03: o X-Wing alterna entre atacar o Destróier e o jogador a cada 8–12 s; o A-Wing
- * persegue o jogador. X-Wing e A-Wing atiram no cone de 15° a menos de ALCANCE_TIRO_INIMIGO,
+ * IA-03: o X-Wing alterna entre atacar o Destróier e o jogador com período de 8–12 s;
+ * a primeira troca pode ser menor se o caça nasce no meio do ciclo. O A-Wing persegue o
+ * jogador. X-Wing e A-Wing atiram no cone de 15° a menos de ALCANCE_TIRO_INIMIGO,
  * respeitando `cooldownTiro`.
  */
 void ia_atualizar(Inimigo *in, Jogo *g, float dt);

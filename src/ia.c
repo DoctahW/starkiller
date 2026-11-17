@@ -55,7 +55,10 @@ float fatorCooldownIA(float tempoDecorrido)
 
 /*
  * IA-03: estado do X-Wing derivado do tempo da partida e do id (sem campo novo no Inimigo).
- * Cada caça troca de alvo a cada 8–12 s; o deslocamento por id evita que todos troquem juntos.
+ * O período de cada estado é 8–12 s; o deslocamento por id evita que todos troquem juntos.
+ * A fase vem do relógio da partida (a struct não guarda o tempo de spawn), então a primeira
+ * troca de um caça que nasce no meio do ciclo pode ser menor que 8 s; daí em diante o
+ * intervalo é sempre o período.
  */
 static EstadoIA estadoDoXWing(const Inimigo *in, const Jogo *g)
 {
@@ -166,7 +169,8 @@ static void atirarSeNoCone(Inimigo *in, Jogo *g, float dt)
         in->cooldownTiro = COOLDOWN_TIRO_INIMIGO * fatorCooldownIA(g->tempoDecorrido);
 }
 
-/* IA-02: 8 de dano/s no casco do Destróier enquanto o Y-Wing estiver no alcance. */static void bombardearDestroier(Inimigo *in, Jogo *g, float dt)
+/* IA-02: 8 de dano/s no casco do Destróier enquanto o Y-Wing estiver no alcance. */
+static void bombardearDestroier(Inimigo *in, Jogo *g, float dt)
 {
     if (in->tipo != YWING || in->estadoIA != IA_ATACAR_DESTROIER)
         return;
