@@ -256,6 +256,47 @@ static void testarNaoAtravessaOCasco(void)
     }
 }
 
+/* IA-05: os fatores de dificuldade vão de 1,0 aos extremos e saturam nas pontas. */
+static void testarFatoresDeDificuldade(void)
+{
+    float meio = 0.5f * DURACAO_PARTIDA;
+
+    VERIFICA(QUASE(progressoDificuldade(0.0f), 0.0f));
+    VERIFICA(QUASE(progressoDificuldade(meio), 0.5f));
+    VERIFICA(QUASE(progressoDificuldade(DURACAO_PARTIDA), 1.0f));
+    VERIFICA(QUASE(progressoDificuldade(2.0f * DURACAO_PARTIDA), 1.0f));
+    VERIFICA(QUASE(progressoDificuldade(-1.0f), 0.0f));
+
+    VERIFICA(QUASE(fatorVelocidadeIA(0.0f), 1.0f));
+    VERIFICA(QUASE(fatorVelocidadeIA(meio), 1.15f));
+    VERIFICA(QUASE(fatorVelocidadeIA(DURACAO_PARTIDA), FATOR_VELOCIDADE_MAX));
+    VERIFICA(QUASE(fatorVelocidadeIA(2.0f * DURACAO_PARTIDA), FATOR_VELOCIDADE_MAX));
+
+    VERIFICA(QUASE(fatorCooldownIA(0.0f), 1.0f));
+    VERIFICA(QUASE(fatorCooldownIA(meio), 0.85f));
+    VERIFICA(QUASE(fatorCooldownIA(DURACAO_PARTIDA), FATOR_COOLDOWN_MIN));
+    VERIFICA(QUASE(fatorCooldownIA(2.0f * DURACAO_PARTIDA), FATOR_COOLDOWN_MIN));
+
+    /* o cooldown encolhe com o tempo; a velocidade cresce */
+    VERIFICA(fatorCooldownIA(DURACAO_PARTIDA) < fatorCooldownIA(0.0f));
+    VERIFICA(fatorVelocidadeIA(DURACAO_PARTIDA) > fatorVelocidadeIA(0.0f));
+}
+
+/* IA-05: no fim da partida o caça chega a FATOR_VELOCIDADE_MAX vezes a velocidade do tipo. */
+static void testarVelocidadeCresceComOTempo(void)
+{
+    Jogo g = { 0 };
+    Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 5000.0f }, IA_ATACAR_DESTROIER);
+    float velMax = VEL_XWING * FATOR_VELOCIDADE_MAX;
+
+    iniciarJogador(&g.jogador);
+    g.tempoDecorrido = DURACAO_PARTIDA;
+
+    simular(&in, &g, 300);
+    VERIFICA(Vector3Length(in.vel) <= velMax + 1e-3f);
+    VERIFICA(Vector3Length(in.vel) > 0.99f * velMax);
+}
+
 int main(void)
 {
     testarAproximaDoDestroier();
@@ -268,6 +309,8 @@ int main(void)
     testarYwingForaDeAlcance();
     testarCascoEmpurraParaFora();
     testarNaoAtravessaOCasco();
+    testarFatoresDeDificuldade();
+    testarVelocidadeCresceComOTempo();
 
     return RESULTADO_TESTES();
 }
