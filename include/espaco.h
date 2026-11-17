@@ -5,7 +5,10 @@
 
 /* Estrelas de fundo, centradas na câmera: nunca se chega perto delas. */
 #define NUM_ESTRELAS 2500
-#define RAIO_CEU     1000.0f   /* < RL_CULL_DISTANCE_FAR (4000) */
+#define RAIO_CEU     1000.0f
+
+/* Nebulosa procedural numa esfera centrada na câmera do céu (sem imagem). */
+#define RAIO_NEBULOSA 2000.0f  /* < RL_CULL_DISTANCE_FAR */
 
 /*
  * Estrela da Morte no céu (raio do modelo: 10 u). A 900 u com escala 18, ~230 px de diâmetro.
@@ -23,13 +26,11 @@
 /* Shaders em assets/shaders/<nome>.vs e .fs (GLSL 330). */
 #define PASTA_SHADERS "assets/shaders/"
 
-/* Sorteia estrelas e poeira (sempre iguais) e carrega modelo e shaders. Exige a janela aberta. */
 void iniciarEspaco(void);
-/* Libera modelos, texturas e shaders. Seguro sem iniciarEspaco. */
 void encerrarEspaco(void);
 
 /*
- * Céu (estrelas e Estrela da Morte) com a câmera na origem e a orientação do jogador:
+ * Céu (nebulosa, estrelas e Estrela da Morte) com a câmera na origem e a orientação do jogador:
  * nada nele se aproxima. Chamar fora de BeginMode3D, antes da cena; não grava profundidade.
  */
 void desenharFundo(const Jogador *j);

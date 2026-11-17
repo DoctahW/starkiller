@@ -15,6 +15,10 @@ static Estrela estrelas[NUM_ESTRELAS];
 static Vector3 poeira[NUM_POEIRA];   /* posições no mundo, em [0, LADO_POEIRA)^3 */
 static unsigned int semente;
 
+static Model nebulosa;
+static Shader sombraNebulosa;
+static int temNebulosa;
+
 static Model estrelaMorte;
 static Shader sombraEstrelaMorte;
 static int temEstrelaMorte;
@@ -74,6 +78,16 @@ static int carregarShader(const char *nome, Shader *s)
     return 1;
 }
 
+static void carregarNebulosa(void)
+{
+    temNebulosa = carregarShader("nebulosa", &sombraNebulosa);
+    if (!temNebulosa)
+        return;   /* com o shader padrão a esfera sairia branca: melhor sem nebulosa */
+    /* O shader pinta a direção de cada pixel, então poucas faces bastam. */
+    nebulosa = LoadModelFromMesh(GenMeshSphere(RAIO_NEBULOSA, 16, 32));
+    nebulosa.materials[0].shader = sombraNebulosa;
+}
+
 static void carregarEstrelaMorte(void)
 {
     /* Acima e à direita da visão inicial do jogador (frente +Z, direita -X). */
@@ -128,12 +142,18 @@ static void carregarEstrelaMorte(void)
 void iniciarEspaco(void)
 {
     sortearEstrelasEPoeira();
+    carregarNebulosa();
     carregarEstrelaMorte();
 }
 
 void encerrarEspaco(void)
 {
     /* UnloadModel não libera texturas nem shaders dos materiais; UnloadShader ignora o padrão. */
+    if (temNebulosa) {
+        UnloadShader(sombraNebulosa);
+        UnloadModel(nebulosa);   /* textura do material é a padrão: nada a liberar */
+        temNebulosa = 0;
+    }
     if (temEstrelaMorte) {
         for (int i = 0; i < estrelaMorte.materialCount; i++)
             for (int m = 0; m <= MATERIAL_MAP_BRDF; m++) {
@@ -160,6 +180,13 @@ void desenharFundo(const Jogador *j)
 
     BeginMode3D(ceu);
     rlDisableDepthMask();
+
+    /* Vista de dentro, a esfera mostra as faces de trás. */
+    if (temNebulosa) {
+        rlDisableBackfaceCulling();
+        DrawModel(nebulosa, (Vector3){ 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
+        rlEnableBackfaceCulling();
+    }
 
     rlBegin(RL_QUADS);
     for (int i = 0; i < NUM_ESTRELAS; i++) {
