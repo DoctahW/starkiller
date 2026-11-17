@@ -1,11 +1,11 @@
+#include <math.h>
 #include <string.h>
 
+#include "entrada.h"
 #include "placar.h"
 #include "pontuacao.h"
 #include "telas.h"
 
-#define TAM_TITULO 40
-#define TAM_TEXTO  20
 #define TAM_MENU   30
 #define TAM_DICA   20
 
@@ -42,16 +42,11 @@ static char ultimoNome[PLACAR_MAX_NOME + 1];
 static int ultimosPontos;
 static int destacarUltima;
 
-static void textoCentralizado(const char *texto, int y, int tamanho, Color cor)
-{
-    DrawText(texto, (GetScreenWidth() - MeasureText(texto, tamanho)) / 2, y, tamanho, cor);
-}
-
 /* Carrega a fonte uma única vez, com ASCII e Latin-1 para os acentos. */
 static Font fonteDoMenu(void)
 {
     if (!fonteMenuCarregada) {
-        static int pontos[0x60 + 0x60]; /* 0x20-0x7E e 0xA0-0xFF */
+        static int pontos[0x60 + 0x60 + 4]; /* ASCII, Latin-1 e setas */
         int quantidade = 0;
         int c;
 
@@ -62,6 +57,8 @@ static Font fonteDoMenu(void)
                 continue;
             pontos[quantidade++] = c;
         }
+        for (c = 0x2190; c <= 0x2193; c++) /* ← ↑ → ↓ */
+            pontos[quantidade++] = c;
 
         fonteMenu = LoadFontEx(FONTE_MENU, 32, pontos, quantidade);
         fonteMenuCarregada = 1;
@@ -388,10 +385,136 @@ EstadoJogo telaPlacar(Jogo *g, const Comandos *cmd)
     return EST_PLACAR;
 }
 
+typedef struct {
+    const char *acao;
+    const char *teclado;
+    const char *controle;
+} LinhaControle;
+
+static const LinhaControle CONTROLES[] = {
+    { "Eixo Y (Inclinar)", "W / S", "Analógico esq. ↑ / ↓" },
+    { "Eixo X (Virar)", "A / D", "Analógico esq. ← / →" },
+    { "Rolagem", "Q / E", "LB / RB" },
+    { "Acelerar / frear", "Shift / Ctrl", "Analógico dir. ↑ / ↓" },
+    { "Disparar lasers", "Espaço", "RT" },
+    { "Próximo / anterior alvo", "T / Y", "D-pad → / ←" },
+    { "Alvo mais próximo", "R", "LT" },
+    { "Pausa", "Esc", "Start" },
+    { "Navegar nos menus", "Setas", "D-pad / analógico esq." },
+    { "Confirmar", "Enter", "A" },
+    { "Voltar", "Esc / Backspace", "B" },
+};
+
+enum { QTD_CONTROLES = (int)(sizeof CONTROLES / sizeof CONTROLES[0]) };
+
+static const char *ROTULOS_CONFIG[] = {
+    "Sensibilidade", "Zona morta", "Inverter eixo Y", "Vibração"
+};
+
+static void ajustarConfig(ConfigEntrada *cfg, int selecionada, int direcao)
+{
+    switch (selecionada) {
+    case 0:
+        cfg->sensibilidade += direcao * 0.05f;
+        if (cfg->sensibilidade < SENSIBILIDADE_MIN)
+            cfg->sensibilidade = SENSIBILIDADE_MIN;
+        if (cfg->sensibilidade > SENSIBILIDADE_MAX)
+            cfg->sensibilidade = SENSIBILIDADE_MAX;
+        cfg->sensibilidade = roundf(cfg->sensibilidade * 20.0f) / 20.0f;
+        break;
+    case 1:
+        cfg->zonaMorta += direcao * 0.05f;
+        if (cfg->zonaMorta < ZONA_MORTA_MIN)
+            cfg->zonaMorta = ZONA_MORTA_MIN;
+        if (cfg->zonaMorta > ZONA_MORTA_MAX)
+            cfg->zonaMorta = ZONA_MORTA_MAX;
+        cfg->zonaMorta = roundf(cfg->zonaMorta * 20.0f) / 20.0f;
+        break;
+    case 2:
+        if (direcao > 0)
+            cfg->inverterArfagem = 1;
+        else if (direcao < 0)
+            cfg->inverterArfagem = 0;
+        else
+            cfg->inverterArfagem = !cfg->inverterArfagem;
+        break;
+    default:
+        if (direcao > 0)
+            cfg->vibracao = 1;
+        else if (direcao < 0)
+            cfg->vibracao = 0;
+        else
+            cfg->vibracao = !cfg->vibracao;
+        break;
+    }
+
+    salvarConfigEntrada(cfg, CAMINHO_CONFIG);
+}
+
 EstadoJogo telaControles(ConfigEntrada *cfg, const Comandos *cmd)
 {
-    (void)cfg;
-    textoCentralizado("Controles", 160, TAM_TITULO, RAYWHITE);
-    textoCentralizado("Esc: voltar", 400, TAM_TEXTO, GRAY);
+    static int selecionada = 0;
+    int centro = GetScreenWidth() / 2;
+    int i;
+
+    if (cmd->menuCima)
+        selecionada = (selecionada + 3) % 4;
+    if (cmd->menuBaixo)
+        selecionada = (selecionada + 1) % 4;
+
+    if (cmd->menuEsquerda)
+        ajustarConfig(cfg, selecionada, -1);
+    else if (cmd->menuDireita)
+        ajustarConfig(cfg, selecionada, 1);
+    else if (cmd->confirmar && selecionada >= 2)
+        ajustarConfig(cfg, selecionada, 0);
+
+    textoNoMenu("Controles", centro, 24, 36, RAYWHITE);
+
+    textoFonte("Ação", 120, 80, 18, GRAY);
+    textoFonte("Teclado", 520, 80, 18, GRAY);
+    textoFonte("Controle Xbox", 760, 80, 18, GRAY);
+    DrawLine(110, 106, 1170, 106, DARKGRAY);
+
+    for (i = 0; i < QTD_CONTROLES; i++) {
+        int y = 114 + i * 26;
+
+        textoFonte(CONTROLES[i].acao, 120, y, 18, LIGHTGRAY);
+        textoFonte(CONTROLES[i].teclado, 520, y, 18, LIGHTGRAY);
+        textoFonte(CONTROLES[i].controle, 760, y, 18, LIGHTGRAY);
+    }
+
+    DrawLine(110, 402, 1170, 402, DARKGRAY);
+    textoNoMenu("Configurações", centro, 414, 24, RAYWHITE);
+
+    for (i = 0; i < 4; i++) {
+        int y = 454 + i * 34;
+        const char *valor;
+        Color cor = i == selecionada ? YELLOW : LIGHTGRAY;
+
+        switch (i) {
+        case 0:
+            valor = TextFormat("%.2f", cfg->sensibilidade);
+            break;
+        case 1:
+            valor = TextFormat("%.2f", cfg->zonaMorta);
+            break;
+        case 2:
+            valor = cfg->inverterArfagem ? "Sim" : "Não";
+            break;
+        default:
+            valor = cfg->vibracao ? "Ligada" : "Desligada";
+            break;
+        }
+
+        if (i == selecionada)
+            textoFonte(">", 140, y, 22, YELLOW);
+        textoFonte(ROTULOS_CONFIG[i], 170, y, 22, cor);
+        textoFonteDireita(valor, 650, y, 22, cor);
+    }
+
+    textoNoMenu("↑/↓ seleciona   ←/→ altera   Enter/A alterna   Esc/B volta",
+                centro, 640, 18, LIGHTGRAY);
+
     return cmd->voltar ? EST_MENU : EST_CONTROLES;
 }
