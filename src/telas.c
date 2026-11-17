@@ -1,3 +1,7 @@
+#include <string.h>
+
+#include "placar.h"
+#include "pontuacao.h"
 #include "telas.h"
 
 #define TAM_TITULO 40
@@ -13,10 +17,29 @@
 #define FONTE_MENU   "assets/fonts/ChakraPetch-Bold.ttf"
 #define ESPACO_FONTE 1.0f
 
+#define TAM_FIM_TITULO 48
+#define TAM_FIM_TEXTO  26
+#define TAM_FIM_NOME   30
+#define TAM_FIM_DICA   20
+#define LARGURA_NOME   440
+#define ALTURA_NOME    52
+#define Y_NOME         378
+#define Y_LETRAS       462
+#define Y_DICA_FIM     540
+
 static Texture2D fundoMenu;
 static int fundoMenuCarregado;
 static Font fonteMenu;
 static int fonteMenuCarregada;
+
+static char nomeFim[PLACAR_MAX_NOME + 1];
+static int nomeTam;
+static int nomeCursor;
+static char letraAtual = 'A';
+
+static char ultimoNome[PLACAR_MAX_NOME + 1];
+static int ultimosPontos;
+static int destacarUltima;
 
 static void textoCentralizado(const char *texto, int y, int tamanho, Color cor)
 {
@@ -116,12 +139,198 @@ EstadoJogo telaMenu(Jogo *g, const Comandos *cmd)
     return cmd->confirmar ? destinos[selecionada] : EST_MENU;
 }
 
+static const char LETRAS_FIM[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .-";
+
+static char proximaLetra(char atual)
+{
+    const char *p = strchr(LETRAS_FIM, atual);
+
+    if (p == NULL || p[1] == '\0')
+        return LETRAS_FIM[0];
+    return p[1];
+}
+
+static char letraAnterior(char atual)
+{
+    const char *p = strchr(LETRAS_FIM, atual);
+
+    if (p == NULL || p == LETRAS_FIM)
+        return LETRAS_FIM[sizeof LETRAS_FIM - 2];
+    return p[-1];
+}
+
+static void apagarLetraNome(void)
+{
+    if (nomeCursor <= 0)
+        return;
+
+    memmove(&nomeFim[nomeCursor - 1], &nomeFim[nomeCursor],
+            (size_t)(nomeTam - nomeCursor + 1));
+    nomeTam--;
+    nomeCursor--;
+}
+
+static void inserirLetraNome(char c)
+{
+    if (nomeTam >= PLACAR_MAX_NOME)
+        return;
+
+    if (nomeCursor < 0)
+        nomeCursor = 0;
+    if (nomeCursor > nomeTam)
+        nomeCursor = nomeTam;
+
+    memmove(&nomeFim[nomeCursor + 1], &nomeFim[nomeCursor],
+            (size_t)(nomeTam - nomeCursor + 1));
+    nomeFim[nomeCursor] = c;
+    nomeTam++;
+    nomeCursor++;
+}
+
+static void atualizarNomeFim(const Comandos *cmd)
+{
+    int c;
+
+    while ((c = GetCharPressed()) != 0) {
+        if (c >= 32 && c <= 126)
+            inserirLetraNome((char)c);
+    }
+
+    if (IsKeyPressed(KEY_BACKSPACE) || (cmd->usandoControle && cmd->voltar))
+        apagarLetraNome();
+
+    if (cmd->menuEsquerda && nomeCursor > 0)
+        nomeCursor--;
+
+    if (cmd->menuDireita) {
+        if (cmd->usandoControle && nomeCursor == nomeTam)
+            inserirLetraNome(letraAtual);
+        else if (nomeCursor < nomeTam)
+            nomeCursor++;
+    }
+
+    if (cmd->usandoControle) {
+        if (cmd->menuCima)
+            letraAtual = letraAnterior(letraAtual);
+        else if (cmd->menuBaixo)
+            letraAtual = proximaLetra(letraAtual);
+
+        if ((cmd->menuCima || cmd->menuBaixo) && nomeCursor < nomeTam)
+            nomeFim[nomeCursor] = letraAtual;
+    }
+
+    if (nomeCursor < nomeTam)
+        letraAtual = nomeFim[nomeCursor];
+}
+
+static void desenharSeletorLetras(void)
+{
+    Font fonte = fonteDoMenu();
+    const char *p;
+    const float tamanho = 18.0f;
+    const float espaco = 6.0f;
+    float largura = 0.0f;
+    float x;
+
+    for (p = LETRAS_FIM; *p != '\0'; p++) {
+        char letra[2] = { *p, '\0' };
+
+        largura += MeasureTextEx(fonte, letra, tamanho, ESPACO_FONTE).x + espaco;
+    }
+
+    x = ((float)GetScreenWidth() - largura) / 2.0f;
+    for (p = LETRAS_FIM; *p != '\0'; p++) {
+        char letra[2] = { *p, '\0' };
+        float larguraLetra = MeasureTextEx(fonte, letra, tamanho, ESPACO_FONTE).x;
+
+        if (*p == letraAtual)
+            DrawRectangleLines((int)x - 2, Y_LETRAS - 2, (int)larguraLetra + 4, 22, YELLOW);
+        DrawTextEx(fonte, letra, (Vector2){ x, (float)Y_LETRAS }, tamanho, ESPACO_FONTE,
+                   *p == letraAtual ? YELLOW : GRAY);
+        x += larguraLetra + espaco;
+    }
+}
+
+static void desenharNomeFim(int usandoControle)
+{
+    Font fonte = fonteDoMenu();
+    int x = (GetScreenWidth() - LARGURA_NOME) / 2;
+    int tx = x + 16;
+    int ty = Y_NOME + 11;
+    char antes[PLACAR_MAX_NOME + 1];
+    float xCursor;
+    int i;
+
+    DrawRectangleLines(x, Y_NOME, LARGURA_NOME, ALTURA_NOME, GRAY);
+    DrawTextEx(fonte, nomeFim, (Vector2){ (float)tx, (float)ty },
+               TAM_FIM_NOME, ESPACO_FONTE, RAYWHITE);
+
+    for (i = 0; i < nomeCursor; i++)
+        antes[i] = nomeFim[i];
+    antes[nomeCursor] = '\0';
+    xCursor = (float)tx + MeasureTextEx(fonte, antes, TAM_FIM_NOME, ESPACO_FONTE).x;
+
+    if (usandoControle && nomeCursor == nomeTam && nomeTam < PLACAR_MAX_NOME) {
+        char previa[2] = { letraAtual, '\0' };
+
+        DrawTextEx(fonte, previa, (Vector2){ xCursor, (float)ty },
+                   TAM_FIM_NOME, ESPACO_FONTE, YELLOW);
+    }
+
+    if (((int)(GetTime() * 2.0)) % 2 == 0)
+        DrawRectangle((int)xCursor, ty, 2, TAM_FIM_NOME, YELLOW);
+}
+
 EstadoJogo telaFim(Jogo *g, const Comandos *cmd)
 {
-    textoCentralizado(g->vitoria ? "VITÓRIA" : "DERROTA", 200, TAM_TITULO, g->vitoria ? GREEN : RED);
-    textoCentralizado(TextFormat("Abates: %d   Pontos: %d", g->abates, g->pontos), 300, TAM_TEXTO, RAYWHITE);
-    textoCentralizado("Enter: continuar", 400, TAM_TEXTO, GRAY);
-    return cmd->confirmar ? EST_PLACAR : EST_FIM;
+    int centro = GetScreenWidth() / 2;
+    int bonus = bonusCasco(g);
+    int total = calcularPontuacao(g);
+
+    atualizarNomeFim(cmd);
+
+    textoNoMenu(g->vitoria ? "VITÓRIA" : "DERROTA", centro, 70,
+                TAM_FIM_TITULO, g->vitoria ? GREEN : RED);
+    textoNoMenu(TextFormat("Abates: %d", g->abates), centro, 160, TAM_FIM_TEXTO, RAYWHITE);
+    textoNoMenu(TextFormat("Pontos: %d", g->pontos), centro, 198, TAM_FIM_TEXTO, RAYWHITE);
+    textoNoMenu(TextFormat("Bônus: %d", bonus), centro, 236, TAM_FIM_TEXTO, RAYWHITE);
+    textoNoMenu(TextFormat("Total: %d", total), centro, 274, TAM_FIM_TEXTO, YELLOW);
+
+    textoNoMenu("Digite seu nome:", centro, 336, 22, LIGHTGRAY);
+    desenharNomeFim(cmd->usandoControle);
+
+    if (cmd->usandoControle) {
+        desenharSeletorLetras();
+        textoNoMenu("↑/↓ letra   → adiciona   ← volta   B apaga   A confirma",
+                    centro, Y_DICA_FIM, TAM_FIM_DICA, LIGHTGRAY);
+    } else {
+        textoNoMenu("Digite, Backspace apaga, Enter confirma",
+                    centro, Y_NOME + ALTURA_NOME + 40, TAM_FIM_DICA, LIGHTGRAY);
+    }
+
+    if (cmd->confirmar) {
+        const char *nomeFinal = nomeTam > 0 ? nomeFim : PLACAR_NOME_ANONIMO;
+        size_t len = strlen(nomeFinal);
+
+        g->placar = inserirPontuacao(g->placar, nomeFinal, total);
+        salvarPlacar(g->placar, CAMINHO_PLACAR);
+
+        if (len >= sizeof ultimoNome)
+            len = sizeof ultimoNome - 1;
+        memcpy(ultimoNome, nomeFinal, len);
+        ultimoNome[len] = '\0';
+        ultimosPontos = total;
+        destacarUltima = 1;
+
+        nomeTam = 0;
+        nomeCursor = 0;
+        nomeFim[0] = '\0';
+        letraAtual = 'A';
+
+        return EST_PLACAR;
+    }
+
+    return EST_FIM;
 }
 
 EstadoJogo telaPlacar(Jogo *g, const Comandos *cmd)

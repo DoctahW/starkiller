@@ -9,7 +9,6 @@
 #define TAM_LINHA    128
 #define ARQUIVO_TMP  "placar.tmp"
 #define TAM_TMP      (TAM_CAMINHO + sizeof ARQUIVO_TMP)
-#define NOME_ANONIMO "anonimo"
 
 /* Copia o nome para o nó, remove caracteres que prejudicam o formato nome;pontos
  * e usa "anonimo" caso o nome seja NULL ou vazio. */
@@ -27,7 +26,7 @@ static void copiarNome(NoPlacar *destino, const char *origem)
     }
 
     if (i == 0)
-        memcpy(destino->nome, NOME_ANONIMO, sizeof NOME_ANONIMO);
+        memcpy(destino->nome, PLACAR_NOME_ANONIMO, sizeof PLACAR_NOME_ANONIMO);
     else
         destino->nome[i] = '\0';
 }
