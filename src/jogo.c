@@ -51,12 +51,13 @@ static int verificarFim(Jogo *g)
     return 0;
 }
 
-/* Seção 3.4: processarReforcos e atualizarInimigos entram depois da nave. */
+/* Seção 3.4, passos 2 a 5; processarReforcos e atualizarInimigos entram entre a nave e o combate. */
 static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
 {
     avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
 
-    /* resolverLasers roda logo depois de atualizarLasers: o segmento do laser é pos - vel * dt → pos. */
+    /* disparar vale enquanto segurado; o cooldown é contado em passos, então o disparo fica no passo.
+     * resolverLasers roda logo depois de atualizarLasers: o segmento do laser é pos - vel * dt → pos. */
     if (cmd->disparar)
         dispararLaser(g);
     atualizarLasers(g, PASSO_FIXO);
@@ -68,13 +69,28 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
     g->tempoRestante = (PASSOS_PARTIDA - r->passos) * PASSO_FIXO;
 }
 
+/* Seção 3.4, passo 1: ações de borda valem uma vez por frame, mesmo em frames sem passo ou com vários. */
+static void tratarMira(Jogo *g, const Comandos *cmd)
+{
+    if (cmd->proximoAlvo)
+        proximoAlvo(&g->inimigos);
+    if (cmd->alvoAnterior)
+        alvoAnterior(&g->inimigos);
+    if (cmd->alvoMaisProximo) {
+        ordenarPorDistancia(&g->inimigos);
+        g->inimigos.alvo = g->inimigos.inicio;
+    }
+}
+
 EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd, float dtFrame)
 {
+    tratarMira(g, cmd);
+
     r->acumulador += dtFrame < DT_MAXIMO ? dtFrame : DT_MAXIMO;
     while (r->acumulador >= PASSO_FIXO) {
         r->acumulador -= PASSO_FIXO;
         passoCombate(g, r, cmd);
-        if (verificarFim(g))
+        if (verificarFim(g))   /* seção 3.4, passo 6 */
             return EST_FIM;
     }
     return EST_COMBATE;
