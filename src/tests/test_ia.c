@@ -297,6 +297,28 @@ static void testarVelocidadeCresceComOTempo(void)
     VERIFICA(Vector3Length(in.vel) > 0.99f * velMax);
 }
 
+/* IA-05: a aceleração escala com o quadrado do fator, então o raio de curva não abre. */
+static void testarAceleracaoAcompanhaFator(void)
+{
+    Jogo g = { 0 };
+    Inimigo inicio;
+    Inimigo fim;
+
+    iniciarJogador(&g.jogador);
+    g.jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
+
+    g.tempoDecorrido = 0.0f;
+    inicio = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 6000.0f }, IA_ATACAR_DESTROIER);
+    ia_atualizar(&inicio, &g, DT);
+
+    g.tempoDecorrido = DURACAO_PARTIDA;
+    fim = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 6000.0f }, IA_ATACAR_DESTROIER);
+    ia_atualizar(&fim, &g, DT);
+
+    VERIFICA(Vector3Length(inicio.vel) > 0.0f);
+    VERIFICA(fabsf(Vector3Length(fim.vel) / Vector3Length(inicio.vel) - 1.69f) < 0.05f);
+}
+
 int main(void)
 {
     testarAproximaDoDestroier();
@@ -311,6 +333,7 @@ int main(void)
     testarNaoAtravessaOCasco();
     testarFatoresDeDificuldade();
     testarVelocidadeCresceComOTempo();
+    testarAceleracaoAcompanhaFator();
 
     return RESULTADO_TESTES();
 }
