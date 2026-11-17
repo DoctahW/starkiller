@@ -1,0 +1,418 @@
+#include "hud.h"
+
+#include <math.h>
+
+#include "raymath.h"
+#include "jogo.h"
+#include "nave.h"
+#include "pontuacao.h"
+
+#define FONTE_HUD     "assets/fonts/ChakraPetch-Bold.ttf"
+#define TAM_BASE_HUD  32      /* tamanho rasterizado; os textos menores escalam a partir dele */
+#define ESPACO_FONTE  1.0f
+
+/*
+ * Cabine do TIE em 2D sobre a cena, com o vidro ocupando quase a tela toda: janela central
+ * octogonal (lados de cima e de baixo retos) e uma escora escura de cada vértice até a parede
+ * circular, que só aparece nos cantos. Os instrumentos ficam no painel, abaixo da janela central.
+ * A retícula fica no centro da tela (eixo da câmera), dentro do vidro.
+ */
+#define JANELA_X      640.0f
+#define JANELA_Y      330.0f
+#define RAIO_PAREDE   700.0f   /* borda interna da parede; a tela inteira cabe em ~750 */
+#define RAIO_VIDRO    240.0f   /* vértices da janela central */
+#define LADOS_VIDRO   8
+#define RAIO_FORA     1000.0f  /* cobre os cantos da tela */
+
+#define LARGURA_ESCORA 22.0f
+#define LARGURA_ARO    18.0f
+
+/* Retícula: anel central com quatro traços. */
+#define RETICULA_RAIO   14.0f
+#define RETICULA_VAO    22
+#define RETICULA_TRACO  18
+
+/* Tablets dos lados do painel (centro x, topo y) e coluna central. */
+#define TABLET_X        360.0f
+#define TABLET_Y        505.0f
+#define TABLET_MEIA     115.0f  /* meia largura */
+#define TABLET_ALTURA   210.0f
+#define COLUNA_TOPO     470.0f
+#define VISOR_Y         632.0f  /* centro do visor redondo da coluna */
+#define VISOR_RAIO      78.0f
+
+#define BARRA_SEGMENTOS 10
+
+#define FRACAO_ALERTA   0.5f   /* abaixo: amarelo */
+#define FRACAO_CRITICA  0.25f  /* abaixo: vermelho piscando */
+#define BORDA_PERTO     0.1f   /* fração do raio da arena a partir da qual a distância à borda fica vermelha */
+#define TEMPO_CRITICO   30     /* s finais com o relógio em vermelho */
+#define PISCA_PERIODO   0.5    /* s de um ciclo aceso/apagado */
+
+/* Estrutura da cabine: metal escuro, com fio de luz numa borda. */
+#define COR_PAREDE   (Color){ 20, 21, 25, 255 }
+#define COR_ESCORA   (Color){ 27, 28, 33, 255 }
+#define COR_BRILHO   (Color){ 72, 75, 84, 255 }
+#define COR_PAINEL   (Color){ 18, 19, 23, 255 }
+#define COR_TELA     (Color){ 10, 14, 32, 255 }
+#define COR_NEON     (Color){ 70, 100, 235, 255 }
+#define COR_NEON_VERMELHO (Color){ 170, 30, 40, 255 }
+
+/* Instrumentos. */
+#define COR_ROTULO    (Color){ 100, 150, 255, 255 }
+#define COR_VALOR     (Color){ 215, 230, 255, 255 }
+#define COR_HUD       (Color){ 120, 230, 140, 255 }
+#define COR_TIE       (Color){ 60, 220, 90, 255 }
+#define COR_DESTROIER (Color){ 70, 170, 255, 255 }
+#define COR_ALERTA    (Color){ 240, 200, 40, 255 }
+#define COR_CRITICA   (Color){ 235, 50, 40, 255 }
+
+static Font fonteHud;
+
+void hud_carregar(void)
+{
+    static int pontos[0x5F + 0x60]; /* ASCII e Latin-1 (acentos) */
+    int quantidade = 0;
+    int c;
+
+    for (c = 0x20; c <= 0x7E; c++)
+        pontos[quantidade++] = c;
+    for (c = 0xA0; c <= 0xFF; c++)
+        if (c != 0xB5) /* micro sign não existe na Chakra Petch */
+            pontos[quantidade++] = c;
+
+    fonteHud = LoadFontEx(FONTE_HUD, TAM_BASE_HUD, pontos, quantidade);
+    if (fonteHud.texture.id != 0)
+        SetTextureFilter(fonteHud.texture, TEXTURE_FILTER_BILINEAR);
+}
+
+void hud_descarregar(void)
+{
+    if (fonteHud.texture.id != 0)
+        UnloadFont(fonteHud);
+    fonteHud = (Font){ 0 };
+}
+
+static Font fonte(void)
+{
+    return fonteHud.texture.id != 0 ? fonteHud : GetFontDefault();
+}
+
+/* `ancora` em [0, 1]: 0 alinha à esquerda de x, 0.5 centraliza, 1 alinha à direita. */
+static void texto(const char *t, int x, int y, int tam, float ancora, Color cor)
+{
+    float largura = MeasureTextEx(fonte(), t, (float)tam, ESPACO_FONTE).x;
+    Vector2 p = { (float)x - largura * ancora, (float)y };
+
+    DrawTextEx(fonte(), t, (Vector2){ p.x + 1.0f, p.y + 1.0f }, (float)tam, ESPACO_FONTE, Fade(BLACK, 0.8f));
+    DrawTextEx(fonte(), t, p, (float)tam, ESPACO_FONTE, cor);
+}
+
+static float fracao(float valor, float maximo)
+{
+    float f = valor / maximo;
+
+    return f < 0.0f ? 0.0f : (f > 1.0f ? 1.0f : f);
+}
+
+static int piscaAceso(void)
+{
+    return fmod(GetTime(), PISCA_PERIODO) < PISCA_PERIODO / 2.0;
+}
+
+/* Cor cheia, amarelo abaixo de FRACAO_ALERTA e vermelho piscando abaixo de FRACAO_CRITICA. */
+static Color corDoNivel(float f, Color cheia)
+{
+    if (f < FRACAO_CRITICA)
+        return piscaAceso() ? COR_CRITICA : Fade(COR_CRITICA, 0.4f);
+    return f < FRACAO_ALERTA ? COR_ALERTA : cheia;
+}
+
+/* Com o eixo y para baixo, a raylib só desenha triângulos com produto vetorial negativo. */
+static void triangulo(Vector2 a, Vector2 b, Vector2 c, Color cor)
+{
+    float giro = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+
+    if (giro > 0.0f)
+        DrawTriangle(a, c, b, cor);
+    else
+        DrawTriangle(a, b, c, cor);
+}
+
+/* Polígono convexo em leque a partir do primeiro vértice. */
+static void poligono(const Vector2 *p, int n, Color cor)
+{
+    int i;
+
+    for (i = 1; i + 1 < n; i++)
+        triangulo(p[0], p[i], p[i + 1], cor);
+}
+
+static void contorno(const Vector2 *p, int n, float espessura, Color cor)
+{
+    int i;
+
+    for (i = 0; i < n; i++)
+        DrawLineEx(p[i], p[(i + 1) % n], espessura, cor);
+}
+
+static Vector2 verticeVidro(int i)
+{
+    float ang = (-112.5f + 360.0f * i / LADOS_VIDRO) * DEG2RAD;
+
+    return (Vector2){ JANELA_X + cosf(ang) * RAIO_VIDRO, JANELA_Y + sinf(ang) * RAIO_VIDRO };
+}
+
+/* Escora escura com um fio de luz do lado de cima. */
+static void desenharEscora(Vector2 a, Vector2 b)
+{
+    Vector2 dir = Vector2Normalize(Vector2Subtract(b, a));
+    Vector2 normal = { -dir.y, dir.x };
+    Vector2 luz = Vector2Scale(normal, normal.y < 0.0f ? 8.0f : -8.0f);
+
+    DrawLineEx(a, b, LARGURA_ESCORA, COR_ESCORA);
+    DrawLineEx(Vector2Add(a, luz), Vector2Add(b, luz), 2.0f, COR_BRILHO);
+}
+
+static void desenharEstrutura(void)
+{
+    Vector2 centro = { JANELA_X, JANELA_Y };
+    Vector2 v[LADOS_VIDRO];
+    int i;
+
+    DrawRing(centro, RAIO_PAREDE, RAIO_FORA, 0.0f, 360.0f, 128, COR_PAREDE);
+    DrawRing(centro, RAIO_PAREDE, RAIO_PAREDE + 3.0f, 0.0f, 360.0f, 128, COR_BRILHO);
+
+    for (i = 0; i < LADOS_VIDRO; i++)
+        v[i] = verticeVidro(i);
+
+    for (i = 0; i < LADOS_VIDRO; i++) {
+        Vector2 dir = Vector2Normalize(Vector2Subtract(v[i], centro));
+
+        desenharEscora(v[i], Vector2Add(centro, Vector2Scale(dir, RAIO_PAREDE + 10.0f)));
+    }
+
+    contorno(v, LADOS_VIDRO, LARGURA_ARO, COR_ESCORA);
+    for (i = 0; i < LADOS_VIDRO; i++) {
+        Vector2 a = Vector2MoveTowards(v[i], centro, 8.0f);
+        Vector2 b = Vector2MoveTowards(v[(i + 1) % LADOS_VIDRO], centro, 8.0f);
+
+        DrawLineEx(a, b, 2.0f, COR_BRILHO);
+        DrawCircleV(v[i], 12.0f, COR_ESCORA);
+    }
+}
+
+static void desenharReticula(void)
+{
+    int cx = LARGURA_TELA / 2;
+    int cy = ALTURA_TELA / 2;
+    Color cor = Fade(COR_HUD, 0.85f);
+
+    DrawCircleLines(cx, cy, RETICULA_RAIO, cor);
+    DrawCircle(cx, cy, 2.0f, cor);
+    DrawLine(cx - RETICULA_VAO - RETICULA_TRACO, cy, cx - RETICULA_VAO, cy, cor);
+    DrawLine(cx + RETICULA_VAO, cy, cx + RETICULA_VAO + RETICULA_TRACO, cy, cor);
+    DrawLine(cx, cy - RETICULA_VAO - RETICULA_TRACO / 2, cx, cy - RETICULA_VAO, cor);
+    DrawLine(cx, cy + RETICULA_VAO, cx, cy + RETICULA_VAO + RETICULA_TRACO / 2, cor);
+}
+
+/* Barra horizontal em segmentos que esvazia da direita para a esquerda. */
+static void barra(Rectangle r, float f, Color cor)
+{
+    float largura = (r.width - 4.0f) / BARRA_SEGMENTOS;
+    int acesos = (int)ceilf(f * BARRA_SEGMENTOS);
+    int i;
+
+    for (i = 0; i < BARRA_SEGMENTOS; i++) {
+        Rectangle s = { r.x + 2.0f + largura * i, r.y, largura - 3.0f, r.height };
+
+        DrawRectangleRec(s, i < acesos ? cor : Fade(COR_ROTULO, 0.15f));
+    }
+}
+
+/*
+ * Tablet hexagonal com a ponta estreita para cima, preso ao painel por um braço,
+ * moldura escura e neon azul com o canto externo vermelho.
+ */
+static void tablet(float cx, int ladoExterno)
+{
+    float t = TABLET_Y;
+    float m = TABLET_MEIA;
+    const Vector2 corpo[] = {
+        { cx - m * 0.62f, t }, { cx + m * 0.62f, t }, { cx + m, t + 62.0f },
+        { cx + m, t + TABLET_ALTURA }, { cx - m, t + TABLET_ALTURA }, { cx - m, t + 62.0f },
+    };
+    Vector2 vidro[6];
+    int i;
+
+    DrawRectangleRec((Rectangle){ cx - 22.0f, t + TABLET_ALTURA - 10.0f, 44.0f, ALTURA_TELA }, COR_PAINEL);
+    poligono(corpo, 6, COR_PAINEL);
+    contorno(corpo, 6, 2.0f, COR_BRILHO);
+    for (i = 0; i < 6; i++)
+        vidro[i] = Vector2MoveTowards(corpo[i], (Vector2){ cx, t + TABLET_ALTURA * 0.55f }, 12.0f);
+    poligono(vidro, 6, COR_TELA);
+    contorno(vidro, 6, 2.0f, COR_NEON);
+    /* Neon vermelho no lado de fora, como nos painéis da referência. */
+    DrawLineEx(corpo[ladoExterno > 0 ? 1 : 0], corpo[ladoExterno > 0 ? 2 : 5], 3.0f, COR_NEON_VERMELHO);
+    DrawLineEx(corpo[ladoExterno > 0 ? 2 : 5], corpo[ladoExterno > 0 ? 3 : 4], 3.0f, COR_NEON_VERMELHO);
+}
+
+static const char *textoMultiplicador(float mult)
+{
+    return mult >= MULTIPLICADOR_X2 ? "x2" : (mult >= MULTIPLICADOR_X1_5 ? "x1,5" : "x1");
+}
+
+static Color corMultiplicador(float mult)
+{
+    return mult >= MULTIPLICADOR_X2 ? COR_CRITICA : (mult >= MULTIPLICADOR_X1_5 ? COR_ALERTA : COR_ROTULO);
+}
+
+/* Tablet esquerdo: tempo, pontos, abates e multiplicador de sequência. */
+static void desenharTabletPartida(const Jogo *g)
+{
+    float cx = TABLET_X;
+    int esq = (int)(cx - TABLET_MEIA) + 22;
+    int dir = (int)(cx + TABLET_MEIA) - 22;
+    int y = (int)TABLET_Y;
+    /* Arredonda para cima: só mostra 0:00 no fim. */
+    int segundos = g->tempoRestante > 0.0f ? (int)ceilf(g->tempoRestante) : 0;
+    Color corTempo = segundos <= TEMPO_CRITICO && piscaAceso() ? COR_CRITICA : COR_VALOR;
+    float mult = multiplicadorAtual(g->sequenciaSemDano);
+
+    tablet(cx, -1);
+    texto("TEMPO", (int)cx, y + 18, 14, 0.5f, COR_ROTULO);
+    texto(TextFormat("%d:%02d", segundos / 60, segundos % 60), (int)cx, y + 32, 40, 0.5f, corTempo);
+    DrawLineEx((Vector2){ (float)esq, y + 82.0f }, (Vector2){ (float)dir, y + 82.0f }, 1.0f, Fade(COR_NEON, 0.6f));
+
+    texto("PONTOS", esq, y + 96, 14, 0.0f, COR_ROTULO);
+    texto(TextFormat("%d", g->pontos), dir, y + 90, 26, 1.0f, COR_VALOR);
+    texto("ABATES", esq, y + 128, 14, 0.0f, COR_ROTULO);
+    texto(TextFormat("%d", g->abates), dir, y + 124, 22, 1.0f, COR_VALOR);
+    texto(TextFormat("SEQ %d", g->sequenciaSemDano), esq, y + 162, 14, 0.0f, COR_ROTULO);
+    texto(textoMultiplicador(mult), dir, y + 154, 26, 1.0f, corMultiplicador(mult));
+}
+
+/* Tablet direito: casco do TIE e do Destróier, distância à borda da arena. */
+static void desenharTabletNave(const Jogo *g)
+{
+    float cx = LARGURA_TELA - TABLET_X;
+    int esq = (int)(cx - TABLET_MEIA) + 22;
+    int dir = (int)(cx + TABLET_MEIA) - 22;
+    int y = (int)TABLET_Y;
+    float casco = fracao(g->jogador.casco, CASCO_JOGADOR);
+    float destroier = fracao(g->cascoDestroier, CASCO_MAX_DESTROIER);
+    float borda = RAIO_ARENA - Vector3Length(g->jogador.pos);
+    Color corCasco = corDoNivel(casco, COR_TIE);
+    Color corDestroier = corDoNivel(destroier, COR_DESTROIER);
+
+    if (borda < 0.0f)
+        borda = 0.0f;
+
+    /* As linhas começam abaixo do topo inclinado do tablet. */
+    tablet(cx, 1);
+    texto("CASCO", esq, y + 46, 14, 0.0f, COR_ROTULO);
+    texto(TextFormat("%d%%", (int)ceilf(casco * 100.0f)), dir, y + 40, 22, 1.0f, corCasco);
+    barra((Rectangle){ (float)esq, y + 68.0f, (float)(dir - esq), 14.0f }, casco, corCasco);
+
+    texto("DESTRÓIER", esq, y + 98, 14, 0.0f, COR_ROTULO);
+    texto(TextFormat("%d%%", (int)ceilf(destroier * 100.0f)), dir, y + 92, 22, 1.0f, corDestroier);
+    barra((Rectangle){ (float)esq, y + 120.0f, (float)(dir - esq), 14.0f }, destroier, corDestroier);
+
+    DrawLineEx((Vector2){ (float)esq, y + 148.0f }, (Vector2){ (float)dir, y + 148.0f }, 1.0f, Fade(COR_NEON, 0.6f));
+    texto("BORDA", esq, y + 164, 14, 0.0f, COR_ROTULO);
+    texto(TextFormat("%d u", (int)lroundf(borda)), dir, y + 158, 22, 1.0f,
+          borda < RAIO_ARENA * BORDA_PERTO ? COR_CRITICA : COR_VALOR);
+}
+
+/* Silhueta do TIE desenhada em linhas. */
+static void silhuetaTie(int cx, int cy, Color cor)
+{
+    int lado;
+
+    for (lado = -1; lado <= 1; lado += 2) {
+        float x = (float)(cx + lado * 28);
+        const Vector2 asa[] = {
+            { x, cy - 36.0f }, { x + 6.0f, cy - 22.0f }, { x + 6.0f, cy + 22.0f },
+            { x, cy + 36.0f }, { x - 6.0f, cy + 22.0f }, { x - 6.0f, cy - 22.0f },
+        };
+
+        contorno(asa, 6, 2.0f, cor);
+        DrawLineEx((Vector2){ x - lado * 6.0f, (float)cy }, (Vector2){ cx + lado * 11.0f, (float)cy }, 3.0f, cor);
+    }
+    DrawCircleLinesV((Vector2){ (float)cx, (float)cy }, 11.0f, cor);
+    DrawCircleLinesV((Vector2){ (float)cx, (float)cy }, 5.0f, cor);
+}
+
+/* Coluna central: velocidade, acelerador e luz da arena no topo; visor redondo com o estado. */
+static void desenharColuna(const Jogo *g, int foraDaArena)
+{
+    const Vector2 corpo[] = { { 520, COLUNA_TOPO }, { 760, COLUNA_TOPO }, { 785, ALTURA_TELA }, { 495, ALTURA_TELA } };
+    Rectangle vel = { 532, COLUNA_TOPO + 10, 54, 28 };
+    Rectangle acel = { 592, COLUNA_TOPO + 10, 96, 28 };
+    Rectangle luz = { 694, COLUNA_TOPO + 10, 54, 28 };
+    Vector2 visor = { JANELA_X, VISOR_Y };
+    float casco = fracao(g->jogador.casco, CASCO_JOGADOR);
+    float f = fracao(g->jogador.velocidade - VEL_MIN, VEL_MAX - VEL_MIN);
+    int aceso = foraDaArena && piscaAceso();
+    const char *estado = "Em combate";
+    Color corEstado = COR_HUD;
+
+    if (foraDaArena) {
+        estado = "Volte à arena";
+        corEstado = COR_CRITICA;
+    } else if (casco < FRACAO_CRITICA) {
+        estado = "Casco crítico";
+        corEstado = COR_CRITICA;
+    } else if (g->cascoDestroier < CASCO_MAX_DESTROIER * FRACAO_CRITICA) {
+        estado = "Destróier!";
+        corEstado = COR_CRITICA;
+    }
+
+    poligono(corpo, 4, COR_PAINEL);
+    contorno(corpo, 4, 2.0f, COR_BRILHO);
+
+    DrawRectangleRec(vel, COR_TELA);
+    DrawRectangleLinesEx(vel, 2.0f, COR_NEON);
+    texto(TextFormat("%d", (int)lroundf(g->jogador.velocidade)), (int)(vel.x + vel.width / 2), (int)vel.y + 4, 20, 0.5f, COR_VALOR);
+
+    DrawRectangleRec(acel, COR_TELA);
+    DrawRectangleRec((Rectangle){ acel.x + 4, acel.y + 9, (acel.width - 8) * f, acel.height - 18 }, COR_NEON);
+    DrawRectangleLinesEx(acel, 2.0f, COR_NEON);
+
+    DrawRectangleRec(luz, aceso ? COR_CRITICA : COR_TELA);
+    DrawRectangleLinesEx(luz, 2.0f, foraDaArena ? COR_CRITICA : COR_NEON);
+    texto("ARENA", (int)(luz.x + luz.width / 2), (int)luz.y + 6, 15, 0.5f, aceso ? WHITE : Fade(COR_CRITICA, 0.6f));
+
+    DrawRectangleRec((Rectangle){ 560, COLUNA_TOPO + 46, 160, 26 }, COR_TELA);
+    texto("ALFA 1", (int)JANELA_X, (int)COLUNA_TOPO + 48, 20, 0.5f, COR_VALOR);
+
+    DrawCircleV(visor, VISOR_RAIO + 6.0f, COR_BRILHO);
+    DrawCircleV(visor, VISOR_RAIO, COR_TELA);
+    DrawCircleLinesV(visor, VISOR_RAIO - 6.0f, Fade(COR_NEON, 0.7f));
+    silhuetaTie((int)visor.x, (int)visor.y - 18, corDoNivel(casco, COR_ALERTA));
+    if (corEstado.r != COR_CRITICA.r || piscaAceso())
+        texto(estado, (int)visor.x, (int)visor.y + 30, 15, 0.5f, corEstado);
+}
+
+/* Aviso piscando no vidro central enquanto a nave está presa na borda da arena. */
+static void desenharAvisoArena(void)
+{
+    Rectangle r = { JANELA_X - 170.0f, 150.0f, 340.0f, 60.0f };
+    float alfa = piscaAceso() ? 0.95f : 0.35f;
+
+    DrawRectangleRec(r, Fade(BLACK, 0.6f));
+    DrawRectangleLinesEx(r, 2.0f, Fade(COR_CRITICA, alfa));
+    texto("LIMITE DA ARENA", (int)JANELA_X, (int)r.y + 4, 28, 0.5f, Fade(COR_CRITICA, alfa));
+    texto("volte para a área de combate", (int)JANELA_X, (int)r.y + 36, 16, 0.5f, COR_VALOR);
+}
+
+void hud_desenhar(const Jogo *g, int foraDaArena)
+{
+    desenharEstrutura();
+    desenharReticula();
+    if (foraDaArena)
+        desenharAvisoArena();
+    desenharTabletPartida(g);
+    desenharTabletNave(g);
+    desenharColuna(g, foraDaArena);
+}
