@@ -44,7 +44,7 @@ static void testarDisparo(void)
     VERIFICA(dispararLaser(&jogo) == 1);
     VERIFICA(contarAtivos(&jogo) == 2);
 
-    /* Dois lasers do jogador, à frente, simétricos em torno do eixo, na velocidade de 600 u/s. */
+    /* Dois lasers do jogador, à frente, simétricos em torno do eixo, na velocidade VEL_LASER. */
     for (i = 0; i < MAX_LASERS; i++) {
         const Laser *l = &jogo.lasers[i];
 
@@ -94,11 +94,11 @@ static void testarMovimentoEVida(void)
     novoJogo();
     dispararLaser(&jogo);
 
-    /* Move a 600 u/s. */
+    /* Move a VEL_LASER. */
     atualizarLasers(&jogo, 0.5f);
     for (i = 0; i < MAX_LASERS; i++)
         if (jogo.lasers[i].ativo)
-            VERIFICA(proximo(jogo.lasers[i].pos.z, jogo.jogador.pos.z + CANHAO_FRENTE + 300.0f));
+            VERIFICA(proximo(jogo.lasers[i].pos.z, jogo.jogador.pos.z + CANHAO_FRENTE + 0.5f * VEL_LASER));
     VERIFICA(contarAtivos(&jogo) == 2);
 
     /* Desativa depois de 2 s de vida. */

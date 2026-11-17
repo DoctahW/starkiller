@@ -15,13 +15,17 @@ void iniciarJogador(Jogador *j);
 /* Constante de tempo (s) da suavização da rotação: ~63% da velocidade angular alvo em TAU_GIRO. */
 #define TAU_GIRO    0.1f
 
-/* Limites de velocidade (u/s) e aceleração com o eixo em ±1 (u/s²). */
-#define VEL_MIN     40.0f
-#define VEL_MAX     120.0f
-#define ACELERACAO  40.0f
+/*
+ * Limites de velocidade (u/s) e aceleração com o eixo em ±1 (u/s²). Escala do mundo: 1 u = 1 m,
+ * com o Destróier no tamanho canônico (1600 m); distâncias e velocidades foram multiplicadas por
+ * ~4,6 junto com ele, para o ritmo da partida não mudar. O tamanho dos caças não mudou.
+ */
+#define VEL_MIN     180.0f
+#define VEL_MAX     550.0f
+#define ACELERACAO  180.0f
 
 /* Raio da arena, centrada na origem. */
-#define RAIO_ARENA  2000.0f
+#define RAIO_ARENA  9000.0f
 
 /*
  * Gira a nave no espaço local conforme os eixos de cmd, com a velocidade angular suavizada

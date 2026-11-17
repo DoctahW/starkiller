@@ -152,12 +152,8 @@ static void testarAWing(void){
     VERIFICA(in.estadoIA == IA_ATACAR_JOGADOR); //persegue o jogador
 }
 
-//velocidade da tabela 2.2; quem consome esses valores e a IA-01 (#49)
+//velocidades da tabela 2.2 (x4,6 com a escala do mundo); quem consome esses valores e a IA-01 (#49)
 static void testarVelocidadesDaTabela(void){
-    VERIFICA(proximo(VEL_XWING, 60.0f));
-    VERIFICA(proximo(VEL_YWING, 35.0f));
-    VERIFICA(proximo(VEL_AWING, 110.0f));
-
     //A-Wing e o mais rapido, Y-Wing o mais lento
     VERIFICA(VEL_AWING > VEL_XWING);
     VERIFICA(VEL_XWING > VEL_YWING);

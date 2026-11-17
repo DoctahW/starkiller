@@ -13,8 +13,8 @@
 
 /* Valores da tabela 2.2 e do criterio da IA-02. */
 #define BOMBA_DANO    8.0f
-#define BOMBA_ALCANCE 150.0f
-#define ORBITA_RAIO   120.0f
+#define BOMBA_ALCANCE 685.0f
+#define ORBITA_RAIO   550.0f
 
 static Inimigo novoInimigo(TipoNave tipo, Vector3 pos, EstadoIA estado)
 {
@@ -34,7 +34,7 @@ static void simular(Inimigo *in, Jogo *g, int passos)
 static void testarAproximaDoDestroier(void)
 {
     Jogo g = { 0 };
-    Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 1000.0f }, IA_ATACAR_DESTROIER);
+    Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 4600.0f }, IA_ATACAR_DESTROIER);
     float antes = Vector3Length(in.pos);
 
     iniciarJogador(&g.jogador);
@@ -65,7 +65,7 @@ static void testarVelocidadeMaximaPorTipo(void)
     iniciarJogador(&g.jogador);
 
     for (int i = 0; i < (int)(sizeof casos / sizeof casos[0]); i++) {
-        Inimigo in = novoInimigo(casos[i].tipo, (Vector3){ 0.0f, 0.0f, 1500.0f }, IA_ATACAR_DESTROIER);
+        Inimigo in = novoInimigo(casos[i].tipo, (Vector3){ 0.0f, 0.0f, 6900.0f }, IA_ATACAR_DESTROIER);
 
         simular(&in, &g, 300);
         VERIFICA(Vector3Length(in.vel) <= casos[i].velMax + 1e-3f);
@@ -77,10 +77,10 @@ static void testarVelocidadeMaximaPorTipo(void)
 static void testarPersegueJogador(void)
 {
     Jogo g = { 0 };
-    Inimigo in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 100.0f }, IA_ATACAR_JOGADOR);
+    Inimigo in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 460.0f }, IA_ATACAR_JOGADOR);
     float antes;
 
-    iniciarJogador(&g.jogador);   /* jogador em (0, 0, 300) */
+    iniciarJogador(&g.jogador);   /* jogador em (0, 0, 1370) */
 
     antes = Vector3Distance(in.pos, g.jogador.pos);
     simular(&in, &g, 120);
@@ -92,7 +92,7 @@ static void testarPersegueJogador(void)
 static void testarFogeDoJogador(void)
 {
     Jogo g = { 0 };
-    Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 400.0f }, IA_FUGIR);
+    Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 1830.0f }, IA_FUGIR);
     float antes;
 
     iniciarJogador(&g.jogador);
@@ -100,7 +100,7 @@ static void testarFogeDoJogador(void)
     antes = Vector3Distance(in.pos, g.jogador.pos);
     simular(&in, &g, 120);
     VERIFICA(Vector3Distance(in.pos, g.jogador.pos) > antes);
-    VERIFICA(in.pos.z > 400.0f);
+    VERIFICA(in.pos.z > 1830.0f);
 }
 
 /* Alvo na mesma posição não pode gerar NaN (divisão por zero no rumo). */
@@ -122,7 +122,7 @@ static void testarAlvoNaMesmaPosicao(void)
 static void testarAtualizarInimigosMove(void)
 {
     Jogo g = { 0 };
-    Vector3 antes = { 0.0f, 0.0f, 1000.0f };
+    Vector3 antes = { 0.0f, 0.0f, 4600.0f };
     Inimigo in = novoInimigo(XWING, antes, IA_ATACAR_DESTROIER);
 
     iniciarJogador(&g.jogador);
@@ -142,11 +142,11 @@ static void testarAtualizarInimigosMove(void)
     liberarListaInimigos(&g.inimigos);
 }
 
-/* IA-02: a menos de 150 do Destróier, o Y-Wing causa 8 de dano/s no casco. */
+/* IA-02: a menos de BOMBA_ALCANCE do Destróier, o Y-Wing causa 8 de dano/s no casco. */
 static void testarYwingBombardeia(void)
 {
     Jogo g = { 0 };
-    Inimigo in = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, 100.0f }, IA_ATACAR_DESTROIER);
+    Inimigo in = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, 460.0f }, IA_ATACAR_DESTROIER);
 
     iniciarJogador(&g.jogador);
     g.cascoDestroier = 2000.0f;
@@ -163,7 +163,7 @@ static void testarYwingBombardeia(void)
 static void testarYwingForaDeAlcance(void)
 {
     Jogo g = { 0 };
-    Inimigo longe = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, 400.0f }, IA_ATACAR_DESTROIER);
+    Inimigo longe = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, 1830.0f }, IA_ATACAR_DESTROIER);
     Inimigo orbita = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, ORBITA_RAIO }, IA_ATACAR_DESTROIER);
     float antes = Vector3Length(orbita.pos);
 
@@ -172,20 +172,20 @@ static void testarYwingForaDeAlcance(void)
 
     ia_atualizar(&longe, &g, DT);
     VERIFICA(g.cascoDestroier == 2000.0f);
-    VERIFICA(Vector3Length(longe.pos) < 400.0f);
+    VERIFICA(Vector3Length(longe.pos) < 1830.0f);
 
     simular(&longe, &g, 600);
-    VERIFICA(Vector3Length(longe.pos) > ORBITA_RAIO - 40.0f);
-    VERIFICA(Vector3Length(longe.pos) < BOMBA_ALCANCE + 10.0f);
+    VERIFICA(Vector3Length(longe.pos) > ORBITA_RAIO - 185.0f);
+    VERIFICA(Vector3Length(longe.pos) < BOMBA_ALCANCE + 45.0f);
     VERIFICA(g.cascoDestroier < 2000.0f);
 
     simular(&orbita, &g, 600);
     /* fica no anel e continua bombardeando */
-    VERIFICA(Vector3Length(orbita.pos) > 80.0f);
-    VERIFICA(Vector3Length(orbita.pos) < BOMBA_ALCANCE + 10.0f);
-    VERIFICA(Vector3Length(orbita.pos) > antes - 60.0f);
-    VERIFICA(fabsf(Vector3DotProduct(Vector3Normalize(orbita.pos), orbita.vel)) < 10.0f);
-    VERIFICA(Vector3Length(orbita.vel) > 20.0f);
+    VERIFICA(Vector3Length(orbita.pos) > 365.0f);
+    VERIFICA(Vector3Length(orbita.pos) < BOMBA_ALCANCE + 45.0f);
+    VERIFICA(Vector3Length(orbita.pos) > antes - 275.0f);
+    VERIFICA(fabsf(Vector3DotProduct(Vector3Normalize(orbita.pos), orbita.vel)) < 45.0f);
+    VERIFICA(Vector3Length(orbita.vel) > 90.0f);
     VERIFICA(g.cascoDestroier < 2000.0f - BOMBA_DANO);
 }
 
