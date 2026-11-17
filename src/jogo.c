@@ -199,5 +199,6 @@ void jogo_executar(void)
     descarregarAssets();
     liberarPlacar(jogo.placar);
     jogo.placar = NULL;
+    descarregarTelas();
     CloseWindow();
 }
