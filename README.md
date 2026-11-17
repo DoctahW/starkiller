@@ -99,7 +99,7 @@ src/
   ia.c           comportamento dos caças rebeldes
   render.c       cena 3D: ordem de desenho, Destróier e carga de modelos e shaders
   espaco.c       fundo: estrelas, nebulosa, Estrela da Morte e poeira
-  hud.c          HUD da cabine
+  hud.c          cabine do TIE: moldura, retícula, medidores, tempo, pontos, console e aviso de arena
   placar.c       árvore binária de busca do placar
   pontuacao.c    pontuação
   telas.c        menu, fim de partida, ranking e controles

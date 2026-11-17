@@ -1,4 +1,3 @@
-#include <math.h>
 #include <string.h>
 
 #include <SDL3/SDL.h>
@@ -6,6 +5,7 @@
 #include "jogo.h"
 #include "combate.h"
 #include "entrada.h"
+#include "hud.h"
 #include "inimigos.h"
 #include "nave.h"
 #include "placar.h"
@@ -112,21 +112,20 @@ static EstadoJogo combate(Jogo *g, const Comandos *cmd, int controleCaiu)
         proximo = simularCombate(g, &relogio, cmd, GetFrameTime());
 
     render_cena(g, cameraDoJogador(&g->jogador));   /* também no frame que entra em pausa: sem piscar preto */
-    /* Provisório até o HUD (VIS-06): arredonda para cima, então só mostra 0:00 no fim. */
-    int segundos = (int)ceilf(g->tempoRestante);
-    DrawText(TextFormat("COMBATE  %d:%02d", segundos / 60, segundos % 60), 20, 20, 20, RAYWHITE);
-    DrawText("Esc/Start: pausa", 20, 50, 20, GRAY);
-    if (avisoArena)
-        DrawText("VOLTE PARA A ARENA", LARGURA_TELA / 2 - 140, 80, 28, RED);
+    hud_desenhar(g, avisoArena);
     return proximo;
 }
 
-/* A cena fica congelada atrás do aviso. */
+/* A cena e a cabine ficam congeladas e escurecidas atrás do aviso. */
 static EstadoJogo pausa(const Jogo *g, const Comandos *cmd)
 {
+    const char *dica = "Esc/Start: continuar   Enter/A: voltar ao menu";
+
     render_cena(g, cameraDoJogador(&g->jogador));
-    DrawText("PAUSA", 20, 20, 40, RAYWHITE);
-    DrawText("Esc/Start: continuar   Enter/A: voltar ao menu", 20, 70, 20, GRAY);
+    hud_desenhar(g, avisoArena);
+    DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, Fade(BLACK, 0.6f));
+    DrawText("PAUSA", (LARGURA_TELA - MeasureText("PAUSA", 40)) / 2, ALTURA_TELA / 2 - 50, 40, RAYWHITE);
+    DrawText(dica, (LARGURA_TELA - MeasureText(dica, 20)) / 2, ALTURA_TELA / 2 + 4, 20, GRAY);
 
     if (cmd->pausa)
         return EST_COMBATE;
@@ -188,6 +187,7 @@ void jogo_executar(void)
 
     iniciarEntrada(&cfg);
     carregarAssets();
+    hud_carregar();
     jogo.estado = EST_MENU;
 
     while (jogo.estado != EST_SAIR && !WindowShouldClose()) {
@@ -209,5 +209,6 @@ void jogo_executar(void)
     liberarPlacar(jogo.placar);
     jogo.placar = NULL;
     descarregarTelas();
+    hud_descarregar();
     CloseWindow();
 }
