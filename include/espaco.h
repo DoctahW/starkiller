@@ -23,11 +23,11 @@
 #define LADO_POEIRA   200.0f
 #define RASTRO_POEIRA 0.05f    /* s: comprimento do risco = velocidade * RASTRO_POEIRA */
 
-/* Shaders em assets/shaders/<nome>.vs e .fs (GLSL 330). */
-#define PASTA_SHADERS "assets/shaders/"
-
 void iniciarEspaco(void);
 void encerrarEspaco(void);
+
+/* Unitário, no mundo, das superfícies para o sol: o mesmo que ilumina a Estrela da Morte e a arena. */
+Vector3 direcaoSol(void);
 
 /*
  * Céu (nebulosa, estrelas e Estrela da Morte) com a câmera na origem e a orientação do jogador:
