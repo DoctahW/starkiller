@@ -5,6 +5,9 @@
 
 #define FOV_JOGADOR 70.0f   /* graus */
 
+/* Casco do TIE no início da partida (o HUD usa como máximo da barra). */
+#define CASCO_JOGADOR 100.0f
+
 /* Velocidades angulares máximas (rad/s), atingidas com o eixo em ±1. */
 #define VEL_ARFAGEM 1.5f
 #define VEL_GUINADA 1.0f
