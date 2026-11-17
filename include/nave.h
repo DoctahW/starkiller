@@ -58,4 +58,13 @@ int colidirDestroier(Jogo *g, float dt);
 /* Câmera de cabine: position = pos, target = pos + frente, up = cima. */
 Camera3D cameraDoJogador(const Jogador *j);
 
+/* Deslocamento máximo (unidades do mundo) do tremor, no começo do feedback de dano. */
+#define AMPLITUDE_TREMOR 1.5f
+/*
+ * Câmera de cabine com tremor: desloca position e target pelo mesmo vetor (no plano frente-cima), então
+ * a vista balança sem girar. A amplitude cai linearmente de AMPLITUDE_TREMOR a 0 em DURACAO_FEEDBACK_DANO.
+ * Determinística em (g->tempoDano, g->tempoDecorrido); tempoDano <= 0 devolve cameraDoJogador.
+ */
+Camera3D cameraComTremor(const Jogo *g);
+
 #endif

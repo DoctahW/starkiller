@@ -4,6 +4,7 @@
 
 #include "destroier.h"
 #include "nave.h"
+#include "pontuacao.h"
 #include "teste.h"
 
 #define EPS 1e-5f
@@ -419,6 +420,32 @@ int main(void)
     cam = cameraDoJogador(&j);
     VERIFICA(proximo(cam.position.x, 10.0f) && proximo(cam.target.x, 11.0f));
     VERIFICA(proximo(cam.target.y, -5.0f) && proximo(cam.up.z, 1.0f));
+
+    /* Tremor: sem dano é a câmera normal; com dano desloca position e target igual e decai a zero. */
+    {
+        Jogo g;
+        Camera3D tr;
+
+        memset(&g, 0, sizeof g);
+        iniciarJogador(&g.jogador);
+        g.tempoDecorrido = 1.0f;
+        tr = cameraComTremor(&g);
+        cam = cameraDoJogador(&g.jogador);
+        VERIFICA(tr.position.x == cam.position.x && tr.position.y == cam.position.y && tr.position.z == cam.position.z);
+
+        g.tempoDano = DURACAO_FEEDBACK_DANO;
+        tr = cameraComTremor(&g);
+        VERIFICA(!proximo(tr.position.x, cam.position.x) || !proximo(tr.position.y, cam.position.y) || !proximo(tr.position.z, cam.position.z));
+        VERIFICA(proximo(tr.target.x - tr.position.x, cam.target.x - cam.position.x));
+        VERIFICA(proximo(tr.target.y - tr.position.y, cam.target.y - cam.position.y));
+        VERIFICA(proximo(tr.target.z - tr.position.z, cam.target.z - cam.position.z));
+        VERIFICA(fabsf(tr.position.x - cam.position.x) + fabsf(tr.position.y - cam.position.y) +
+                     fabsf(tr.position.z - cam.position.z) <= AMPLITUDE_TREMOR * 3.0f);
+
+        g.tempoDano = 0.0f;
+        tr = cameraComTremor(&g);
+        VERIFICA(tr.position.x == cam.position.x && tr.position.y == cam.position.y && tr.position.z == cam.position.z);
+    }
 
     testarRotacao();
     testarSemGimbalLock();

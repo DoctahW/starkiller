@@ -563,8 +563,21 @@ static void desenharAvisoArena(void)
     texto("volte para a área de combate", (int)JANELA_X, (int)r.y + 36, 16, 0.5f, COR_VALOR);
 }
 
+/* Flash vermelho no vidro inteiro enquanto g->tempoDano > 0; a opacidade cai junto com o tremor. */
+static void desenharFlashDano(const Jogo *g)
+{
+    float fator = g->tempoDano / DURACAO_FEEDBACK_DANO;
+
+    if (g->tempoDano <= 0.0f)
+        return;
+    if (fator > 1.0f)
+        fator = 1.0f;
+    DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, Fade(COR_CRITICA, 0.45f * fator));
+}
+
 void hud_desenhar(const Jogo *g, int foraDaArena)
 {
+    desenharFlashDano(g);
     desenharEstrutura();
     desenharReticula();
     if (foraDaArena)

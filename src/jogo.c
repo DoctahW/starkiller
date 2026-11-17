@@ -70,6 +70,12 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
     colidirDestroier(g, PASSO_FIXO);
 
     /* O tempo do passo entra antes dos reforços: o grupo de t = 3 s nasce no passo 180. */
+    if (g->tempoDano > 0.0f) {
+        g->tempoDano -= PASSO_FIXO;
+        if (g->tempoDano < 0.0f)
+            g->tempoDano = 0.0f;
+    }
+
     r->passos++;
     g->tempoDecorrido = r->passos * PASSO_FIXO;
     g->tempoRestante = (PASSOS_PARTIDA - r->passos) * PASSO_FIXO;
@@ -139,7 +145,7 @@ static EstadoJogo combate(Jogo *g, const ConfigEntrada *cfg, const Comandos *cmd
             vibrar(cfg, 0.6f, 0.3f);
     }
 
-    render_cena(g, cameraDoJogador(&g->jogador));   /* também no frame que entra em pausa: sem piscar preto */
+    render_cena(g, cameraComTremor(g));   /* também no frame que entra em pausa: sem piscar preto */
     hud_desenhar(g, avisoArena);
     return proximo;
 }
@@ -149,7 +155,7 @@ static EstadoJogo pausa(const Jogo *g, const Comandos *cmd)
 {
     const char *dica = "Esc/Start: continuar   Enter/A: voltar ao menu";
 
-    render_cena(g, cameraDoJogador(&g->jogador));
+    render_cena(g, cameraComTremor(g));
     hud_desenhar(g, avisoArena);
     DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, Fade(BLACK, 0.6f));
     DrawText("PAUSA", (LARGURA_TELA - MeasureText("PAUSA", 40)) / 2, ALTURA_TELA / 2 - 50, 40, RAYWHITE);

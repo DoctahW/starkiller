@@ -6,6 +6,7 @@
 #include "inimigos.h"
 #include "jogo.h"
 #include "nave.h"
+#include "pontuacao.h"
 #include "raymath.h"
 #include "reforcos.h"
 #include "teste.h"
@@ -311,6 +312,17 @@ int main(void)
         VERIFICA(jogo.pontos > 0);
         liberarListaInimigos(&jogo.inimigos);
     }
+
+    /* Feedback de dano: o timer decai com os passos e zera em DURACAO_FEEDBACK_DANO. */
+    novaPartida(0);
+    registrarDanoJogador(&jogo);
+    VERIFICA(jogo.tempoDano == DURACAO_FEEDBACK_DANO);
+    simularCombate(&jogo, &relogio, &parado, PASSO_FIXO);
+    VERIFICA(jogo.tempoDano < DURACAO_FEEDBACK_DANO && jogo.tempoDano > 0.0f);
+    for (int i = 0; i < 20; i++)
+        simularCombate(&jogo, &relogio, &parado, PASSO_FIXO);
+    VERIFICA(jogo.tempoDano == 0.0f);
+    liberarListaInimigos(&jogo.inimigos);
 
     testarComandosDeCombate();
     testarMiraPorDistancia();
