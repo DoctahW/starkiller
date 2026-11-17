@@ -6,7 +6,6 @@
 #include "pontuacao.h"
 
 #define VELOCIDADE_INICIAL VEL_MIN
-#define CASCO_JOGADOR      100.0f
 
 /* Velocidade angular atual (rad/s) em x = arfagem, y = guinada, z = rolagem. Só existe um jogador. */
 static Vector3 velAng;
