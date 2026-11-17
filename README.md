@@ -120,3 +120,20 @@ Cada módulo tem um `include/<modulo>.h` e um `src/<modulo>.c`, criados pelo don
 ## Créditos
 
 - `assets/models/death_star.glb`: adaptado de ["Death Star - Star Wars"](https://sketchfab.com/3d-models/death-star-star-wars-423fb92f677f4448aef407112a1fc032), de [Quiznos323](https://sketchfab.com/quiznos323), licença [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0/). Alterações: superlaser e esqueleto removidos, mapas de normal e emissivo removidos, casco com metade dos polígonos e texturas com metade da resolução. A versão adaptada é distribuída sob a mesma licença.
+
+## Pipeline de modelos — VIS-01 (#55)
+
+Uma unidade equivale a uma unidade de mundo (metro). Frente **+Z**, cima **+Y**, origem no centro. A direita da câmera inicial é **−X**, conforme `nave.c`. Essas convenções seguem o código de voo existente; o alinhamento explícito com a responsável pelo voo ainda precisa ser registrado na issue.
+
+Os modelos ficam em `assets/models/`, em GLB com materiais e texturas embutidos. O orçamento de referência é **2–5 mil triângulos por nave**, com teto de 5 mil. A sonda de teste usa menos triângulos e não representa uma nave final.
+
+`teste_eixos.glb` foi exportado pelo Blender 4.5.3 LTS. Tem corpo de 2 × 2 × 4 unidades, grade UV embutida de 32 × 32 pixels, haste vermelha em +Z e amarela em +Y. Seus limites são X=[−1,1], Y=[−1,3] e Z=[−2,4]. O exportador aplica transformações e converte Z-up do Blender para Y-up do glTF.
+
+```sh
+blender --background --factory-startup --python tools/exportar_modelos.py
+make preview-modelo
+# Teste com saída automática e captura em build/modelo.png:
+./build/preview_modelo --capturar
+```
+
+A inspeção carrega o GLB com `LoadModel`, verifica suas dimensões e textura embutida e o desenha junto aos eixos do mundo. Esc/Start encerra a janela. O manifesto em `assets/models/manifesto.json` registra a contagem de triângulos e o raio.
