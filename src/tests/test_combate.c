@@ -616,14 +616,14 @@ static void testarColisaoLasersInimigos(void)
     VERIFICA(contarAtivos(&jogo) == 0);
     VERIFICA(proximo(jogo.cascoDestroier, 0.0f));   /* Jogo zerado: o Destróier não foi tocado */
 
-    /* Acerto no Destróier (proa): cascoDestroier cai, o casco do TIE não. */
+    /* Acerto no Destróier (proa): cascoDestroier cai a fração do dano, o casco do TIE não. */
     novoJogo();
     jogo.cascoDestroier = 100.0f;
     jogo.jogador.pos = (Vector3){ 4000.0f, 0.0f, 0.0f };
     in = inimigoEm((Vector3){ 0.0f, 0.0f, 3000.0f }, IA_ATACAR_DESTROIER);
     dispararLaserInimigo(&jogo, &in);
     voarLasersInimigos(dt, 600, &passos);
-    VERIFICA(proximo(jogo.cascoDestroier, 100.0f - DANO_LASER_INIMIGO));
+    VERIFICA(proximo(jogo.cascoDestroier, 100.0f - DANO_LASER_INIMIGO * FRACAO_DANO_DESTROIER));
     VERIFICA(proximo(jogo.jogador.casco, 100.0f));
     VERIFICA(contarAtivos(&jogo) == 0);
 
@@ -654,7 +654,7 @@ static void testarColisaoLasersInimigos(void)
                               .vida = 1.0f, .ativo = 1, .doJogador = 0, .dano = 5.0f };
     VERIFICA(colidirLasersInimigos(&jogo, 0.1f) == 0);  /* segmento de z = 884 a 700, cruzando a proa em 823 */
     VERIFICA(proximo(jogo.jogador.casco, 100.0f));
-    VERIFICA(proximo(jogo.cascoDestroier, 95.0f));
+    VERIFICA(proximo(jogo.cascoDestroier, 100.0f - 5.0f * FRACAO_DANO_DESTROIER));
     VERIFICA(contarAtivos(&jogo) == 0);
 
     /* Erra os dois: continua ativo e sem dano. Lasers do jogador e inativos são ignorados. */

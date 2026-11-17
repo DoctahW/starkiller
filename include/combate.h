@@ -61,7 +61,12 @@ int resolverLasers(Jogo *g, float dt);
 /* Laser inimigo (vermelho): mesma escala do mundo (×4,6); 5 s cobrem a arena de 9000 u. */
 #define VEL_LASER_INIMIGO   1840.0f  /* u/s */
 #define VIDA_LASER_INIMIGO  5.0f
-#define DANO_LASER_INIMIGO  8.0f     /* tirado do casco do TIE ou de cascoDestroier */
+#define DANO_LASER_INIMIGO  8.0f     /* tirado do casco do TIE; no Destróier, vezes FRACAO_DANO_DESTROIER */
+/*
+ * cascoDestroier vai de 0 a 100 para uma nave de 1600 m: um tiro de caça vale uma fração do que
+ * vale no TIE. Com 1, dois X-Wings da primeira onda derrubavam o Destróier em menos de 1 minuto.
+ */
+#define FRACAO_DANO_DESTROIER 0.1f
 
 /*
  * Dispara um laser inimigo (doJogador = 0) da posição de `in` rumo ao alvo do seu estadoIA:
@@ -74,7 +79,7 @@ int dispararLaserInimigo(Jogo *g, const Inimigo *in);
  * Colisão dos lasers inimigos × TIE (esfera RAIO_JOGADOR) e × Destróier (casco de destroier.h,
  * amostrando o segmento). Roda logo depois de atualizarLasers, com o mesmo segmento
  * (pos - vel * dt → pos). Cada laser atinge só o primeiro alvo que atravessa e é desativado.
- * No TIE: casco -= dano e registrarDanoJogador. No Destróier: cascoDestroier -= dano.
+ * No TIE: casco -= dano e registrarDanoJogador. No Destróier: cascoDestroier -= dano * FRACAO_DANO_DESTROIER.
  * Devolve quantos acertos no TIE houve neste passo (quem chama vibra o controle).
  */
 int colidirLasersInimigos(Jogo *g, float dt);
