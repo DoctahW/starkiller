@@ -253,6 +253,29 @@ static void testarProcessarReforcos(void)
     VERIFICA(jogo.reforcos.tamanho == 0 && jogo.inimigos.tamanho == 0);
 }
 
+/*
+ * O grupo nasce longe do jogador mesmo com ele na borda da arena, onde a esfera de spawn
+ * passa a menos de 1000 dele: nenhum caça a menos de 3000 em 200 grupos seguidos.
+ */
+static void testarSpawnLongeDoJogador(void)
+{
+    Jogo jogo = { 0 };
+    const Vector3 bordas[] = { { 0.0f, 0.0f, 9000.0f }, { 9000.0f, 0.0f, 0.0f }, { 0.0f, -9000.0f, 0.0f } };
+    float menor = 1e9f;
+
+    iniciarJogador(&jogo.jogador);
+    jogo.proximoId = 1;
+    for (int i = 0; i < 200; i++) {
+        jogo.jogador.pos = bordas[i % 3];
+        enfileirarReforco(&jogo.reforcos, 0.0f, 2, 1, 1);
+        processarReforcos(&jogo);
+        for (const NoInimigo *no = jogo.inimigos.inicio; no != NULL; no = no->prox)
+            menor = fminf(menor, distancia(no->dado.pos, jogo.jogador.pos));
+        liberarListaInimigos(&jogo.inimigos);
+    }
+    VERIFICA(menor > 3000.0f - 50.0f);   /* a formação abre até ~30 u do centro */
+}
+
 int main(void)
 {
     testarVazia();
@@ -261,6 +284,7 @@ int main(void)
     testarLiberar();
     testarGerarReforcos();
     testarProcessarReforcos();
+    testarSpawnLongeDoJogador();
 
     return RESULTADO_TESTES();
 }

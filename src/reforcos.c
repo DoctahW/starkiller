@@ -13,6 +13,10 @@
 #define ESPACO_FORMACAO  30.0f
 #define COLUNAS_FORMACAO 3
 
+/* O grupo nasce longe do jogador: fora do alcance de tiro (1840) com folga para ele reagir. */
+#define DIST_MIN_JOGADOR 3000.0f
+#define TENTATIVAS_CENTRO 16
+
 static unsigned int semente = 0x5EEDu;
 
 /* LCG próprio, como o do céu: não mexe no rand() nem no RNG da raylib. Devolve [0, 1). */
@@ -85,16 +89,37 @@ void gerarReforcos(FilaReforcos *f, float duracao)
     }
 }
 
-/* Ponto uniforme na esfera de raio RAIO_REFORCO e os eixos da formação (perpendiculares ao raio). */
-static Vector3 sortearCentro(Vector3 *direita, Vector3 *cima)
+/* Direção uniforme na esfera unitária. */
+static Vector3 sortearDirecao(void)
 {
     float z = 2.0f * aleatorio() - 1.0f;
     float ang = 2.0f * PI * aleatorio();
     float r = sqrtf(1.0f - z * z);
-    Vector3 raio = { r * cosf(ang), z, r * sinf(ang) };
-    Vector3 apoio = fabsf(raio.y) > 0.9f ? (Vector3){ 0.0f, 0.0f, 1.0f }
-                                         : (Vector3){ 0.0f, 1.0f, 0.0f };
 
+    return (Vector3){ r * cosf(ang), z, r * sinf(ang) };
+}
+
+/*
+ * Ponto uniforme na esfera de raio RAIO_REFORCO a pelo menos DIST_MIN_JOGADOR do jogador e os
+ * eixos da formação (perpendiculares ao raio). Se nenhuma tentativa servir, fica a mais distante.
+ */
+static Vector3 sortearCentro(Vector3 jogador, Vector3 *direita, Vector3 *cima)
+{
+    Vector3 raio = sortearDirecao();
+    float melhor = Vector3Distance(Vector3Scale(raio, RAIO_REFORCO), jogador);
+    Vector3 apoio;
+
+    for (int i = 1; i < TENTATIVAS_CENTRO && melhor < DIST_MIN_JOGADOR; i++) {
+        Vector3 outro = sortearDirecao();
+        float dist = Vector3Distance(Vector3Scale(outro, RAIO_REFORCO), jogador);
+
+        if (dist > melhor) {
+            melhor = dist;
+            raio = outro;
+        }
+    }
+
+    apoio = fabsf(raio.y) > 0.9f ? (Vector3){ 0.0f, 0.0f, 1.0f } : (Vector3){ 0.0f, 1.0f, 0.0f };
     *direita = Vector3Normalize(Vector3CrossProduct(raio, apoio));
     *cima = Vector3CrossProduct(*direita, raio);
     return Vector3Scale(raio, RAIO_REFORCO);
@@ -122,7 +147,7 @@ static void criarGrupo(Jogo *g, const NoReforco *grupo)
 
     colunas = total < COLUNAS_FORMACAO ? total : COLUNAS_FORMACAO;
     linhas = (total + colunas - 1) / colunas;
-    centro = sortearCentro(&direita, &cima);
+    centro = sortearCentro(g->jogador.pos, &direita, &cima);
 
     for (i = 0; i < total; i++) {
         int coluna = i % colunas;
