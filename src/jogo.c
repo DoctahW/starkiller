@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string.h>
 
 #include "jogo.h"
@@ -104,7 +105,9 @@ static EstadoJogo combate(Jogo *g, const Comandos *cmd, int controleCaiu)
         proximo = simularCombate(g, &relogio, cmd, GetFrameTime());
 
     render_cena(g, cameraDoJogador(&g->jogador));   /* também no frame que entra em pausa: sem piscar preto */
-    DrawText(TextFormat("COMBATE  %3.0f s", g->tempoRestante), 20, 20, 20, RAYWHITE);
+    /* Provisório até o HUD (VIS-06): arredonda para cima, então só mostra 0:00 no fim. */
+    int segundos = (int)ceilf(g->tempoRestante);
+    DrawText(TextFormat("COMBATE  %d:%02d", segundos / 60, segundos % 60), 20, 20, 20, RAYWHITE);
     DrawText("Esc/Start: pausa", 20, 50, 20, GRAY);
     if (avisoArena)
         DrawText("VOLTE PARA A ARENA", LARGURA_TELA / 2 - 140, 80, 28, RED);
