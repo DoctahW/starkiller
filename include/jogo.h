@@ -25,8 +25,9 @@ typedef struct {
 void jogo_executar(void);
 
 /*
- * Roda os passos fixos que cabem no acumulador; devolve EST_FIM com g->vitoria preenchido ao fim da partida.
- * Os campos de borda de cmd (pausa, mira) são tratados uma vez por frame, fora daqui.
+ * Um frame de combate na ordem da seção 3.4: aplica as ações de mira de cmd uma vez (são de borda),
+ * depois roda os passos fixos que cabem no acumulador (nave, disparo, lasers, colisões, fim).
+ * Devolve EST_FIM com g->vitoria preenchido ao fim da partida. A pausa é tratada fora daqui.
  */
 EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd, float dtFrame);
 
