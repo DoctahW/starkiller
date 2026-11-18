@@ -12,10 +12,7 @@
 /* Distância mínima para normalizar o rumo; evita divisão por zero com o alvo em cima. */
 #define DIST_MINIMA   1e-4f
 
-/* IA-02: o Y-Wing bombardeia a menos de 685 do Destróier (no tamanho canônico) e orbita a ~550.
- * As duas distâncias acompanham a escala do Destróier no jogo (ESCALA_DESTROIER). */
-#define ALCANCE_BOMBA_YWING (685.0f * ESCALA_DESTROIER)
-#define DANO_BOMBA_YWING    24.0f   /* 24/s em 300 HP mantém os ~12,5 s do desenho de 100 HP */
+/* IA-02: o Y-Wing orbita a ~550 do Destróier (no tamanho canônico), dentro do ALCANCE_BOMBA_YWING de ia.h. */
 #define RAIO_ORBITA_YWING   (550.0f * ESCALA_DESTROIER)
 #define AVANCO_ORBITA       (185.0f * ESCALA_DESTROIER)
 /* O Destróier é um alvo de 6400 u: os caças atiram nele de mais longe do que no TIE. */
@@ -257,12 +254,16 @@ static void atirarSeNoCone(Inimigo *in, Jogo *g, float dt)
         in->cooldownTiro = COOLDOWN_TIRO_INIMIGO * fatorCooldownIA(g->tempoDecorrido);
 }
 
-/* IA-02: 8 de dano/s no casco do Destróier enquanto o Y-Wing estiver no alcance. */
+int ywingBombardeando(const Inimigo *in)
+{
+    return in->tipo == YWING && in->estadoIA == IA_ATACAR_DESTROIER
+        && Vector3Length(in->pos) < ALCANCE_BOMBA_YWING;
+}
+
+/* IA-02: DANO_BOMBA_YWING por segundo no casco do Destróier enquanto o Y-Wing estiver no alcance. */
 static void bombardearDestroier(Inimigo *in, Jogo *g, float dt)
 {
-    if (in->tipo != YWING || in->estadoIA != IA_ATACAR_DESTROIER)
-        return;
-    if (Vector3Length(in->pos) >= ALCANCE_BOMBA_YWING)
+    if (!ywingBombardeando(in))
         return;
 
     g->cascoDestroier -= DANO_BOMBA_YWING * dt;

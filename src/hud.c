@@ -5,6 +5,7 @@
 
 #include "raymath.h"
 #include "combate.h"
+#include "ia.h"
 #include "jogo.h"
 #include "nave.h"
 #include "pontuacao.h"
@@ -584,6 +585,25 @@ static void desenharAvisoArena(void)
     texto("volte para a área de combate", (int)JANELA_X, (int)r.y + 36, 16, 0.5f, COR_VALOR);
 }
 
+/* Aviso piscando no topo do vidro enquanto algum Y-Wing bombardeia o Destróier, com quantos são. */
+static void desenharAvisoBombardeio(const Jogo *g)
+{
+    Rectangle r = { JANELA_X - 190.0f, 70.0f, 380.0f, 60.0f };
+    float alfa = piscaAceso() ? 0.95f : 0.35f;
+    int n = 0;
+
+    for (const NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox)
+        n += ywingBombardeando(&no->dado);
+    if (n == 0)
+        return;
+
+    DrawRectangleRec(r, Fade(BLACK, 0.6f));
+    DrawRectangleLinesEx(r, 2.0f, Fade(COR_ALERTA, alfa));
+    texto(n == 1 ? "Y-WING NO DESTRÓIER" : TextFormat("%d Y-WINGS NO DESTRÓIER", n), (int)JANELA_X, (int)r.y + 4, 28,
+          0.5f, Fade(COR_ALERTA, alfa));
+    texto("abata os bombardeiros para proteger a nave", (int)JANELA_X, (int)r.y + 36, 16, 0.5f, COR_VALOR);
+}
+
 /* Flash vermelho no vidro inteiro enquanto g->tempoDano > 0; a opacidade cai junto com o tremor. */
 static void desenharFlashDano(const Jogo *g)
 {
@@ -603,6 +623,7 @@ void hud_desenhar(const Jogo *g, int foraDaArena)
     desenharReticula();
     if (foraDaArena)
         desenharAvisoArena();
+    desenharAvisoBombardeio(g);
     desenharAlvoNoVidro(g);
     desenharTabletPartida(g);
     desenharTabletNave(g);
