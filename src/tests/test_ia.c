@@ -13,9 +13,9 @@
 #define DT (1.0f / 60.0f)
 #define QUASE(a, b) (fabsf((a) - (b)) < 1e-4f)
 
-/* Valores da tabela 2.2 e do criterio da IA-02. */
-#define BOMBA_DANO    24.0f
-#define BOMBA_ALCANCE (685.0f * ESCALA_DESTROIER)
+/* Valores da tabela 2.2 e do criterio da IA-02 (o dano e o alcance da bomba vêm de ia.h). */
+#define BOMBA_DANO    DANO_BOMBA_YWING
+#define BOMBA_ALCANCE ALCANCE_BOMBA_YWING
 #define ORBITA_RAIO   (550.0f * ESCALA_DESTROIER)
 
 static Inimigo novoInimigo(TipoNave tipo, Vector3 pos, EstadoIA estado)
@@ -170,7 +170,7 @@ static void testarAtualizarInimigosMove(void)
     liberarListaInimigos(&g.inimigos);
 }
 
-/* IA-02: a menos de BOMBA_ALCANCE do Destróier, o Y-Wing causa 24 de dano/s no casco. */
+/* IA-02: a menos de BOMBA_ALCANCE do Destróier, o Y-Wing causa DANO_BOMBA_YWING de dano/s no casco. */
 static void testarYwingBombardeia(void)
 {
     Jogo g = { 0 };

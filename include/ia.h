@@ -25,6 +25,16 @@
  */
 void ia_atualizar(Inimigo *in, Jogo *g, float dt);
 
+/*
+ * IA-02: o Y-Wing bombardeia a menos de 685 do Destróier (no tamanho canônico). O dano antigo, 24/s,
+ * derrubava os 300 do casco em 12,5 s com um único Y-Wing: o Destróier sumia antes de o jogador
+ * reagir. Com 6/s, um Y-Wing sozinho leva 50 s, e o HUD avisa enquanto algum bombardeia.
+ */
+#define ALCANCE_BOMBA_YWING (685.0f * ESCALA_DESTROIER)
+#define DANO_BOMBA_YWING    6.0f   /* por segundo no alcance */
+/* 1 se `in` é um Y-Wing atacando o Destróier dentro do ALCANCE_BOMBA_YWING (está tirando casco dele). */
+int ywingBombardeando(const Inimigo *in);
+
 /* Passagem de ataque. O Destróier rompe a 1100 da origem: fora do casco (até ~900) e dentro do alcance. */
 #define DIST_ROMPER_JOGADOR    600.0f
 #define DIST_RETOMAR_JOGADOR   1600.0f
