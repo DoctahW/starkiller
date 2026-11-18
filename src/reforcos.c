@@ -86,13 +86,22 @@ void gerarReforcos(FilaReforcos *f, float duracao)
         int totalBase = 2 + (int)(t / 40.0f);
         int qtdABase = (int)(totalBase * (t / duracao));
         int qtdYBase = onda == 0 ? 0 : (totalBase >= 3 ? 2 : 1);
-        int qtdXBase;
+        int x, y, a;
 
         if (qtdABase > totalBase - 1 - qtdYBase)
             qtdABase = totalBase - 1 - qtdYBase;
-        qtdXBase = totalBase - qtdYBase - qtdABase;
-        /* Reforços mais frequentes e por tipo: todos os caças rebeldes em 3×. */
-        enfileirarReforco(f, t, qtdXBase * MULT_XWING, qtdYBase * MULT_YWING, qtdABase * MULT_AWING);
+        x = (totalBase - qtdYBase - qtdABase) * MULT_XWING;
+        y = qtdYBase * MULT_YWING;
+        a = qtdABase * MULT_AWING;
+
+        /* Da 12ª onda em diante não entram A-Wings: a cota deles é dividida entre X e Y
+         * (em quantidade ímpar, o extra vai para o X-Wing). */
+        if (onda >= 11) {
+            x += (a + 1) / 2;
+            y += a / 2;
+            a = 0;
+        }
+        enfileirarReforco(f, t, x, y, a);
     }
 }
 

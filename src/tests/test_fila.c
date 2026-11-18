@@ -110,7 +110,7 @@ static void testarGerarReforcos(void)
     FilaReforcos f = { 0 };
     NoReforco grupo;
     float t = 3.0f;
-    int onda = 0, qtdAAnterior = 0, qtdYAnterior = 0;
+    int onda = 0, qtdAAnterior = 0, qtdYAnterior = 0, viuA = 0;
 
     gerarReforcos(&f, DURACAO_PARTIDA);
     VERIFICA(f.tamanho == 20);
@@ -119,27 +119,38 @@ static void testarGerarReforcos(void)
         int totalBase = 2 + (int)(grupo.tempoChegada / 40.0f);
         int qtdYBase = onda == 0 ? 0 : (totalBase >= 3 ? 2 : 1);
         int qtdABase = (int)(totalBase * (grupo.tempoChegada / DURACAO_PARTIDA));
-        int qtdXBase;
+        int x, y, a;
 
         if (qtdABase > totalBase - 1 - qtdYBase)
             qtdABase = totalBase - 1 - qtdYBase;
-        qtdXBase = totalBase - qtdYBase - qtdABase;
+        x = (totalBase - qtdYBase - qtdABase) * 3;
+        y = qtdYBase * 3;
+        a = qtdABase * 3;
+        if (onda >= 11) {
+            x += (a + 1) / 2;
+            y += a / 2;
+            a = 0;
+        }
 
         VERIFICA(grupo.tempoChegada == t);
-        VERIFICA(grupo.qtdX == qtdXBase * 3);
-        VERIFICA(grupo.qtdY == qtdYBase * 3);
-        VERIFICA(grupo.qtdA == qtdABase * 3);
+        VERIFICA(grupo.qtdX == x);
+        VERIFICA(grupo.qtdY == y);
+        VERIFICA(grupo.qtdA == a);
         VERIFICA(grupo.qtdX >= 3);
+        viuA |= grupo.qtdA > 0;
 
         if (onda == 0)
             VERIFICA(grupo.qtdY == 0);
         else
             VERIFICA(grupo.qtdY >= 3);
-        if (onda > 0 && totalBase >= 3)
+        if (onda > 0 && onda < 11 && totalBase >= 3)
             VERIFICA(grupo.qtdY == 6);
 
         if (onda > 0) {
-            VERIFICA(grupo.qtdA >= qtdAAnterior);
+            if (onda < 11)
+                VERIFICA(grupo.qtdA >= qtdAAnterior);
+            else
+                VERIFICA(grupo.qtdA == 0);
             VERIFICA(grupo.qtdY >= qtdYAnterior);
         }
 
@@ -150,7 +161,7 @@ static void testarGerarReforcos(void)
     }
 
     VERIFICA(onda == 20);
-    VERIFICA(qtdAAnterior > 0);
+    VERIFICA(viuA);
     VERIFICA(f.tamanho == 0 && f.inicio == NULL && f.fim == NULL);
 
     /* Partida que acaba antes da primeira onda não gera nada. */
