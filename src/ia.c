@@ -12,11 +12,14 @@
 /* Distância mínima para normalizar o rumo; evita divisão por zero com o alvo em cima. */
 #define DIST_MINIMA   1e-4f
 
-/* IA-02: o Y-Wing bombardeia a menos de 685 do Destróier e orbita a ~550. */
-#define ALCANCE_BOMBA_YWING 685.0f
-#define DANO_BOMBA_YWING    8.0f
-#define RAIO_ORBITA_YWING   550.0f
-#define AVANCO_ORBITA       185.0f
+/* IA-02: o Y-Wing bombardeia a menos de 685 do Destróier (no tamanho canônico) e orbita a ~550.
+ * As duas distâncias acompanham a escala do Destróier no jogo (ESCALA_DESTROIER). */
+#define ALCANCE_BOMBA_YWING (685.0f * ESCALA_DESTROIER)
+#define DANO_BOMBA_YWING    24.0f   /* 24/s em 300 HP mantém os ~12,5 s do desenho de 100 HP */
+#define RAIO_ORBITA_YWING   (550.0f * ESCALA_DESTROIER)
+#define AVANCO_ORBITA       (185.0f * ESCALA_DESTROIER)
+/* O Destróier é um alvo de 6400 u: os caças atiram nele de mais longe do que no TIE. */
+#define ALCANCE_TIRO_DESTROIER (1840.0f * ESCALA_DESTROIER)
 
 static float velocidadeMaxima(TipoNave tipo)
 {
@@ -224,6 +227,7 @@ static void atirarSeNoCone(Inimigo *in, Jogo *g, float dt)
 {
     Vector3 alvo, rumo;
     float dist, cosseno;
+    float alcance = in->estadoIA == IA_ATACAR_DESTROIER ? ALCANCE_TIRO_DESTROIER : ALCANCE_TIRO_INIMIGO;
 
     if (in->cooldownTiro > 0.0f) {
         in->cooldownTiro -= dt;
@@ -242,7 +246,7 @@ static void atirarSeNoCone(Inimigo *in, Jogo *g, float dt)
 
     rumo = Vector3Subtract(alvo, in->pos);
     dist = Vector3Length(rumo);
-    if (dist > ALCANCE_TIRO_INIMIGO || dist < 1e-6f)
+    if (dist > alcance || dist < 1e-6f)
         return;
 
     cosseno = Vector3DotProduct(Vector3Normalize(in->vel), Vector3Scale(rumo, 1.0f / dist));

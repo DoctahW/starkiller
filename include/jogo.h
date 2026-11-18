@@ -12,8 +12,8 @@
 #define PASSO_FIXO         (1.0f / PASSOS_POR_SEGUNDO)
 #define DT_MAXIMO          0.25f
 
-/* Casco máximo do Destróier na escala usada pela partida (0-100). */
-#define CASCO_MAX_DESTROIER 100.0f
+/* Casco máximo do Destróier na escala usada pela partida (0 a 300). */
+#define CASCO_MAX_DESTROIER 300.0f
 
 /* O tempo da partida vem de passos inteiros, sem somar PASSO_FIXO em float a cada passo. */
 typedef struct {

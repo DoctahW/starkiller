@@ -83,19 +83,19 @@ int main(void)
     VERIFICA(bonusCasco(&g) == 5000);
     VERIFICA(calcularPontuacao(&g) == 6000);
 
-    g.cascoDestroier = 50.0f; /* 50% -> 2500 */
+    g.cascoDestroier = 0.5f * CASCO_MAX_DESTROIER; /* 50% -> 2500 */
     VERIFICA(bonusCasco(&g) == 2500);
     VERIFICA(calcularPontuacao(&g) == 3500);
 
-    g.cascoDestroier = 55.0f; /* 55% -> 2750 */
+    g.cascoDestroier = 0.55f * CASCO_MAX_DESTROIER; /* 55% -> 2750 */
     VERIFICA(bonusCasco(&g) == 2750);
     VERIFICA(calcularPontuacao(&g) == 3750);
 
-    g.cascoDestroier = 75.0f; /* 75% -> 3750 */
+    g.cascoDestroier = 0.75f * CASCO_MAX_DESTROIER; /* 75% -> 3750 */
     VERIFICA(bonusCasco(&g) == 3750);
 
     /* Casco fora da faixa é limitado a 0..100% */
-    g.cascoDestroier = 120.0f;
+    g.cascoDestroier = 1.2f * CASCO_MAX_DESTROIER;
     VERIFICA(bonusCasco(&g) == 5000);
     g.cascoDestroier = -10.0f;
     VERIFICA(bonusCasco(&g) == 0);
@@ -110,7 +110,7 @@ int main(void)
 
     /* calcularPontuacao não altera o Jogo e é idempotente */
     g.vitoria = 1;
-    g.cascoDestroier = 60.0f; /* 60% -> 3000 */
+    g.cascoDestroier = 0.6f * CASCO_MAX_DESTROIER; /* 60% -> 3000 */
     {
         int pontos = g.pontos;
         int sequencia = g.sequenciaSemDano;
@@ -122,7 +122,7 @@ int main(void)
         VERIFICA(g.pontos == pontos);
         VERIFICA(g.sequenciaSemDano == sequencia);
         VERIFICA(g.abates == abates);
-        VERIFICA(g.cascoDestroier == 60.0f);
+        VERIFICA(g.cascoDestroier == 0.6f * CASCO_MAX_DESTROIER);
     }
 
     return RESULTADO_TESTES();

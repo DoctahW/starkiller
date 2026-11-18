@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -197,8 +198,9 @@ NoPlacar *carregarPlacar(const char *caminho)
             continue;
         *separador = '\0';
 
+        errno = 0;
         valor = strtol(separador + 1, &fim, 10);
-        if (fim == separador + 1)
+        if (fim == separador + 1 || errno == ERANGE)
             continue;
         while (*fim == ' ' || *fim == '\t' || *fim == '\r' || *fim == '\n')
             fim++;

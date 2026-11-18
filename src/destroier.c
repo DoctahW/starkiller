@@ -4,13 +4,17 @@
 
 #include "raymath.h"
 
+#define MAX_FAIXAS_CASCO 4        /* intervalos sólidos por coluna (o vão da ponte separa dois) */
+
 typedef struct {
     short primeira, quantidade;   /* colunas x da linha */
     int inicio;                   /* índice da primeira em COLUNAS_CASCO */
 } LinhaCasco;
 
 typedef struct {
-    short baixo, cima;            /* y ocupado; baixo > cima é coluna vazia */
+    short baixo[MAX_FAIXAS_CASCO];
+    short cima[MAX_FAIXAS_CASCO];
+    short n;                      /* faixas usadas; n = 0 é coluna vazia */
 } ColunaCasco;
 
 #include "casco_destroier.inc"
@@ -18,9 +22,9 @@ typedef struct {
 /* Passo da busca pela saída: menor que qualquer coluna inflada pelo raio da nave, nada é pulado. */
 #define PASSO_SAIDA     (LADO_CELULA_CASCO * 0.5f)
 #define REFINOS_SAIDA   16
-#define BUSCA_MAXIMA    1000.0f   /* u; maior que a meia espessura do casco em qualquer sentido */
+#define BUSCA_MAXIMA    (1000.0f * ESCALA_DESTROIER)   /* u; maior que a meia espessura do casco em qualquer sentido */
 
-/* Intervalo da coluna (ix, iz); 0 se vazia ou fora da grade. */
+/* Faixas sólidas da coluna (ix, iz); devolve a quantidade preenchida (0 se vazia ou fora da grade). */
 static int coluna(int ix, int iz, float *baixo, float *cima)
 {
     const LinhaCasco *l;
@@ -32,15 +36,19 @@ static int coluna(int ix, int iz, float *baixo, float *cima)
     if (ix < l->primeira || ix >= l->primeira + l->quantidade)
         return 0;
     c = &COLUNAS_CASCO[l->inicio + ix - l->primeira];
-    if (c->baixo > c->cima)
-        return 0;
-    *baixo = c->baixo;
-    *cima = c->cima;
-    return 1;
+    for (int i = 0; i < c->n; i++) {
+        baixo[i] = c->baixo[i];
+        cima[i] = c->cima[i];
+    }
+    return c->n;
 }
 
 int tocaDestroier(Vector3 centro, float raio)
 {
+    /* O mapa está no tamanho canônico do modelo; a consulta chega em coordenadas do mundo. */
+    centro = Vector3Scale(centro, 1.0f / ESCALA_DESTROIER);
+    raio /= ESCALA_DESTROIER;
+
     int ix0 = (int)floorf((centro.x - raio - X0_CASCO) / LADO_CELULA_CASCO);
     int ix1 = (int)floorf((centro.x + raio - X0_CASCO) / LADO_CELULA_CASCO);
     int iz0 = (int)floorf((centro.z - raio - Z0_CASCO) / LADO_CELULA_CASCO);
@@ -48,11 +56,12 @@ int tocaDestroier(Vector3 centro, float raio)
 
     for (int iz = iz0; iz <= iz1; iz++)
         for (int ix = ix0; ix <= ix1; ix++) {
-            float baixo, cima, x0, z0, dx, dz, folga;
+            float baixo[MAX_FAIXAS_CASCO], cima[MAX_FAIXAS_CASCO], x0, z0, dx, dz, folga;
+            int n = coluna(ix, iz, baixo, cima);
 
-            if (!coluna(ix, iz, &baixo, &cima))
-                continue;
             /* Distância horizontal do centro ao retângulo da coluna; dentro dele, a esfera inteira conta. */
+            if (n == 0)
+                continue;
             x0 = X0_CASCO + ix * LADO_CELULA_CASCO;
             z0 = Z0_CASCO + iz * LADO_CELULA_CASCO;
             dx = fmaxf(fmaxf(x0 - centro.x, centro.x - (x0 + LADO_CELULA_CASCO)), 0.0f);
@@ -60,8 +69,9 @@ int tocaDestroier(Vector3 centro, float raio)
             if (dx * dx + dz * dz > raio * raio)
                 continue;
             folga = sqrtf(raio * raio - dx * dx - dz * dz);
-            if (centro.y >= baixo - folga && centro.y <= cima + folga)
-                return 1;
+            for (int i = 0; i < n; i++)
+                if (centro.y >= baixo[i] - folga && centro.y <= cima[i] + folga)
+                    return 1;
         }
     return 0;
 }

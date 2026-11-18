@@ -311,6 +311,7 @@ static float alturaDeContato(float x, float z)
 static void testarColisaoDestroier(void)
 {
     Jogo *g = &jogoDestroier;
+    const float E = ESCALA_DESTROIER;
     float casco0, conves, lado;
     Jogador inicio;
 
@@ -323,19 +324,19 @@ static void testarColisaoDestroier(void)
     VERIFICA(proximo(g->jogador.pos.z, inicio.pos.z) && proximo(g->jogador.casco, casco0));
     VERIFICA(g->sequenciaSemDano == 5);
 
-    /* Rente ao casco: na proa (z = 700) ele tem ~20 u de meia espessura; 40 u acima do eixo é livre. */
-    VERIFICA(tocaDestroier((Vector3){ 0.0f, 0.0f, 700.0f }, 0.0f));
-    VERIFICA(!tocaDestroier((Vector3){ 0.0f, 40.0f, 700.0f }, RAIO_JOGADOR));
-    VERIFICA(!tocaDestroier((Vector3){ 0.0f, -40.0f, 700.0f }, RAIO_JOGADOR));
+    /* Rente ao casco: na proa ele tem ~20 u de meia espessura; 40 u acima do eixo é livre. */
+    VERIFICA(tocaDestroier((Vector3){ 0.0f, 0.0f, 700.0f * E }, 0.0f));
+    VERIFICA(!tocaDestroier((Vector3){ 0.0f, 40.0f * E, 700.0f * E }, RAIO_JOGADOR));
+    VERIFICA(!tocaDestroier((Vector3){ 0.0f, -40.0f * E, 700.0f * E }, RAIO_JOGADOR));
 
     /* Desceu 2 u para dentro do conves: sobe de volta (x e z iguais), perde casco e zera a sequência. */
-    conves = alturaDeContato(0.0f, 200.0f);
-    VERIFICA(conves > 0.0f && conves < 200.0f);
-    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f });
+    conves = alturaDeContato(0.0f, 200.0f * E);
+    VERIFICA(conves > 0.0f && conves < 200.0f * E);
+    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f * E });
     g->sequenciaSemDano = 5;
     VERIFICA(colidirDestroier(g, 1.0f / 60.0f) == 1);
     VERIFICA(g->jogador.pos.y > conves - 2.0f && g->jogador.pos.y < conves + 0.51f);
-    VERIFICA(proximo(g->jogador.pos.x, 0.0f) && proximo(g->jogador.pos.z, 200.0f));
+    VERIFICA(proximo(g->jogador.pos.x, 0.0f) && proximo(g->jogador.pos.z, 200.0f * E));
     VERIFICA(!tocaDestroier(g->jogador.pos, RAIO_JOGADOR));
     VERIFICA(proximo(g->jogador.casco, casco0 - DANO_COLISAO_DESTROIER));
     VERIFICA(g->sequenciaSemDano == 0);
@@ -344,13 +345,21 @@ static void testarColisaoDestroier(void)
     VERIFICA(colidirDestroier(g, 1.0f / 60.0f) == 0);
 
     /* Pela parede lateral da popa: o empurrão é para o lado. */
-    for (lado = 600.0f; lado > 0.0f && !tocaDestroier((Vector3){ lado, 0.0f, -600.0f }, RAIO_JOGADOR); lado -= 0.5f)
+    for (lado = 600.0f * E; lado > 0.0f && !tocaDestroier((Vector3){ lado, 0.0f, -600.0f * E }, RAIO_JOGADOR); lado -= 0.5f)
         ;
-    VERIFICA(lado > MEIA_BOCA_DESTROIER - 60.0f);
-    novoJogoEm((Vector3){ lado - 2.0f, 0.0f, -600.0f });
+    VERIFICA(lado > (MEIA_BOCA_DESTROIER - 60.0f) * E);
+    novoJogoEm((Vector3){ lado - 2.0f, 0.0f, -600.0f * E });
     VERIFICA(colidirDestroier(g, 1.0f / 60.0f) == 1);
     VERIFICA(g->jogador.pos.x > lado - 2.0f && g->jogador.pos.x < lado + 0.51f);
-    VERIFICA(proximo(g->jogador.pos.y, 0.0f) && proximo(g->jogador.pos.z, -600.0f));
+    VERIFICA(proximo(g->jogador.pos.y, 0.0f) && proximo(g->jogador.pos.z, -600.0f * E));
+
+    /* Vão sob as asas da ponte de comando (x = ±140, z = -564 no modelo): o casco embaixo e a
+     * asa em cima são sólidos, mas o espaço entre eles é livre. A ponte em si (y 240-275) é sólida. */
+    VERIFICA(!tocaDestroier((Vector3){ 140.0f * E, 176.0f * E, -564.0f * E }, RAIO_JOGADOR));
+    VERIFICA(!tocaDestroier((Vector3){ -140.0f * E, 176.0f * E, -564.0f * E }, RAIO_JOGADOR));
+    VERIFICA(tocaDestroier((Vector3){ 140.0f * E, 100.0f * E, -564.0f * E }, RAIO_JOGADOR));   /* casco abaixo */
+    VERIFICA(tocaDestroier((Vector3){ 140.0f * E, 250.0f * E, -564.0f * E }, RAIO_JOGADOR));   /* asa acima */
+    VERIFICA(tocaDestroier((Vector3){ 135.0f * E, 250.0f * E, -567.0f * E }, RAIO_JOGADOR));   /* ponte */
 
     /* Bem no meio do casco: sai mesmo assim, sem ficar dentro. */
     novoJogoEm((Vector3){ 0.0f, 0.0f, 0.0f });
@@ -358,7 +367,7 @@ static void testarColisaoDestroier(void)
     VERIFICA(!tocaDestroier(g->jogador.pos, RAIO_JOGADOR));
 
     /* Encostada contra o casco: empurra todo passo, mas o dano só volta depois de RECARGA_COLISAO. */
-    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f });
+    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f * E });
     casco0 = g->jogador.casco;
     colidirDestroier(g, 0.1f);
     g->jogador.pos.y = conves - 2.0f;
@@ -369,15 +378,15 @@ static void testarColisaoDestroier(void)
     VERIFICA(proximo(g->jogador.casco, casco0 - 2.0f * DANO_COLISAO_DESTROIER));
 
     /* iniciarJogador zera a recarga: a partida seguinte não herda o intervalo da anterior. */
-    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f });
+    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f * E });
     colidirDestroier(g, 1.0f / 60.0f);
-    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f });
+    novoJogoEm((Vector3){ 0.0f, conves - 2.0f, 200.0f * E });
     casco0 = g->jogador.casco;
     colidirDestroier(g, 1.0f / 60.0f);
     VERIFICA(proximo(g->jogador.casco, casco0 - DANO_COLISAO_DESTROIER));
 
     /* Voando de frente contra a proa por 3 s: bate e nunca termina um passo dentro do casco. */
-    novoJogoEm((Vector3){ 0.0f, 0.0f, Z_PROA_DESTROIER + 300.0f });
+    novoJogoEm((Vector3){ 0.0f, 0.0f, (Z_PROA_DESTROIER + 300.0f) * E });
     g->jogador.rot = (Quaternion){ 0.0f, 1.0f, 0.0f, 0.0f };   /* 180° em Y: olha para -Z, rumo ao Destróier */
     {
         Comandos acelera = { .aceleracao = 1.0f };

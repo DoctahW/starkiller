@@ -63,10 +63,11 @@ int resolverLasers(Jogo *g, float dt);
 #define VIDA_LASER_INIMIGO  5.0f
 #define DANO_LASER_INIMIGO  8.0f     /* tirado do casco do TIE; no Destróier, vezes FRACAO_DANO_DESTROIER */
 /*
- * cascoDestroier vai de 0 a 100 para uma nave de 1600 m: um tiro de caça vale uma fração do que
- * vale no TIE. Com 1, dois X-Wings da primeira onda derrubavam o Destróier em menos de 1 minuto.
+ * cascoDestroier vai de 0 a CASCO_MAX_DESTROIER (300) para uma nave de 1600 m: um tiro de caça
+ * vale uma fração do que vale no TIE. A fração acompanha o HP (0,3 para 300) para o tempo de
+ * queda continuar o do desenho antigo de 100, em que cada tiro valia 0,8.
  */
-#define FRACAO_DANO_DESTROIER 0.1f
+#define FRACAO_DANO_DESTROIER 0.3f
 
 /*
  * Onde um projétil de velocidade `velProjetil`, saindo de `origem` agora, encontra um alvo em `alvo`

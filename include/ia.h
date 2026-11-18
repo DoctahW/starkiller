@@ -1,6 +1,7 @@
 #ifndef IA_H
 #define IA_H
 
+#include "destroier.h"
 #include "tipos.h"
 
 /* Aceleração com que o rumo dos caças é corrigido: sem virar no mesmo frame (IA-01). */
@@ -10,7 +11,8 @@
  * Seção 3.4, passo 4: direciona `vel` suavemente para o alvo do estado atual,
  * com a velocidade máxima da tabela 2.2 escalada pela dificuldade (IA-05); a aceleração
  * acompanha o quadrado do fator, então o raio de curva (v²/a) fica constante. Avança `pos` com `vel`.
- * Y-Wing em IA_ATACAR_DESTROIER orbita o Destróier e bombardeia a menos de 685.
+ * Y-Wing em IA_ATACAR_DESTROIER orbita o Destróier e bombardeia a menos de 685 (no tamanho
+ * canônico; a distância acompanha ESCALA_DESTROIER).
  * O caça nunca fica dentro do casco: usa afastarDoDestroier (IA-04).
  * IA-03: o X-Wing alterna entre atacar o Destróier e o jogador com período de 8–12 s;
  * a primeira troca pode ser menor se o caça nasce no meio do ciclo. O A-Wing persegue o
@@ -26,8 +28,9 @@ void ia_atualizar(Inimigo *in, Jogo *g, float dt);
 /* Passagem de ataque. O Destróier rompe a 1100 da origem: fora do casco (até ~900) e dentro do alcance. */
 #define DIST_ROMPER_JOGADOR    600.0f
 #define DIST_RETOMAR_JOGADOR   1600.0f
-#define DIST_ROMPER_DESTROIER  1100.0f
-#define DIST_RETOMAR_DESTROIER 2400.0f
+/* A escala do Destróier entra aqui: 850 u canônicos ficam logo à frente da proa (823). */
+#define DIST_ROMPER_DESTROIER  (850.0f * ESCALA_DESTROIER)
+#define DIST_RETOMAR_DESTROIER (1750.0f * ESCALA_DESTROIER)
 /* Na fuga, a menos disto da borda da arena o rumo perde a componente para fora. */
 #define MARGEM_BORDA_FUGA      500.0f
 /* Separação entre caças: alcance (u) e peso do empurrão no rumo unitário, no máximo PESO por vizinho. */

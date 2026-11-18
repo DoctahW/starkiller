@@ -754,12 +754,12 @@ static void testarArenaNaoEADistanciaDoJogador(void){
 
 static void testarAtualizarMovePelaIA(void){
     memset(&jogo, 0, sizeof(jogo));
-    porNaFrente(&jogo.inimigos, 1, 3000.0f);
+    porNaFrente(&jogo.inimigos, 1, 5000.0f);
 
     atualizarInimigos(&jogo, 1.0f / 60.0f);
 
     //IA-01 (#49): o X-Wing anda na direcao do Destroier, na origem (longe dele, antes de romper a passagem)
-    VERIFICA(jogo.inimigos.inicio->dado.pos.z < 3000.0f);
+    VERIFICA(jogo.inimigos.inicio->dado.pos.z < 5000.0f);
     VERIFICA(!vetorNulo(jogo.inimigos.inicio->dado.vel));
 
     liberarListaInimigos(&jogo.inimigos);

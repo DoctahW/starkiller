@@ -89,7 +89,7 @@ include/         headers públicos de cada módulo
   teste.h        verificações dos testes de console
 src/
   main.c         ponto de entrada
-  destroier.c    medidas do Destróier e colisão com o casco (mapa de alturas em casco_destroier.inc)
+  destroier.c    medidas do Destróier e colisão com o casco (mapa de colunas em casco_destroier.inc)
   jogo.c         janela, máquina de estados e loop de combate
   entrada.c      teclado e controle -> Comandos
   nave.c         voo e câmera de cabine
@@ -125,9 +125,13 @@ Pipeline: Blender → `.glb` (glTF binário) → `LoadModel` da raylib. Os model
 | Malhas            | Até 65.535 vértices por malha: a raylib converte índices de 32 bits para 16 e quebra malhas maiores                    |
 | Texturas          | Embutidas no `.glb` em PNG (a raylib padrão não lê JPEG), só o primeiro mapa UV. A raylib usa a cor base e a textura de cor |
 | Emissivo          | A raylib só lê o emissivo com textura: material emissivo leva cor base = cor do emissivo e uma textura emissiva 1x1, e o jogo o desenha sem luz |
-| Colisão           | Destróier: mapa de alturas gerado do modelo (`src/casco_destroier.inc`); mudou o modelo, rodar `python3 assets/models/fontes/casco_destroier.py` |
+| Colisão           | Destróier: mapa de colunas gerado do modelo (`src/casco_destroier.inc`), com até 4 intervalos sólidos por coluna para deixar vazios os vãos abertos (como o da ponte de comando); mudou o modelo, rodar `python3 assets/models/fontes/casco_destroier.py` |
 
-O `assets/models/destroier.glb` sai do modelo do Sketchfab (link nos créditos) com `blender -b --factory-startup -P assets/models/fontes/destroier.py -- <star_wars_imperial_ii_star_destroyer.glb>`, rodado na raiz do repositório: escala para 1600 u de comprimento (o canônico), Decimate só nos detalhes pesados sem textura (235k → 60k triângulos) e os ajustes de textura e emissivo da tabela. Depois, `python3 assets/models/fontes/casco_destroier.py` gera o casco de colisão. Sem o `.glb`, o jogo desenha uma cunha de primitivas nas mesmas medidas.
+O `assets/models/destroier.glb` versionado é o modelo detalhado do Imperial-class Star Destroyer (**1,35 mi de triângulos**, ~71 MB), de [Heataker](https://sketchfab.com/Heataker) no Sketchfab, licença **Free Standard**, já ajustado para 1600 u de comprimento (o canônico), proa em +Z e com as texturas/emissivos da tabela. O GLB é versionado via **Git LFS**. O pipeline antigo de `assets/models/fontes/destroier.py` (modelo do Sketchfab com Decimate 235k → 60k) continua no repositório como referência, mas não é o que gera o arquivo atual. Depois, `python3 assets/models/fontes/casco_destroier.py` gera o casco de colisão em grade de 8 u a partir do GLB atual; o script amostra a malha, então modelos muito densos demoram. Sem o `.glb`, o jogo desenha uma cunha de primitivas nas mesmas medidas.
+
+No jogo, o modelo e o mapa de colisão continuam canônicos (1600 u), mas são desenhados e testados na escala `ESCALA_DESTROIER` (`include/destroier.h`, atualmente **4×**, 6400 u). Mudar essa constante muda o tamanho visual e a colisão juntos, sem regenerar o modelo nem o casco.
+
+Modelos locais de teste: o X-Wing usa `assets/models/xwing.glb` ("Low Poly X-Wing", de felipelunardelli, CC BY 4.0; ajustado para 12,5 m e centrado; **25.873 triângulos**, acima do orçamento de 2–5k por decisão temporária do time). O Y-Wing e o A-Wing usam modelos locais do Battlefront II (2005) em `assets/models/bf2/` (`ywing.glb`, `awing.glb`), com o trem de pouso removido; essa pasta é ignorada pelo Git — os assets do BF2 são de terceiros e não são redistribuídos no repositório.
 
 ## Estruturas de dados
 
@@ -140,10 +144,12 @@ O `assets/models/destroier.glb` sai do modelo do Sketchfab (link nos créditos) 
 
 ## Créditos
 
-- `assets/models/destroier.glb`: adaptado de ["Star Wars: Imperial II Star Destroyer"](https://sketchfab.com/3d-models/star-wars-imperial-ii-star-destroyer-b8bd2d35f7604670ab85242c06c6d280), de [Daniel](https://sketchfab.com/DanielAndersson), licença [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Alterações: escala, menos polígonos nos detalhes, mapas de normal e UVs extras removidos, texturas convertidas para PNG e materiais emissivos adaptados à raylib (`assets/models/fontes/destroier.py`).
+- `assets/models/destroier.glb`: ["Imperial-Class Star Destroyer"](https://sketchfab.com/3d-models/star-wars-imperial-class-star-destroyer-fa18d537db4d4020a443c1802ec0f88e), de [Heataker](https://sketchfab.com/Heataker), licença [Free Standard](https://sketchfab.com/licenses). Alterações: escala para 1600 u, proa em +Z, texturas em PNG, materiais emissivos adaptados à raylib e malhas divididas para os índices de 16 bits da raylib. Versionado via Git LFS.
+- `assets/models/fontes/destroier.py`: pipeline antigo do ["Star Wars: Imperial II Star Destroyer"](https://sketchfab.com/3d-models/star-wars-imperial-ii-star-destroyer-b8bd2d35f7604670ab85242c06c6d280), de [Daniel](https://sketchfab.com/DanielAndersson), licença [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Mantido como referência do modelo reduzido anterior.
 - `assets/models/death_star.glb`: adaptado de ["Death Star - Star Wars"](https://sketchfab.com/3d-models/death-star-star-wars-423fb92f677f4448aef407112a1fc032), de [Quiznos323](https://sketchfab.com/quiznos323), licença [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0/). Alterações: superlaser e esqueleto removidos, mapas de normal e emissivo removidos, casco com metade dos polígonos e texturas com metade da resolução. A versão adaptada é distribuída sob a mesma licença.
+- `assets/models/xwing.glb`: ["Low Poly X-Wing"](https://skfb.ly/6W8Rs), de [felipelunardelli](https://sketchfab.com/felipelunardelli), licença [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Alterações: escala para 12,5 m de comprimento, origem no centro e exportação em GLB único (sem decimate).
 
-## Pipeline de modelos — VIS-01 (#55)
+## Pipeline de modelos - VIS-01 (#55)
 
 Uma unidade equivale a uma unidade de mundo (metro). Frente **+Z**, cima **+Y**, origem no centro. A direita da câmera inicial é **−X**, conforme `nave.c`. Essas convenções seguem o código de voo existente; o alinhamento explícito com a responsável pelo voo ainda precisa ser registrado na issue.
 

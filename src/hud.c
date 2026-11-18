@@ -370,6 +370,23 @@ static void barra(Rectangle r, float f, Color cor)
 }
 
 /*
+ * Barra contínua com marcas a cada 10%. O casco do Destróier tem 300 pontos e cada laser tira
+ * 2,4, então em 10 segmentos (30 pontos cada) a barra quase não se movia.
+ */
+static void barraContinua(Rectangle r, float f, Color cor)
+{
+    int i;
+
+    DrawRectangleRec(r, Fade(COR_ROTULO, 0.15f));
+    DrawRectangleRec((Rectangle){ r.x, r.y, r.width * f, r.height }, cor);
+    for (i = 1; i < 10; i++) {
+        float x = r.x + r.width * i / 10.0f;
+
+        DrawLineV((Vector2){ x, r.y }, (Vector2){ x, r.y + r.height }, Fade(BLACK, 0.35f));
+    }
+}
+
+/*
  * Tablet hexagonal com a ponta estreita para cima, preso ao painel por um braço,
  * moldura escura e neon azul com o canto externo vermelho.
  */
@@ -455,7 +472,7 @@ static void desenharTabletNave(const Jogo *g)
 
     texto("DESTRÓIER", esq, y + 98, 14, 0.0f, COR_ROTULO);
     texto(TextFormat("%d%%", (int)ceilf(destroier * 100.0f)), dir, y + 92, 22, 1.0f, corDestroier);
-    barra((Rectangle){ (float)esq, y + 120.0f, (float)(dir - esq), 14.0f }, destroier, corDestroier);
+    barraContinua((Rectangle){ (float)esq, y + 120.0f, (float)(dir - esq), 14.0f }, destroier, corDestroier);
 
     DrawLineEx((Vector2){ (float)esq, y + 148.0f }, (Vector2){ (float)dir, y + 148.0f }, 1.0f, Fade(COR_NEON, 0.6f));
     texto("BORDA", esq, y + 164, 14, 0.0f, COR_ROTULO);

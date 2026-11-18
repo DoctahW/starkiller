@@ -16,7 +16,8 @@ void iniciarJogador(Jogador *j)
 {
     velAng = (Vector3){ 0.0f, 0.0f, 0.0f };
     recargaColisao = 0.0f;
-    j->pos = (Vector3){ 0.0f, 0.0f, 1370.0f };   /* ~550 à frente da proa */
+    /* ~550 u à frente da proa, já com a escala do Destróier no jogo. */
+    j->pos = (Vector3){ 0.0f, 0.0f, Z_PROA_DESTROIER * ESCALA_DESTROIER + 550.0f };
     j->rot = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f };
     j->frente = (Vector3){ 0.0f, 0.0f, 1.0f };
     j->cima = (Vector3){ 0.0f, 1.0f, 0.0f };
