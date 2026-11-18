@@ -342,6 +342,52 @@ static void testarUmAcertoPorLaser(void)
     VERIFICA(contarAtivos(&jogo) == 0);
 }
 
+/* Aponta o TIE na origem para o ponto de interceptação do caça, desviado de `fracao` × TOLERANCIA_MIRA para cima. */
+static void mirarComErro(const Inimigo *in, float fracao)
+{
+    Jogador *j = &jogo.jogador;
+    Vector3 ponto = pontoDeInterceptacao(j->pos, VEL_LASER, in->pos, in->vel);
+    Vector3 erro = Vector3Scale((Vector3){ 0.0f, 1.0f, 0.0f }, fracao * TOLERANCIA_MIRA * Vector3Length(ponto));
+
+    j->frente = Vector3Normalize(Vector3Add(ponto, erro));
+    j->direita = Vector3Normalize(Vector3CrossProduct(j->frente, (Vector3){ 0.0f, 1.0f, 0.0f }));
+    j->cima = Vector3CrossProduct(j->direita, j->frente);
+}
+
+/* Uma rajada contra um A-Wing cruzando a 2000 u, com ele voando reto: devolve os acertos. */
+static int rajadaNoAwing(float fracaoErro, int *verde)
+{
+    const float dt = 1.0f / 60.0f;
+    NoInimigo *no;
+    int passo, acertos = 0;
+
+    novoJogo();
+    adicionar(AWING, (Vector3){ 0.0f, 0.0f, 2000.0f });
+    no = jogo.inimigos.inicio;
+    no->dado.vel = (Vector3){ VEL_AWING, 0.0f, 0.0f };
+    mirarComErro(&no->dado, fracaoErro);
+    *verde = tiroAcerta(&jogo.jogador, &no->dado);
+    dispararLaser(&jogo);
+    for (passo = 0; passo < (int)(VIDA_LASER / dt) + 2 && contarAtivos(&jogo) > 0; passo++) {
+        no->dado.pos = Vector3Add(no->dado.pos, Vector3Scale(no->dado.vel, dt));
+        atualizarLasers(&jogo, dt);
+        acertos += colidirLasers(&jogo, dt);
+    }
+    return acertos;
+}
+
+static void testarIndicadorVerdeAcerta(void)
+{
+    int verde;
+
+    /* Dentro da folga, com o erro no pior sentido para os canhões laterais: verde e acerta. */
+    VERIFICA(rajadaNoAwing(0.9f, &verde) > 0);
+    VERIFICA(verde);
+    /* Bem fora da folga: nem verde nem acerto. */
+    VERIFICA(rajadaNoAwing(1.5f, &verde) == 0);
+    VERIFICA(!verde);
+}
+
 static void testarAplicarDano(void)
 {
     Inimigo in = { .escudo = 20.0f, .escudoMax = 20.0f, .casco = 30.0f, .cascoMax = 30.0f };
@@ -710,6 +756,7 @@ int main(void)
     testarColisaoLasers();
     testarUmAcertoPorLaser();
     testarAcertoNoUltimoPasso();
+    testarIndicadorVerdeAcerta();
     testarAplicarDano();
     testarExplosoes();
     testarAbate();

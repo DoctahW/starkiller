@@ -29,8 +29,7 @@
 #define LARGURA_ESCORA 22.0f
 #define LARGURA_ARO    18.0f
 
-/* Retícula: anel central com quatro traços. */
-#define RETICULA_RAIO   14.0f
+/* Retícula: anel central com quatro traços. O raio do anel é o ângulo TOLERANCIA_MIRA na tela. */
 #define RETICULA_VAO    22
 #define RETICULA_TRACO  18
 
@@ -218,13 +217,19 @@ static void desenharEstrutura(void)
     }
 }
 
+/* Pixels por unidade a 1 u de distância, no centro da tela. */
+static float distanciaFocal(void)
+{
+    return (ALTURA_TELA * 0.5f) / tanf(FOV_JOGADOR * 0.5f * DEG2RAD);
+}
+
 static void desenharReticula(void)
 {
     int cx = LARGURA_TELA / 2;
     int cy = ALTURA_TELA / 2;
     Color cor = Fade(COR_HUD, 0.85f);
 
-    DrawCircleLines(cx, cy, RETICULA_RAIO, cor);
+    DrawCircleLines(cx, cy, distanciaFocal() * TOLERANCIA_MIRA, cor);
     DrawCircle(cx, cy, 2.0f, cor);
     DrawLine(cx - RETICULA_VAO - RETICULA_TRACO, cy, cx - RETICULA_VAO, cy, cor);
     DrawLine(cx + RETICULA_VAO, cy, cx + RETICULA_VAO + RETICULA_TRACO, cy, cor);
@@ -294,7 +299,7 @@ static void setaParaOAlvo(const Jogador *j, const Inimigo *alvo, float dist)
 
 /*
  * Alvo travado no vidro. O indicador de tiro adiantado fica onde o caça estará quando o laser
- * chegar, se ele voar reto; com o indicador dentro da retícula, o tiro acerta (fica verde).
+ * chegar, se ele voar reto; fica verde quando tiroAcerta, o mesmo teste da colisão do laser.
  */
 static void desenharAlvoNoVidro(const Jogo *g)
 {
@@ -314,7 +319,7 @@ static void desenharAlvoNoVidro(const Jogo *g)
         return;
     }
 
-    focal = (ALTURA_TELA * 0.5f) / tanf(FOV_JOGADOR * 0.5f * DEG2RAD);
+    focal = distanciaFocal();
     m = fmaxf(MARCA_MIN, raioInimigo(alvo->tipo) * MARCA_ESCALA * focal / noEspacoDaNave(j, alvo->pos).z);
     colchetes(tela, m, COR_ALVO);
     texto(TextFormat("%s  %d u", nomeDoTipo(alvo->tipo), (int)lroundf(dist)), (int)tela.x, (int)(tela.y + m + 4.0f),
@@ -324,8 +329,7 @@ static void desenharAlvoNoVidro(const Jogo *g)
         return;
     adiantado = pontoDeInterceptacao(j->pos, VEL_LASER, alvo->pos, alvo->vel);
     if (noVidro(j, adiantado, &pipper)) {
-        Vector2 centro = { LARGURA_TELA / 2.0f, ALTURA_TELA / 2.0f };
-        int naMira = Vector2Distance(pipper, centro) <= RETICULA_RAIO;
+        int naMira = tiroAcerta(j, alvo);
         Color cor = naMira ? COR_HUD : COR_ALVO;
 
         DrawLineEx(tela, pipper, 1.0f, Fade(cor, 0.5f));
