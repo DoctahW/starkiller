@@ -9,7 +9,7 @@
 
 #define MAX_LASERS    256
 #define MAX_EXPLOSOES 64
-#define MAX_ALIADOS   12   /* 12 TIEs aliados + o jogador */
+#define MAX_ALIADOS   8   /* 8 TIEs aliados + o jogador */
 
 typedef enum { XWING, YWING, AWING } TipoNave;
 

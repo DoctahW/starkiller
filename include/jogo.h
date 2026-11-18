@@ -7,7 +7,8 @@
 #define ALTURA_TELA  720
 
 #define PASSOS_POR_SEGUNDO 60
-#define DURACAO_PARTIDA    300.0f
+#define DURACAO_ONDAS     300.0f   /* janela de geração das ondas (20 ondas) */
+#define DURACAO_PARTIDA   320.0f   /* +20 s para a última onda durar mais */
 #define PASSOS_PARTIDA     ((int)DURACAO_PARTIDA * PASSOS_POR_SEGUNDO)
 #define PASSO_FIXO         (1.0f / PASSOS_POR_SEGUNDO)
 #define DT_MAXIMO          0.25f

@@ -167,7 +167,7 @@ static void testarComandosDeCombate(void)
 static void testarReforcosNoLoop(void)
 {
     novaPartida(0);
-    gerarReforcos(&jogo.reforcos, DURACAO_PARTIDA);
+    gerarReforcos(&jogo.reforcos, DURACAO_ONDAS);
     VERIFICA(jogo.reforcos.tamanho == 20);
     VERIFICA(jogo.reforcos.inicio->tempoChegada == 3.0f);
     VERIFICA(jogo.reforcos.inicio->qtdX == 6);

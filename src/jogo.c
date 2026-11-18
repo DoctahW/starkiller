@@ -41,7 +41,7 @@ static void iniciarPartida(Jogo *g)
     g->tempoRestante = DURACAO_PARTIDA;
     iniciarDestroier(g);
     g->proximoId = 1;
-    gerarReforcos(&g->reforcos, DURACAO_PARTIDA);
+    gerarReforcos(&g->reforcos, DURACAO_ONDAS);
     iniciarJogador(&g->jogador);
     iniciarAliados(g);
     relogio = (RelogioCombate){ 0 };

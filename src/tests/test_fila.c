@@ -112,13 +112,13 @@ static void testarGerarReforcos(void)
     float t = 3.0f;
     int onda = 0, qtdAAnterior = 0, qtdYAnterior = 0, viuA = 0;
 
-    gerarReforcos(&f, DURACAO_PARTIDA);
+    gerarReforcos(&f, DURACAO_ONDAS);
     VERIFICA(f.tamanho == 20);
 
     while (desenfileirarReforco(&f, &grupo) == 1) {
         int totalBase = 2 + (int)(grupo.tempoChegada / 40.0f);
         int qtdYBase = onda == 0 ? 0 : (totalBase >= 3 ? 2 : 1);
-        int qtdABase = (int)(totalBase * (grupo.tempoChegada / DURACAO_PARTIDA));
+        int qtdABase = (int)(totalBase * (grupo.tempoChegada / DURACAO_ONDAS));
         int x, y, a;
 
         if (qtdABase > totalBase - 1 - qtdYBase)
