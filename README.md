@@ -2,7 +2,7 @@
 
 # Starkiller
 
-[Compilar e rodar](#compilar-e-rodar) • [Controles](#controles) • [Áudio](#áudio) • [Estrutura](#estrutura-do-projeto) • [Créditos](#créditos)
+[Compilar e rodar](#compilar-e-rodar) • [Controles](#controles) • [Estrutura](#estrutura-do-projeto) • [Créditos](#créditos)
 
 ![CI](https://github.com/DoctahW/starkiller/actions/workflows/ci.yml/badge.svg)
 ![C99](https://img.shields.io/badge/C-99-A8B9CC?style=flat-square&logo=c&logoColor=white)
@@ -19,7 +19,6 @@
 - [Stack](#stack)
 - [Compilar e rodar](#compilar-e-rodar)
 - [Controles](#controles)
-- [Áudio](#áudio)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Créditos](#créditos)
 
@@ -44,10 +43,6 @@ um dos dois for destruído.
 - **Feedback de dano**: tremor de câmera, flash vermelho e vibração do controle.
 - **Som 3D**: motores, armas e explosões com volume, pan e Doppler de acordo
   com a posição de cada nave, além de alarmes de casco baixo.
-- **Música e interface**: trilhas em loop para menu, combate e ranking, além de
-  sons de navegação, seleção, volta e digitação.
-- **Opções de áudio**: volumes geral, de efeitos e de música na mesma tela de
-  opções do menu e da pausa.
 - **Placar**: no fim da partida, você digita seu nome e entra no ranking,
   salvo em `dados/placar.dat`.
 - **Teclado e controle**: suporte a controle Xbox, com vibração.
@@ -175,23 +170,6 @@ Outros comandos:
 | Pausa                   | Esc                      | Start                    |
 | Confirmar / voltar      | Enter / Esc ou Backspace | A / B                    |
 
-O menu principal abre **Opções**, com as abas **Controles** e **Áudio**. A mesma
-tela aparece no menu de pausa, que tem **Continuar**, **Opções** e **Voltar ao
-menu principal**. `↑/↓` navega, `←/→` troca de aba ou ajusta valores, e `Esc/B`
-volta para a origem.
-
-
-# Áudio
-
-- A música de fundo toca em loop no menu, no combate e no ranking.
-- **Opções → Áudio** ajusta os volumes **geral**, **efeitos** (tiros, motores e
-  sons de interface) e **música**, em passos de 5%.
-- Os volumes são salvos em `dados/audio.txt`.
-- Os efeitos de interface (navegar, selecionar, voltar e digitar) também
-  respeitam o volume de efeitos.
-- Os arquivos ficam em `assets/sounds/musics/` (trilhas) e
-  `assets/sounds/menu/` (interface).
-
 
 # Estrutura do projeto
 
@@ -208,9 +186,7 @@ starkiller/
 └── Makefile
 ```
 
-O jogo cria a pasta `dados/` ao salvar o placar e as configurações. O placar fica
-em `dados/placar.dat`, as opções de entrada em `dados/config.txt` e as de áudio
-em `dados/audio.txt`.
+O jogo cria a pasta `dados/` ao salvar o placar e as configurações.
 
 
 # Créditos
@@ -220,4 +196,4 @@ em `dados/audio.txt`.
 - X-Wing: ["Low Poly X-Wing"](https://skfb.ly/6W8Rs), de [felipelunardelli](https://sketchfab.com/felipelunardelli), licença [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/).
 - Y-Wing e A-Wing: adaptados do Battlefront II (2005), © LucasArts/EA.
 - Fonte: Chakra Petch, licença [SIL OFL](assets/fonts/ChakraPetch-OFL.txt).
-- Efeitos sonoros e músicas: fornecidos pelo grupo.
+- Efeitos sonoros: fornecidos pelo grupo.
