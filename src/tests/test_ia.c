@@ -14,9 +14,9 @@
 #define QUASE(a, b) (fabsf((a) - (b)) < 1e-4f)
 
 /* Valores da tabela 2.2 e do criterio da IA-02. */
-#define BOMBA_DANO    8.0f
-#define BOMBA_ALCANCE 685.0f
-#define ORBITA_RAIO   550.0f
+#define BOMBA_DANO    24.0f
+#define BOMBA_ALCANCE (685.0f * ESCALA_DESTROIER)
+#define ORBITA_RAIO   (550.0f * ESCALA_DESTROIER)
 
 static Inimigo novoInimigo(TipoNave tipo, Vector3 pos, EstadoIA estado)
 {
@@ -36,7 +36,7 @@ static void simular(Inimigo *in, Jogo *g, int passos)
 static void testarAproximaDoDestroier(void)
 {
     Jogo g = { 0 };
-    Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 4600.0f }, IA_ATACAR_DESTROIER);
+    Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 8200.0f }, IA_ATACAR_DESTROIER);
     float antes = Vector3Length(in.pos);
 
     iniciarJogador(&g.jogador);
@@ -67,7 +67,7 @@ static void testarVelocidadeMaximaPorTipo(void)
     iniciarJogador(&g.jogador);
 
     for (int i = 0; i < (int)(sizeof casos / sizeof casos[0]); i++) {
-        Inimigo in = novoInimigo(casos[i].tipo, (Vector3){ 0.0f, 0.0f, 6900.0f }, IA_ATACAR_DESTROIER);
+        Inimigo in = novoInimigo(casos[i].tipo, (Vector3){ 0.0f, 0.0f, 8200.0f }, IA_ATACAR_DESTROIER);
 
         simular(&in, &g, 300);
         VERIFICA(Vector3Length(in.vel) <= casos[i].velMax + 1e-3f);
@@ -79,10 +79,11 @@ static void testarVelocidadeMaximaPorTipo(void)
 static void testarPersegueJogador(void)
 {
     Jogo g = { 0 };
-    Inimigo in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_JOGADOR);
+    Inimigo in;
     float antes;
 
-    iniciarJogador(&g.jogador);   /* jogador em (0, 0, 1370) */
+    iniciarJogador(&g.jogador);
+    in = novoInimigo(AWING, Vector3Add(g.jogador.pos, (Vector3){ 0.0f, 0.0f, 1130.0f }), IA_ATACAR_JOGADOR);
 
     antes = Vector3Distance(in.pos, g.jogador.pos);
     simular(&in, &g, 120);
@@ -90,19 +91,32 @@ static void testarPersegueJogador(void)
     VERIFICA(in.vel.z < 0.0f);
 }
 
-/* IA_FUGIR: o caça se afasta do alvo do seu estado de ataque (aqui o Destróier) e do jogador à frente dele. */
+/* IA_FUGIR: o caça se afasta do jogador, que é o alvo do seu estado de ataque. */
 static void testarFogeDoJogador(void)
 {
     Jogo g = { 0 };
-    Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 1830.0f }, IA_FUGIR);
-    float antes;
+    Inimigo in;
+    float antes, z0;
 
     iniciarJogador(&g.jogador);
+    in = novoInimigo(AWING, Vector3Add(g.jogador.pos, (Vector3){ 0.0f, 0.0f, 500.0f }), IA_FUGIR);
 
     antes = Vector3Distance(in.pos, g.jogador.pos);
+    z0 = in.pos.z;
     simular(&in, &g, 120);
     VERIFICA(Vector3Distance(in.pos, g.jogador.pos) > antes);
-    VERIFICA(in.pos.z > 1830.0f);
+    VERIFICA(in.pos.z > z0);
+
+    /* X-Wing: a referência da fuga é o Destróier (estado de ataque no tempo 0). */
+    {
+        Jogo gx = { 0 };
+
+        iniciarJogador(&gx.jogador);
+        in = novoInimigo(XWING, (Vector3){ 0.0f, 2200.0f, 0.0f }, IA_FUGIR);
+        antes = Vector3Length(in.pos);
+        simular(&in, &gx, 120);
+        VERIFICA(Vector3Length(in.pos) > antes);
+    }
 }
 
 /*
@@ -156,7 +170,7 @@ static void testarAtualizarInimigosMove(void)
     liberarListaInimigos(&g.inimigos);
 }
 
-/* IA-02: a menos de BOMBA_ALCANCE do Destróier, o Y-Wing causa 8 de dano/s no casco. */
+/* IA-02: a menos de BOMBA_ALCANCE do Destróier, o Y-Wing causa 24 de dano/s no casco. */
 static void testarYwingBombardeia(void)
 {
     Jogo g = { 0 };
@@ -177,25 +191,27 @@ static void testarYwingBombardeia(void)
 static void testarYwingForaDeAlcance(void)
 {
     Jogo g = { 0 };
-    Inimigo longe = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, 1830.0f }, IA_ATACAR_DESTROIER);
+    Inimigo longe = novoInimigo(YWING, (Vector3){ 0.0f, 0.0f, BOMBA_ALCANCE + 900.0f }, IA_ATACAR_DESTROIER);
     Inimigo orbita = novoInimigo(YWING, (Vector3){ ORBITA_RAIO, 0.0f, 0.0f }, IA_ATACAR_DESTROIER);
+    float antes;
 
     iniciarJogador(&g.jogador);
     g.cascoDestroier = 2000.0f;
 
+    antes = Vector3Length(longe.pos);
     ia_atualizar(&longe, &g, DT);
     VERIFICA(g.cascoDestroier == 2000.0f);
-    VERIFICA(Vector3Length(longe.pos) < 1830.0f);
+    VERIFICA(Vector3Length(longe.pos) < antes);
 
     simular(&longe, &g, 600);
-    VERIFICA(Vector3Length(longe.pos) > ORBITA_RAIO - 185.0f);
-    VERIFICA(Vector3Length(longe.pos) < BOMBA_ALCANCE + 45.0f);
+    VERIFICA(Vector3Length(longe.pos) > ORBITA_RAIO - 185.0f * ESCALA_DESTROIER);
+    VERIFICA(Vector3Length(longe.pos) < BOMBA_ALCANCE + 45.0f * ESCALA_DESTROIER);
     VERIFICA(g.cascoDestroier < 2000.0f);
 
     simular(&orbita, &g, 600);
     /* fica no anel, no plano z = 0, e continua bombardeando */
-    VERIFICA(Vector3Length(orbita.pos) > 365.0f);
-    VERIFICA(Vector3Length(orbita.pos) < BOMBA_ALCANCE + 45.0f);
+    VERIFICA(Vector3Length(orbita.pos) > ORBITA_RAIO - 185.0f * ESCALA_DESTROIER);
+    VERIFICA(Vector3Length(orbita.pos) < BOMBA_ALCANCE + 45.0f * ESCALA_DESTROIER);
     VERIFICA(fabsf(orbita.pos.z) < 50.0f);
     VERIFICA(fabsf(Vector3DotProduct(Vector3Normalize(orbita.pos), orbita.vel)) < 45.0f);
     VERIFICA(Vector3Length(orbita.vel) > 90.0f);
@@ -287,7 +303,7 @@ static void testarFatoresDeDificuldade(void)
 static void testarVelocidadeCresceComOTempo(void)
 {
     Jogo g = { 0 };
-    Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 5000.0f }, IA_ATACAR_DESTROIER);
+    Inimigo in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 8200.0f }, IA_ATACAR_DESTROIER);
     float velMax = VEL_XWING * FATOR_VELOCIDADE_MAX;
 
     iniciarJogador(&g.jogador);
@@ -306,26 +322,24 @@ static void testarAceleracaoAcompanhaFator(void)
     Inimigo fim;
 
     iniciarJogador(&g.jogador);
-    g.jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
 
     g.tempoDecorrido = 0.0f;
-    inicio = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 6000.0f }, IA_ATACAR_DESTROIER);
+    inicio = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 8200.0f }, IA_ATACAR_DESTROIER);
     ia_atualizar(&inicio, &g, DT);
 
     g.tempoDecorrido = DURACAO_PARTIDA;
-    fim = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 6000.0f }, IA_ATACAR_DESTROIER);
+    fim = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 8200.0f }, IA_ATACAR_DESTROIER);
     ia_atualizar(&fim, &g, DT);
 
     VERIFICA(Vector3Length(inicio.vel) > 0.0f);
     VERIFICA(fabsf(Vector3Length(fim.vel) / Vector3Length(inicio.vel) - 1.69f) < 0.05f);
 }
 
-/* Zera o jogo e põe o jogador na posição padrão da escala nova (fora do casco). */
+/* Zera o jogo e põe o jogador na posição padrão de nascimento (fora do casco). */
 static void iniciarJogoVazio(Jogo *g)
 {
     memset(g, 0, sizeof *g);
     iniciarJogador(&g->jogador);
-    g->jogador.pos = (Vector3){ 0.0f, 0.0f, 1370.0f };
 }
 
 static int lasersAtivos(const Jogo *g)
@@ -393,7 +407,7 @@ static void testarTiroNoCone(void)
 
     /* A-Wing dentro do cone e do alcance: um laser inimigo e cooldown recarregado. */
     iniciarJogoVazio(&g);
-    in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_JOGADOR);
+    in = novoInimigo(AWING, Vector3Add(g.jogador.pos, (Vector3){ 0.0f, 0.0f, 1130.0f }), IA_ATACAR_JOGADOR);
     in.vel = (Vector3){ 0.0f, 0.0f, -VEL_AWING };
     ia_atualizar(&in, &g, DT);
     VERIFICA(lasersAtivos(&g) == 1);
@@ -407,7 +421,7 @@ static void testarTiroNoCone(void)
 
     /* Passado o cooldown, dispara outra vez (no mesmo ponto, longe de romper a passagem). */
     for (int i = 0; i < (int)(COOLDOWN_TIRO_INIMIGO / DT) + 1; i++) {
-        in.pos = (Vector3){ 0.0f, 0.0f, 2500.0f };
+        in.pos = Vector3Add(g.jogador.pos, (Vector3){ 0.0f, 0.0f, 1130.0f });
         in.vel = (Vector3){ 0.0f, 0.0f, -VEL_AWING };
         ia_atualizar(&in, &g, DT);
     }
@@ -415,14 +429,14 @@ static void testarTiroNoCone(void)
 
     /* Fora do cone (voando para longe do alvo): não dispara. */
     iniciarJogoVazio(&g);
-    in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_JOGADOR);
+    in = novoInimigo(AWING, Vector3Add(g.jogador.pos, (Vector3){ 0.0f, 0.0f, 1130.0f }), IA_ATACAR_JOGADOR);
     in.vel = (Vector3){ 0.0f, 0.0f, VEL_AWING };
     ia_atualizar(&in, &g, DT);
     VERIFICA(lasersAtivos(&g) == 0);
 
     /* Fora do alcance: não dispara. */
     iniciarJogoVazio(&g);
-    in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 4000.0f }, IA_ATACAR_JOGADOR);
+    in = novoInimigo(AWING, Vector3Add(g.jogador.pos, (Vector3){ 0.0f, 0.0f, 2000.0f }), IA_ATACAR_JOGADOR);
     in.vel = (Vector3){ 0.0f, 0.0f, -VEL_AWING };
     ia_atualizar(&in, &g, DT);
     VERIFICA(lasersAtivos(&g) == 0);
@@ -437,7 +451,7 @@ static void testarTiroNoCone(void)
     /* X-Wing no estado de atacar o jogador também atira (id 0, t = 9 -> jogador). */
     iniciarJogoVazio(&g);
     g.tempoDecorrido = 9.0f;
-    in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_DESTROIER);
+    in = novoInimigo(XWING, Vector3Add(g.jogador.pos, (Vector3){ 0.0f, 0.0f, 1130.0f }), IA_ATACAR_DESTROIER);
     in.id = 0;
     in.vel = (Vector3){ 0.0f, 0.0f, -VEL_XWING };
     ia_atualizar(&in, &g, DT);
@@ -447,7 +461,7 @@ static void testarTiroNoCone(void)
     /* No fim da partida o cooldown recarregado usa o fator da IA-05. */
     iniciarJogoVazio(&g);
     g.tempoDecorrido = DURACAO_PARTIDA;
-    in = novoInimigo(AWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_JOGADOR);
+    in = novoInimigo(AWING, Vector3Add(g.jogador.pos, (Vector3){ 0.0f, 0.0f, 1130.0f }), IA_ATACAR_JOGADOR);
     in.vel = (Vector3){ 0.0f, 0.0f, -VEL_AWING };
     ia_atualizar(&in, &g, DT);
     VERIFICA(lasersAtivos(&g) == 1);
@@ -500,7 +514,7 @@ static void testarPassagemNoDestroier(void)
 
     iniciarJogoVazio(&g);
     g.jogador.pos = (Vector3){ 0.0f, 0.0f, -8000.0f };
-    in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 2500.0f }, IA_ATACAR_DESTROIER);
+    in = novoInimigo(XWING, (Vector3){ 0.0f, 0.0f, 5000.0f }, IA_ATACAR_DESTROIER);
 
     for (int i = 1; i < 8 * 60; i++) {
         g.tempoDecorrido = i * DT;

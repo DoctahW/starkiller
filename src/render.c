@@ -47,6 +47,24 @@ static const Motor MOTORES_DESTROIER[NUM_MOTORES] = {
 #define Z_POPA_CASCO (Z_POPA_DESTROIER + FUNDO_MOTOR)
 #define LADOS_MOTOR  16
 
+/*
+ * Brilho dos motores: os 7 bocais reais do modelo (3 grandes no eixo e 4 pequenos em cima/embaixo),
+ * medidos do material Emission1. `raio` é o raio da abertura do bocal, no tamanho canônico do modelo.
+ */
+typedef struct {
+    float x, y, raio;
+} BrilhoMotor;
+
+#define NUM_BRILHOS 7
+static const BrilhoMotor BRILHOS_MOTORES[NUM_BRILHOS] = {
+    { -213.0f,   1.0f, 50.0f }, {  -1.0f,   1.0f, 50.0f }, { 211.0f,   1.0f, 50.0f },
+    { -110.0f,  32.0f, 20.0f }, { -110.0f, -32.0f, 20.0f },
+    {  110.0f,  32.0f, 20.0f }, {  110.0f, -32.0f, 20.0f },
+};
+#define TAM_TEXTURA_BRILHO 128
+static Texture2D texturaBrilho;
+static int temTexturaBrilho;
+
 static const Color COR_CASCO = { 150, 152, 158, 255 };
 static const Color COR_MOTOR = { 20, 20, 23, 255 };
 static const Color COR_BOCAL = { 150, 190, 255, 255 };
@@ -55,6 +73,10 @@ static Model destroier;
 static Shader sombraCasco;
 static int temDestroier, temSombraCasco;
 static Vector3 sol;
+
+/* Modelos dos caças: X-Wing CC (assets/models/xwing.glb) e Y-Wing/A-Wing locais do BF2. */
+static Model modeloXwing, modeloYwing, modeloAwing;
+static int temModeloXwing, temModeloYwing, temModeloAwing;
 
 int carregarShader(const char *nome, Shader *s)
 {
@@ -98,6 +120,53 @@ void descarregarModelo(Model m)
     UnloadModel(m);
 }
 
+static void criarTexturaBrilho(void)
+{
+    Image img = GenImageColor(TAM_TEXTURA_BRILHO, TAM_TEXTURA_BRILHO, BLANK);
+
+    for (int y = 0; y < TAM_TEXTURA_BRILHO; y++) {
+        for (int x = 0; x < TAM_TEXTURA_BRILHO; x++) {
+            float dx = (x + 0.5f) / TAM_TEXTURA_BRILHO * 2.0f - 1.0f;
+            float dy = (y + 0.5f) / TAM_TEXTURA_BRILHO * 2.0f - 1.0f;
+            float d = sqrtf(dx * dx + dy * dy);
+            float halo = 1.0f - d;
+            float nucleo = expf(-d * d * 18.0f);
+            float a;
+
+            if (halo < 0.0f)
+                halo = 0.0f;
+            a = powf(halo, 2.2f) * 0.85f + nucleo;
+            if (a > 1.0f)
+                a = 1.0f;
+            ImageDrawPixel(&img, x, y, (Color){ 255, 255, 255, (unsigned char)(255.0f * a) });
+        }
+    }
+
+    texturaBrilho = LoadTextureFromImage(img);
+    UnloadImage(img);
+    SetTextureFilter(texturaBrilho, TEXTURE_FILTER_BILINEAR);
+    temTexturaBrilho = 1;
+}
+
+/* Disco opaco do propulsor: desenhado como a tampa de um cilindro curto no plano XY da popa
+ * (um billboard de 400 u sairia para trás da popa quando visto de lado). */
+static void desenharDiscosMotores(void)
+{
+    for (int i = 0; i < NUM_BRILHOS; i++) {
+        const BrilhoMotor *m = &BRILHOS_MOTORES[i];
+        float x = m->x * ESCALA_DESTROIER;
+        float y = m->y * ESCALA_DESTROIER;
+        float r = m->raio * ESCALA_DESTROIER;
+        Vector3 boca = { x, y, (Z_POPA_DESTROIER + 8.0f) * ESCALA_DESTROIER };
+        Vector3 fundo = { x, y, (Z_POPA_DESTROIER + 20.0f) * ESCALA_DESTROIER };
+
+        DrawCylinderEx(boca, fundo, r, r, 24, (Color){ 45, 115, 255, 255 });
+        DrawCylinderEx((Vector3){ x, y, (Z_POPA_DESTROIER + 7.0f) * ESCALA_DESTROIER },
+                       (Vector3){ x, y, (Z_POPA_DESTROIER + 9.0f) * ESCALA_DESTROIER },
+                       r * 0.55f, r * 0.55f, 24, (Color){ 150, 205, 255, 255 });
+    }
+}
+
 static void carregarDestroier(void)
 {
     temDestroier = temSombraCasco = 0;
@@ -127,6 +196,22 @@ static void carregarDestroier(void)
     suavizarTexturas(&destroier);
 }
 
+/* Carrega um GLB de caça; sem o arquivo ou com modelo inválido, cai nas primitivas. */
+static int carregarModeloInimigo(const char *caminho, Model *modelo)
+{
+    if (!FileExists(caminho)) {
+        TraceLog(LOG_WARNING, "RENDER: %s ausente, caça em primitivas", caminho);
+        return 0;
+    }
+    *modelo = LoadModel(caminho);
+    if (!IsModelValid(*modelo)) {
+        TraceLog(LOG_WARNING, "RENDER: %s não carregou, caça em primitivas", caminho);
+        return 0;
+    }
+    suavizarTexturas(modelo);
+    return 1;
+}
+
 void carregarAssets(void)
 {
     /*
@@ -138,15 +223,31 @@ void carregarAssets(void)
     iniciarEspaco();
     sol = direcaoSol();
     carregarDestroier();
+    criarTexturaBrilho();
+    temModeloXwing = carregarModeloInimigo("assets/models/xwing.glb", &modeloXwing);
+    temModeloYwing = carregarModeloInimigo("assets/models/bf2/ywing.glb", &modeloYwing);
+    temModeloAwing = carregarModeloInimigo("assets/models/bf2/awing.glb", &modeloAwing);
 }
 
 void descarregarAssets(void)
 {
     if (temSombraCasco)
         UnloadShader(sombraCasco);
+    if (temTexturaBrilho) {
+        UnloadTexture(texturaBrilho);
+        temTexturaBrilho = 0;
+        texturaBrilho.id = 0;
+    }
     if (temDestroier)
         descarregarModelo(destroier);
+    if (temModeloXwing)
+        descarregarModelo(modeloXwing);
+    if (temModeloYwing)
+        descarregarModelo(modeloYwing);
+    if (temModeloAwing)
+        descarregarModelo(modeloAwing);
     temDestroier = temSombraCasco = 0;
+    temModeloXwing = temModeloYwing = temModeloAwing = 0;
     encerrarEspaco();
 }
 
@@ -252,12 +353,50 @@ static void desenharPrimitivas(void)
     }
 }
 
-static void desenharDestroier(void)
+static void desenharGlowMotores(const Camera3D *cam)
 {
-    if (temDestroier)
-        DrawModel(destroier, (Vector3){ 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
-    else
+    if (!temTexturaBrilho)
+        return;
+
+    /* Halo em volta do disco, somado à cena (sem gravar profundidade). */
+    rlDisableDepthMask();
+    BeginBlendMode(BLEND_ADDITIVE);
+    for (int i = 0; i < NUM_BRILHOS; i++) {
+        const BrilhoMotor *m = &BRILHOS_MOTORES[i];
+        float x = m->x * ESCALA_DESTROIER;
+        float y = m->y * ESCALA_DESTROIER;
+        Vector3 pos;
+
+        /* Núcleo quente logo à frente do disco. */
+        pos = (Vector3){ x, y, (Z_POPA_DESTROIER - 1.0f) * ESCALA_DESTROIER };
+        DrawBillboard(*cam, texturaBrilho, pos, m->raio * 1.2f * ESCALA_DESTROIER,
+                      (Color){ 220, 240, 255, 200 });
+        /* Halo próximo, ainda colado no disco. */
+        pos.z = (Z_POPA_DESTROIER + 2.0f) * ESCALA_DESTROIER;
+        DrawBillboard(*cam, texturaBrilho, pos, m->raio * 3.2f * ESCALA_DESTROIER,
+                      (Color){ 85, 155, 255, 150 });
+        /* Halo largo: é ele que lava o casco em volta do propulsor. */
+        pos.z = (Z_POPA_DESTROIER - 5.0f) * ESCALA_DESTROIER;
+        DrawBillboard(*cam, texturaBrilho, pos, m->raio * 5.6f * ESCALA_DESTROIER,
+                      (Color){ 35, 95, 255, 95 });
+    }
+    EndBlendMode();
+    rlEnableDepthMask();
+}
+
+static void desenharDestroier(const Camera3D *cam)
+{
+    if (temDestroier) {
+        DrawModelEx(destroier, (Vector3){ 0.0f, 0.0f, 0.0f }, (Vector3){ 0.0f, 1.0f, 0.0f }, 0.0f,
+                    (Vector3){ ESCALA_DESTROIER, ESCALA_DESTROIER, ESCALA_DESTROIER }, WHITE);
+        desenharDiscosMotores();
+        desenharGlowMotores(cam);
+    } else {
+        rlPushMatrix();
+        rlScalef(ESCALA_DESTROIER, ESCALA_DESTROIER, ESCALA_DESTROIER);
         desenharPrimitivas();
+        rlPopMatrix();
+    }
 }
 
 /* Primitivas em coordenadas locais: frente +Z, cima +Y e raio próximo de 1.
@@ -327,11 +466,31 @@ static void desenharInimigo(const Inimigo *inimigo)
     rlPushMatrix();
     rlTranslatef(inimigo->pos.x, inimigo->pos.y, inimigo->pos.z);
     rlRotatef(angulo, eixo.x, eixo.y, eixo.z);
-    rlScalef(raio, raio, raio);
     switch (inimigo->tipo) {
-        case XWING: desenharXWing(); break;
-        case YWING: desenharYWing(); break;
-        case AWING: desenharAWing(); break;
+        case XWING:
+            if (temModeloXwing) {
+                DrawModel(modeloXwing, (Vector3){0}, 1.0f, WHITE);
+            } else {
+                rlScalef(raio, raio, raio);
+                desenharXWing();
+            }
+            break;
+        case YWING:
+            if (temModeloYwing) {
+                DrawModel(modeloYwing, (Vector3){0}, 1.0f, WHITE);
+            } else {
+                rlScalef(raio, raio, raio);
+                desenharYWing();
+            }
+            break;
+        case AWING:
+            if (temModeloAwing) {
+                DrawModel(modeloAwing, (Vector3){0}, 1.0f, WHITE);
+            } else {
+                rlScalef(raio, raio, raio);
+                desenharAWing();
+            }
+            break;
     }
     rlPopMatrix();
 }
@@ -362,7 +521,7 @@ void render_cena(const Jogo *g, Camera3D cam)
     desenharFundo(&g->jogador);
 
     BeginMode3D(cam);
-    desenharDestroier();
+    desenharDestroier(&cam);
     for (const NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox)
         desenharInimigo(&no->dado);
     desenharLasers(g);

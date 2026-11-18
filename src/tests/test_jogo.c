@@ -48,6 +48,7 @@ static EstadoJogo simularCom(const Comandos *cmd, float dtFrame)
 static void adicionarInimigo(Vector3 pos, float distancia)
 {
     Inimigo in = criarInimigo(XWING, pos, jogo.proximoId++);
+
     in.distancia = distancia;
     VERIFICA(inserirInimigo(&jogo.inimigos, in) == 1);
 }
@@ -60,16 +61,25 @@ static int lasersAtivos(void)
     return n;
 }
 
+static int lasersJogador(void)
+{
+    int n = 0;
+    for (int i = 0; i < MAX_LASERS; i++)
+        n += jogo.lasers[i].ativo && jogo.lasers[i].doJogador;
+    return n;
+}
+
 /* Seção 3.4, passo 1: mira uma vez por frame; disparo e colisão dentro dos passos. */
 static void testarComandosDeCombate(void)
 {
     Comandos cmd = { 0 };
-    Vector3 perto = { 0.0f, 0.0f, 1420.0f };   /* jogador em z = 1370 */
-    Vector3 longe = { 0.0f, 0.0f, 1620.0f };
-    Vector3 medio = { 0.0f, 0.0f, 1520.0f };
+    Vector3 perto, longe, medio;
 
     /* trocar de alvo vale uma vez por frame, com vários passos ou nenhum */
     novaPartida(0);
+    perto = Vector3Add(jogo.jogador.pos, (Vector3){ 0.0f, 0.0f, 50.0f });
+    longe = Vector3Add(jogo.jogador.pos, (Vector3){ 0.0f, 0.0f, 250.0f });
+    medio = Vector3Add(jogo.jogador.pos, (Vector3){ 0.0f, 0.0f, 150.0f });
     adicionarInimigo(perto, 50.0f);
     adicionarInimigo(longe, 250.0f);
     adicionarInimigo(medio, 150.0f);
@@ -114,11 +124,12 @@ static void testarComandosDeCombate(void)
     /* lasers que acertam um inimigo à frente são desativados pela colisão do passo */
     novaPartida(0);
     adicionarInimigo(Vector3Add(jogo.jogador.pos, Vector3Scale(jogo.jogador.frente, 690.0f)), 690.0f);
+    jogo.inimigos.inicio->dado.cooldownTiro = 1.0f;   /* isola os lasers do jogador neste passo */
     simularCom(&cmd, PASSO_FIXO);
-    VERIFICA(lasersAtivos() == 2);
+    VERIFICA(lasersJogador() == 2);
     for (int i = 0; i < 6; i++)   /* 60 passos em frames abaixo de DT_MAXIMO */
         simular(10.0f * PASSO_FIXO);
-    VERIFICA(lasersAtivos() == 0);
+    VERIFICA(lasersJogador() == 0);
 
     /* sem inimigos no caminho, os mesmos lasers continuam ativos */
     novaPartida(0);
