@@ -238,7 +238,7 @@ static EstadoJogo atualizarEstado(Jogo *g, ConfigEntrada *cfg, const Comandos *c
 }
 
 /* Faixa de fundo de cada estado; Opções herda o contexto de quem a abriu. */
-static void definirMusica(EstadoJogo anterior, EstadoJogo novo)
+static void definirMusica(const Jogo *g, EstadoJogo anterior, EstadoJogo novo)
 {
     switch (novo) {
     case EST_MENU:
@@ -258,7 +258,11 @@ static void definirMusica(EstadoJogo anterior, EstadoJogo novo)
         break;
     case EST_FIM:
     case EST_PLACAR:
-        audioMusicaTocar(AUDIO_MUSICA_RANKING, 1.0f);
+        /* Derrota fica em silêncio; vitória leva a fanfarra também para o placar. */
+        if (g->vitoria == 1)
+            audioMusicaTocar(AUDIO_MUSICA_VITORIA, 1.0f);
+        else
+            audioMusicaTocar(AUDIO_MUSICA_NENHUMA, 0.0f);
         break;
     case EST_SAIR:
         audioMusicaTocar(AUDIO_MUSICA_NENHUMA, 0.0f);
@@ -279,7 +283,7 @@ static void trocarEstado(Jogo *g, EstadoJogo novo)
         pausaSelecionada = 0;
 
     g->estado = novo;
-    definirMusica(anterior, novo);
+    definirMusica(g, anterior, novo);
 }
 
 void jogo_executar(void)
