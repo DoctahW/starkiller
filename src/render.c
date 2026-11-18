@@ -404,7 +404,7 @@ static void desenharDestroier(const Camera3D *cam)
  * A escala de cada caça acompanha seu raio de colisão. */
 static void desenharXWing(void)
 {
-    Color cor = {235, 105, 80, 255};
+    Color cor = COR_XWING;
     DrawCylinderEx((Vector3){0, 0, -0.5f}, (Vector3){0, 0, 0.8f},
                    0.16f, 0.04f, 8, LIGHTGRAY);
     DrawCube((Vector3){0, 0.13f, 0.05f}, 0.17f, 0.12f, 0.32f, DARKBLUE);
@@ -421,7 +421,7 @@ static void desenharXWing(void)
 
 static void desenharYWing(void)
 {
-    Color cor = {245, 195, 65, 255};
+    Color cor = COR_YWING;
     DrawCube((Vector3){0, 0, 0.35f}, 0.36f, 0.22f, 0.65f, cor);
     DrawCube((Vector3){0, 0.14f, 0.4f}, 0.22f, 0.1f, 0.25f, DARKBLUE);
     DrawCube((Vector3){0, 0, -0.15f}, 1.1f, 0.12f, 0.18f, LIGHTGRAY);
@@ -435,7 +435,7 @@ static void desenharYWing(void)
 
 static void desenharAWing(void)
 {
-    Color cor = {85, 195, 130, 255};
+    Color cor = COR_AWING;
     /* Cone achatado: silhueta de cunha, com a ponta voltada para +Z. */
     rlPushMatrix();
     rlScalef(1.0f, 0.35f, 1.0f);

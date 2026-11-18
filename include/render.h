@@ -9,6 +9,11 @@
 /* Destróier Estelar (medidas em destroier.h); sem o arquivo, é desenhado com primitivas. */
 #define ARQUIVO_DESTROIER "assets/models/destroier.glb"
 
+/* Cores dos caças rebeldes (VIS-04): primitivas da cena e pontos do radar do HUD. */
+#define COR_XWING (Color){ 235, 105, 80, 255 }
+#define COR_YWING (Color){ 245, 195, 65, 255 }
+#define COR_AWING (Color){ 85, 195, 130, 255 }
+
 void carregarAssets(void);
 void descarregarAssets(void);
 

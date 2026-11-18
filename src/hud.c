@@ -9,6 +9,7 @@
 #include "jogo.h"
 #include "nave.h"
 #include "pontuacao.h"
+#include "render.h"
 
 #define FONTE_HUD     "assets/fonts/ChakraPetch-Bold.ttf"
 #define TAM_BASE_HUD  32      /* tamanho rasterizado; os textos menores escalam a partir dele */
@@ -74,15 +75,16 @@
 /*
  * Alvo travado. No vidro: colchetes em volta do caça, com tipo e distância, e o indicador de tiro
  * adiantado (onde mirar para o laser encontrar o caça); fora do vidro, uma seta em volta da retícula.
- * No visor: escopo com a direção do alvo (centro = à frente, anel do meio = 90°, borda = atrás).
+ * No visor, o radar: direção de cada caça (centro = à frente, anel do meio = 90°, borda = atrás).
  */
 #define MARCA_MIN       14.0f   /* meia largura mínima dos colchetes (px) */
 #define MARCA_ESCALA    1.6f    /* colchetes um pouco maiores que o caça */
 #define MARGEM_VIDRO    20.0f   /* px; mais perto da borda da tela, vira seta */
 #define RAIO_SETA       200.0f  /* círculo em torno da retícula onde fica a seta */
 #define PIPPER_RAIO     7.0f
-#define ESCOPO_RAIO     40.0f
-#define ESCOPO_Y        (VISOR_Y - 14.0f)
+#define RADAR_RAIO      40.0f
+#define RADAR_Y         (VISOR_Y - 14.0f)
+#define RADAR_ATRAS     0.45f   /* opacidade dos caças atrás da nave */
 
 static Font fonteHud;
 
@@ -341,24 +343,63 @@ static void desenharAlvoNoVidro(const Jogo *g)
     }
 }
 
-/* Escopo no visor: direção do alvo travado; o ponto pisca quando o alvo está atrás. */
-static void desenharEscopo(const Jogador *j, const Inimigo *alvo)
+static Color corDoTipo(TipoNave t)
 {
-    Vector2 c = { JANELA_X, ESCOPO_Y };
-    Vector3 local = Vector3Normalize(noEspacoDaNave(j, alvo->pos));
+    switch (t) {
+    case YWING: return COR_YWING;
+    case AWING: return COR_AWING;
+    case XWING:
+    default:    return COR_XWING;
+    }
+}
+
+/* Posição de `p` no radar; `atras` = 1 se ele está a mais de 90° da frente da nave. */
+static Vector2 noRadar(const Jogador *j, Vector3 p, int *atras)
+{
+    Vector3 local = Vector3Normalize(noEspacoDaNave(j, p));
     float ang = acosf(Clamp(local.z, -1.0f, 1.0f));
     Vector2 dir = { local.x, -local.y };
-    Vector2 ponto;
 
-    dir = Vector2Length(dir) > 1e-3f ? Vector2Normalize(dir) : (Vector2){ 0.0f, 0.0f };
-    ponto = Vector2Add(c, Vector2Scale(dir, ang / PI * ESCOPO_RAIO));
+    /* Bem à frente o raio é ~0; bem atrás, a direção some e o ponto vai para a borda de baixo. */
+    dir = Vector2Length(dir) > 1e-3f ? Vector2Normalize(dir) : (Vector2){ 0.0f, 1.0f };
+    *atras = ang > PI * 0.5f;
+    return Vector2Add((Vector2){ JANELA_X, RADAR_Y }, Vector2Scale(dir, ang / PI * RADAR_RAIO));
+}
 
-    DrawCircleLinesV(c, ESCOPO_RAIO, Fade(COR_NEON, 0.8f));
-    DrawCircleLinesV(c, ESCOPO_RAIO * 0.5f, Fade(COR_NEON, 0.4f));
-    DrawLineV((Vector2){ c.x - ESCOPO_RAIO, c.y }, (Vector2){ c.x + ESCOPO_RAIO, c.y }, Fade(COR_NEON, 0.3f));
-    DrawLineV((Vector2){ c.x, c.y - ESCOPO_RAIO }, (Vector2){ c.x, c.y + ESCOPO_RAIO }, Fade(COR_NEON, 0.3f));
-    if (ang <= PI * 0.5f || piscaAceso())
-        DrawCircleV(ponto, 4.0f, COR_ALVO);
+/*
+ * Radar no visor, com o jogador no centro: todos os caças na cor do tipo, apagados quando atrás.
+ * O alvo travado é desenhado por último, maior e com anel; atrás, ele pisca.
+ */
+static void desenharRadar(const Jogo *g)
+{
+    const Jogador *j = &g->jogador;
+    const NoInimigo *alvo = g->inimigos.alvo;
+    Vector2 c = { JANELA_X, RADAR_Y };
+    int atras;
+
+    DrawCircleLinesV(c, RADAR_RAIO, Fade(COR_NEON, 0.8f));
+    DrawCircleLinesV(c, RADAR_RAIO * 0.5f, Fade(COR_NEON, 0.4f));
+    DrawLineV((Vector2){ c.x - RADAR_RAIO, c.y }, (Vector2){ c.x + RADAR_RAIO, c.y }, Fade(COR_NEON, 0.3f));
+    DrawLineV((Vector2){ c.x, c.y - RADAR_RAIO }, (Vector2){ c.x, c.y + RADAR_RAIO }, Fade(COR_NEON, 0.3f));
+    DrawCircleV(c, 2.0f, COR_HUD);
+
+    for (const NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox) {
+        Vector2 p;
+
+        if (no == alvo)
+            continue;
+        p = noRadar(j, no->dado.pos, &atras);
+        DrawCircleV(p, 2.5f, Fade(corDoTipo(no->dado.tipo), atras ? RADAR_ATRAS : 1.0f));
+    }
+
+    if (alvo != NULL) {
+        Vector2 p = noRadar(j, alvo->dado.pos, &atras);
+
+        if (!atras || piscaAceso()) {
+            DrawCircleV(p, 3.5f, corDoTipo(alvo->dado.tipo));
+            DrawRing(p, 5.0f, 7.0f, 0.0f, 360.0f, 16, COR_ALVO);
+        }
+    }
 }
 
 /* Barra horizontal em segmentos que esvazia da direita para a esquerda. */
@@ -492,26 +533,7 @@ static void desenharTabletNave(const Jogo *g)
           borda < RAIO_ARENA * BORDA_PERTO ? COR_CRITICA : COR_VALOR);
 }
 
-/* Silhueta do TIE desenhada em linhas. */
-static void silhuetaTie(int cx, int cy, Color cor)
-{
-    int lado;
-
-    for (lado = -1; lado <= 1; lado += 2) {
-        float x = (float)(cx + lado * 28);
-        const Vector2 asa[] = {
-            { x, cy - 36.0f }, { x + 6.0f, cy - 22.0f }, { x + 6.0f, cy + 22.0f },
-            { x, cy + 36.0f }, { x - 6.0f, cy + 22.0f }, { x - 6.0f, cy - 22.0f },
-        };
-
-        contorno(asa, 6, 2.0f, cor);
-        DrawLineEx((Vector2){ x - lado * 6.0f, (float)cy }, (Vector2){ cx + lado * 11.0f, (float)cy }, 3.0f, cor);
-    }
-    DrawCircleLinesV((Vector2){ (float)cx, (float)cy }, 11.0f, cor);
-    DrawCircleLinesV((Vector2){ (float)cx, (float)cy }, 5.0f, cor);
-}
-
-/* Coluna central: velocidade, acelerador e luz da arena no topo; visor redondo com o estado. */
+/* Coluna central: velocidade, acelerador e luz da arena no topo; visor redondo com o radar e o estado. */
 static void desenharColuna(const Jogo *g, int foraDaArena)
 {
     const Vector2 corpo[] = { { 520, COLUNA_TOPO }, { 760, COLUNA_TOPO }, { 785, ALTURA_TELA }, { 495, ALTURA_TELA } };
@@ -572,10 +594,7 @@ static void desenharColuna(const Jogo *g, int foraDaArena)
     DrawCircleV(visor, VISOR_RAIO + 6.0f, COR_BRILHO);
     DrawCircleV(visor, VISOR_RAIO, COR_TELA);
     DrawCircleLinesV(visor, VISOR_RAIO - 6.0f, Fade(COR_NEON, 0.7f));
-    if (alvo != NULL)
-        desenharEscopo(&g->jogador, alvo);
-    else
-        silhuetaTie((int)visor.x, (int)visor.y - 18, corDoNivel(casco, COR_ALERTA));
+    desenharRadar(g);
     if (corEstado.r != COR_CRITICA.r || piscaAceso())
         texto(estado, (int)visor.x, (int)visor.y + 30, 15, 0.5f, corEstado);
 }
