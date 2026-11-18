@@ -114,18 +114,41 @@ int segmentoAcertaEsfera(Vector3 a, Vector3 b, Vector3 centro, float raio, float
     return 1;
 }
 
-/* Inimigo de menor t que o segmento do laser (pos - vel * dt → pos) atravessa, ou NULL. */
+float raioDeAcerto(TipoNave t, float distancia)
+{
+    return fmaxf(raioInimigo(t), distancia * TOLERANCIA_MIRA);
+}
+
+int tiroAcerta(const Jogador *j, const Inimigo *alvo)
+{
+    Vector3 rel = Vector3Subtract(pontoDeInterceptacao(j->pos, VEL_LASER, alvo->pos, alvo->vel), j->pos);
+    float aFrente = Vector3DotProduct(rel, j->frente);
+    float r;
+
+    if (aFrente <= 0.0f || aFrente > VEL_LASER * VIDA_LASER)
+        return 0;
+    /* Os canhões ficam a ±CANHAO_LATERAL do eixo: no pior caso o mais perto passa a sqrt(erro² + lateral²). */
+    rel = Vector3Subtract(rel, Vector3Scale(j->frente, aFrente));
+    r = raioDeAcerto(alvo->tipo, aFrente);
+    return Vector3DotProduct(rel, rel) + CANHAO_LATERAL * CANHAO_LATERAL <= r * r;
+}
+
+/*
+ * Inimigo de menor t que o segmento do laser (pos - vel * dt → pos) atravessa, ou NULL. O raio de
+ * cada caça é raioDeAcerto pela distância dele à boca do canhão, de onde o laser saiu (pela vida gasta).
+ */
 static NoInimigo *primeiroAtingido(const Jogo *g, const Laser *l, float dt)
 {
     Vector3 anterior = Vector3Subtract(l->pos, Vector3Scale(l->vel, dt));
+    Vector3 origem = Vector3Subtract(l->pos, Vector3Scale(l->vel, VIDA_LASER - l->vida));
     NoInimigo *no, *primeiro = NULL;
     float melhor = 2.0f;
 
     for (no = g->inimigos.inicio; no; no = no->prox) {
+        float raio = raioDeAcerto(no->dado.tipo, Vector3Distance(no->dado.pos, origem));
         float t;
 
-        if (segmentoAcertaEsfera(anterior, l->pos, no->dado.pos, raioInimigo(no->dado.tipo), &t)
-            && t < melhor) {
+        if (segmentoAcertaEsfera(anterior, l->pos, no->dado.pos, raio, &t) && t < melhor) {
             melhor = t;
             primeiro = no;
         }

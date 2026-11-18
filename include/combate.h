@@ -36,6 +36,20 @@ float raioInimigo(TipoNave t);
  * dentro). Considera o caminho todo, então não deixa passar um laser rápido por uma esfera pequena.
  */
 int segmentoAcertaEsfera(Vector3 a, Vector3 b, Vector3 centro, float raio, float *t);
+
+/*
+ * Assistência de mira: o laser do jogador acerta o caça que passar a até raioDeAcerto do caminho dele.
+ * O raio é o do caça de perto e cresce com a distância percorrida pelo laser (TOLERANCIA_MIRA rad),
+ * então a folga na tela é constante: o anel da retícula do HUD tem exatamente esse ângulo. A folga
+ * também cobre a curva que o caça faz durante o voo do laser, que a previsão em linha reta não vê.
+ */
+#define TOLERANCIA_MIRA  0.035f   /* rad (~2°) */
+float raioDeAcerto(TipoNave t, float distancia);
+/*
+ * 1 se um disparo agora acerta `alvo` voando reto: o ponto de interceptação está no alcance do laser
+ * e o canhão mais perto passa a até raioDeAcerto dele. É o teste do indicador verde do HUD.
+ */
+int tiroAcerta(const Jogador *j, const Inimigo *alvo);
 /*
  * Colisão laser do jogador × inimigos. Deve rodar logo depois de atualizarLasers(g, dt): o segmento
  * de cada laser vai da posição anterior (pos - vel * dt) à atual. Cada laser acerta no máximo
