@@ -8,10 +8,26 @@
 #include "nave.h"
 #include "raymath.h"
 
-#define PASTA_SONS "assets/sounds/"
+#define PASTA_SONS    "assets/sounds/"
+#define PASTA_MENU    "assets/sounds/menu/"
+#define PASTA_MUSICAS "assets/sounds/musics/"
 
-#define VOLUME_MESTRE 0.85f
 #define TAU_VOLUME    0.08f   /* s; suavização dos loops (crossfade dos setores de motor) */
+#define TAU_MUSICA    0.25f   /* s; crossfade entre faixas de fundo */
+#define VOZES_TECLA   4
+
+/* Volumes base dos sons de interface (antes dos volumes geral/efeitos). */
+#define VOLUME_UI_MOVER       0.55f
+#define VOLUME_UI_SELECIONAR  0.75f
+#define VOLUME_UI_VOLTAR      0.65f
+#define VOLUME_UI_TECLA       0.45f
+
+/* Configuração viva; a tela de opções altera os campos e chama audioAplicarVolumes(). */
+static ConfigAudio configAudio = {
+    AUDIO_VOLUME_GERAL_PADRAO,
+    AUDIO_VOLUME_EFEITOS_PADRAO,
+    AUDIO_VOLUME_MUSICA_PADRAO
+};
 
 /* Alcances (u) das fontes posicionais. */
 #define ALCANCE_ENGINE_INIMIGO     1850.0f
@@ -38,7 +54,7 @@
 #define FRACAO_CASCO_CRITICO  0.25f
 #define INTERVALO_AVISO_CASCO 0.75f
 
-/* Volumes dos eventos (antes do VOLUME_MESTRE). */
+/* Volumes dos eventos (antes dos volumes geral/efeitos). */
 #define VOLUME_TIRO_JOGADOR   0.80f
 #define VOLUME_TIRO_INIMIGO   0.75f
 #define VOLUME_ACELERACAO     0.45f
@@ -58,6 +74,14 @@ typedef struct {
     float volume;
     float pitch;
 } Loop;
+
+/* Faixa de fundo em loop, com crossfade entre a faixa atual e a anterior. */
+typedef struct {
+    Music m;
+    int carregado;
+    int tocando;
+    float volume;
+} MusicaFundo;
 
 typedef struct {
     int grupo;
@@ -109,6 +133,19 @@ static Sound spinInimigoVoz[3][SPIN_VOZES];
 static Sound isdDestroyed;
 static Sound isdShieldEnable;
 static Sound isdShieldDisable;
+
+/* Sons de interface. uiTecla usa um pequeno pool para não cortar digitação rápida. */
+static Sound uiMover;
+static Sound uiSelecionar;
+static Sound uiVoltar;
+static Sound uiTeclaBase;
+static Sound uiTeclaVoz[VOZES_TECLA];
+static int proximaTecla;
+
+/* Músicas de fundo, indexadas por FaixaMusica - 1. */
+static MusicaFundo musicas[3];
+static FaixaMusica faixaAtual = AUDIO_MUSICA_NENHUMA;
+static float fatorMusica = 1.0f;
 
 /* Loops. */
 static Loop motoresJogador[NUM_MOTORES_JOGADOR];
@@ -253,7 +290,7 @@ static void loopAtualizarComPitch(Loop *l, float alvo, float pan, float pitchAlv
         return;
     if (alvo < 0.0f)
         alvo = 0.0f;
-    alvo *= VOLUME_MESTRE;
+    alvo *= configAudio.geral * configAudio.efeitos;
     if (pan < -1.0f)
         pan = -1.0f;
     if (pan > 1.0f)
@@ -301,6 +338,92 @@ static void loopAtualizar(Loop *l, float alvo, float pan, float dt)
     loopAtualizarComPitch(l, alvo, pan, 1.0f, dt);
 }
 
+static void carregarMusica(MusicaFundo *mf, const char *caminho)
+{
+    if (!audioPronto)
+        return;
+    if (!FileExists(caminho)) {
+        TraceLog(LOG_WARNING, "AUDIO: %s ausente (música)", caminho);
+        return;
+    }
+
+    mf->m = LoadMusicStream(caminho);
+    if (!IsMusicValid(mf->m)) {
+        TraceLog(LOG_WARNING, "AUDIO: %s não carregou (música)", caminho);
+        mf->m = (Music){ 0 };
+        return;
+    }
+
+    mf->m.looping = 1;
+    mf->carregado = 1;
+    mf->tocando = 0;
+    mf->volume = 0.0f;
+}
+
+static void liberarMusica(MusicaFundo *mf)
+{
+    if (!mf->carregado)
+        return;
+    StopMusicStream(mf->m);
+    UnloadMusicStream(mf->m);
+    mf->m = (Music){ 0 };
+    mf->carregado = 0;
+    mf->tocando = 0;
+    mf->volume = 0.0f;
+}
+
+/*
+ * A faixa atual sobe até o alvo; todas as outras descem e param. Assim a troca de tela
+ * é um crossfade curto e o duck da pausa só muda o alvo, sem reiniciar a música.
+ */
+static void atualizarMusicas(float dt)
+{
+    float alvoAtual = 0.0f;
+    float k;
+    int i;
+
+    if (!audioPronto)
+        return;
+
+    if (faixaAtual != AUDIO_MUSICA_NENHUMA) {
+        alvoAtual = configAudio.geral * configAudio.musica * fatorMusica;
+        if (alvoAtual < 0.0f)
+            alvoAtual = 0.0f;
+    }
+
+    k = 1.0f - expf(-dt / TAU_MUSICA);
+    for (i = 0; i < 3; i++) {
+        MusicaFundo *mf = &musicas[i];
+        int eAtual = (int)faixaAtual == i + 1;
+        float alvo = eAtual ? alvoAtual : 0.0f;
+
+        if (!mf->carregado)
+            continue;
+
+        if (eAtual && !mf->tocando) {
+            mf->volume = 0.0f;
+            PlayMusicStream(mf->m);
+            mf->tocando = 1;
+        }
+
+        mf->volume += (alvo - mf->volume) * k;
+        if (mf->volume < 0.0f)
+            mf->volume = 0.0f;
+        if (mf->volume > 1.0f)
+            mf->volume = 1.0f;
+
+        SetMusicVolume(mf->m, mf->volume);
+        if (mf->tocando) {
+            UpdateMusicStream(mf->m);
+            if (!eAtual && mf->volume <= 0.002f) {
+                StopMusicStream(mf->m);
+                mf->tocando = 0;
+                mf->volume = 0.0f;
+            }
+        }
+    }
+}
+
 static void tocar(Sound s, float volume, float pan)
 {
     if (!audioPronto || !IsSoundValid(s))
@@ -314,7 +437,7 @@ static void tocar(Sound s, float volume, float pan)
     if (pan > 1.0f)
         pan = 1.0f;
 
-    SetSoundVolume(s, volume * VOLUME_MESTRE);
+    SetSoundVolume(s, volume * configAudio.geral * configAudio.efeitos);
     SetSoundPan(s, pan);
     PlaySound(s);
 }
@@ -603,10 +726,13 @@ static void silenciarMotoresJogador(float dt)
 
 void iniciarAudio(void)
 {
-    int k;
+    int k, i;
 
     if (audioPronto)
         return;
+
+    audioConfigPadroes(&configAudio);
+    audioConfigCarregar(&configAudio, CAMINHO_CONFIG_AUDIO);
 
     InitAudioDevice();
     if (!IsAudioDeviceReady()) {
@@ -660,6 +786,20 @@ void iniciarAudio(void)
         carregarLoop(&vozes[AWING][k].principal, PASTA_SONS "rebel/engine_awing.ogg");
     }
 
+    uiMover = carregarSom(PASTA_MENU "ui_menuMove.wav");
+    uiSelecionar = carregarSom(PASTA_MENU "ui_menuSelect.wav");
+    uiVoltar = carregarSom(PASTA_MENU "ui_menuBack.wav");
+    uiTeclaBase = carregarSom(PASTA_MENU "ui_keyboardtype.wav");
+    proximaTecla = 0;
+    if (IsSoundValid(uiTeclaBase)) {
+        for (i = 0; i < VOZES_TECLA; i++)
+            uiTeclaVoz[i] = LoadSoundAlias(uiTeclaBase);
+    }
+
+    carregarMusica(&musicas[AUDIO_MUSICA_MENU - 1], PASTA_MUSICAS "menuMusic2.mp3");
+    carregarMusica(&musicas[AUDIO_MUSICA_COMBATE - 1], PASTA_MUSICAS "in_gameMusic.mp3");
+    carregarMusica(&musicas[AUDIO_MUSICA_RANKING - 1], PASTA_MUSICAS "ranking_menuMusic.mp3");
+
     ouvintePos = (Vector3){ 0.0f, 0.0f, 0.0f };
     ouvinteVel = (Vector3){ 0.0f, 0.0f, 0.0f };
     ouvinteDireita = (Vector3){ -1.0f, 0.0f, 0.0f };
@@ -673,7 +813,7 @@ void iniciarAudio(void)
 
 void encerrarAudio(void)
 {
-    int k, t;
+    int k, t, i;
 
     if (!audioPronto)
         return;
@@ -714,6 +854,21 @@ void encerrarAudio(void)
     liberarSom(&isdShieldEnable);
     liberarSom(&isdShieldDisable);
 
+    liberarSom(&uiMover);
+    liberarSom(&uiSelecionar);
+    liberarSom(&uiVoltar);
+    for (i = 0; i < VOZES_TECLA; i++) {
+        if (IsSoundValid(uiTeclaVoz[i]))
+            UnloadSoundAlias(uiTeclaVoz[i]);
+        uiTeclaVoz[i] = (Sound){ 0 };
+    }
+    liberarSom(&uiTeclaBase);
+
+    for (i = 0; i < 3; i++)
+        liberarMusica(&musicas[i]);
+    faixaAtual = AUDIO_MUSICA_NENHUMA;
+    fatorMusica = 1.0f;
+
     audioPronto = 0;
     CloseAudioDevice();
 }
@@ -741,6 +896,8 @@ void audioAtualizar(const Jogo *g, const Comandos *cmd, int emCombate, float dt)
         dt = 0.0f;
     if (dt > 0.25f)
         dt = 0.25f;
+
+    atualizarMusicas(dt);
 
     /* Destruição do Destróier: dispara uma vez, na transição de vivo para destruído. */
     if (g->cascoDestroier > 0.0f) {
@@ -932,4 +1089,67 @@ void audioEscudoDestroier(int ligado)
 {
     tocarEspacial(ligado ? isdShieldEnable : isdShieldDisable,
                   (Vector3){ 0.0f, 0.0f, 0.0f }, 0.9f, ALCANCE_ISD);
+}
+
+static float limitarVolume(float v)
+{
+    if (!(v >= AUDIO_VOLUME_MIN))   /* também pega NaN */
+        return AUDIO_VOLUME_MIN;
+    if (v > AUDIO_VOLUME_MAX)
+        return AUDIO_VOLUME_MAX;
+    return v;
+}
+
+ConfigAudio *audioConfig(void)
+{
+    return &configAudio;
+}
+
+void audioAplicarVolumes(void)
+{
+    configAudio.geral = limitarVolume(configAudio.geral);
+    configAudio.efeitos = limitarVolume(configAudio.efeitos);
+    configAudio.musica = limitarVolume(configAudio.musica);
+}
+
+int audioSalvarConfiguracao(void)
+{
+    return audioConfigSalvar(&configAudio, CAMINHO_CONFIG_AUDIO);
+}
+
+void audioMusicaTocar(FaixaMusica faixa, float fator)
+{
+    if (faixa < AUDIO_MUSICA_NENHUMA || faixa > AUDIO_MUSICA_RANKING)
+        faixa = AUDIO_MUSICA_NENHUMA;
+    if (!(fator >= 0.0f))           /* também pega NaN */
+        fator = 0.0f;
+    if (fator > 1.0f)
+        fator = 1.0f;
+
+    faixaAtual = faixa;
+    fatorMusica = fator;
+}
+
+void audioUIMover(void)
+{
+    tocar(uiMover, VOLUME_UI_MOVER, 0.0f);
+}
+
+void audioUISelecionar(void)
+{
+    tocar(uiSelecionar, VOLUME_UI_SELECIONAR, 0.0f);
+}
+
+void audioUIVoltar(void)
+{
+    tocar(uiVoltar, VOLUME_UI_VOLTAR, 0.0f);
+}
+
+void audioUITecla(void)
+{
+    if (!audioPronto || !IsSoundValid(uiTeclaBase))
+        return;
+
+    tocar(uiTeclaVoz[proximaTecla], VOLUME_UI_TECLA, 0.0f);
+    proximaTecla = (proximaTecla + 1) % VOZES_TECLA;
 }

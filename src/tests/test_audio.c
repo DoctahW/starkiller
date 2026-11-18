@@ -30,6 +30,16 @@ static void testarSemDispositivo(void)
     audioDestroierDestruido();
     audioEscudoDestroier(1);
     audioEscudoDestroier(0);
+    audioUIMover();
+    audioUISelecionar();
+    audioUIVoltar();
+    audioUITecla();
+    audioMusicaTocar(AUDIO_MUSICA_MENU, 1.0f);
+    audioMusicaTocar(AUDIO_MUSICA_COMBATE, AUDIO_FATOR_PAUSA);
+    audioMusicaTocar(AUDIO_MUSICA_RANKING, 1.0f);
+    audioMusicaTocar(AUDIO_MUSICA_NENHUMA, 0.0f);
+    audioAplicarVolumes();
+    VERIFICA(audioConfig() != NULL);
     {
         int voz = audioSpinInimigo(AWING, (Vector3){ 1.0f, 2.0f, 3.0f });
 
