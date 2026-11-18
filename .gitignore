@@ -12,9 +12,6 @@ PLANO.md
 # Dados gerados em tempo de execução (pasta criada no primeiro salvamento)
 /dados/
 
-# Assets temporários do BF2 (copyright; uso local, não commitar)
-/assets/models/bf2/
-
 # Editores e sistema
 .vscode/
 .idea/
