@@ -36,6 +36,16 @@ void iniciarJogador(Jogador *j);
 #define TAU_GIRO    0.1f
 
 /*
+ * Queda do TIE: em vez de obedecer aos comandos, a nave gira incontrolavelmente em torno de um
+ * eixo aleatório e continua avançando com a velocidade atual. Devolve a duração sorteada do giro,
+ * entre 1,0 s e a duração do áudio de SPIN (maior que 1 segundo, como pede a AUD-01).
+ * iniciarJogador cancela a queda.
+ */
+float iniciarQuedaJogador(void);
+/* Fase da queda: 0 = não começou, 1 = girando, 2 = giro terminou (pronto para explodir). */
+int faseQuedaJogador(void);
+
+/*
  * Limites de velocidade (u/s) e aceleração com o eixo em ±1 (u/s²). Escala do mundo: 1 u = 1 m,
  * com o Destróier no tamanho canônico (1600 m); distâncias e velocidades foram multiplicadas por
  * ~4,6 junto com ele, para o ritmo da partida não mudar. O tamanho dos caças não mudou.

@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include "raymath.h"
+#include "audio.h"
 #include "pontuacao.h"
 #include "destroier.h"
 #include "nave.h"
@@ -51,6 +52,7 @@ int dispararLaser(Jogo *g)
     ativarLaser(&g->lasers[b], Vector3Add(base, deslocamento), vel);        /* canhão direito */
     j->cooldownLaser = COOLDOWN_LASER;
     j->esperaEscudo = ATRASO_ESCUDO;   /* disparar é estar em combate: o escudo não recarrega */
+    audioTiroJogador();
     return 1;
 }
 
@@ -182,6 +184,7 @@ static void abaterInimigo(Jogo *g, NoInimigo *no)
 
     registrarAbate(g, tipo);
     criarExplosao(g, pos, RAIO_EXPLOSAO);
+    audioDestruicaoInimigo(tipo, pos);
     removerInimigo(&g->inimigos, no);
 }
 
@@ -317,6 +320,7 @@ int dispararLaserInimigo(Jogo *g, const Inimigo *in)
     l->doJogador = 0;
     l->vida = VIDA_LASER_INIMIGO;
     l->dano = DANO_LASER_INIMIGO;
+    audioTiroInimigo(in->tipo, in->pos);
     return 1;
 }
 
@@ -371,7 +375,10 @@ int colidirLasersInimigos(Jogo *g, float dt)
 
         l->ativo = 0;
         if (tTie <= tCasco) {
-            danificarJogador(g, l->dano);
+            if (g->jogador.casco > 0.0f) {
+                danificarJogador(g, l->dano);
+                audioDanoJogador();
+            }
             acertosTie++;
         } else {
             g->cascoDestroier -= l->dano * FRACAO_DANO_DESTROIER;

@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "jogo.h"
+#include "audio.h"
 #include "combate.h"
 #include "entrada.h"
 #include "hud.h"
@@ -40,10 +41,28 @@ static void iniciarPartida(Jogo *g)
     avisoArena = 0;
 }
 
-/* Derrota tem precedência sobre o tempo esgotado. */
+/*
+ * Derrota tem precedência sobre o tempo esgotado. Com o casco do TIE em 0, a nave primeiro
+ * rodopia (iniciarQuedaJogador + SPIN) e só depois explode (BOOM), como pede a AUD-01.
+ */
 static int verificarFim(Jogo *g)
 {
-    if (g->jogador.casco <= 0.0f || g->cascoDestroier <= 0.0f) {
+    if (g->jogador.casco <= 0.0f) {
+        int fase = faseQuedaJogador();
+
+        if (fase == 0) {
+            iniciarQuedaJogador();
+            audioSpinJogador();
+            return 0;
+        }
+        if (fase == 1)   /* ainda rodopiando */
+            return 0;
+        criarExplosao(g, g->jogador.pos, RAIO_EXPLOSAO);
+        audioBoomJogador(g->jogador.pos);
+        g->vitoria = 0;
+        return 1;
+    }
+    if (g->cascoDestroier <= 0.0f) {
         g->vitoria = 0;
         return 1;
     }
@@ -94,8 +113,11 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
     idAlvo = tinhaAlvo ? g->inimigos.alvo->dado.id : 0;
     resolverLasers(g, PASSO_FIXO);
     /* Alvo abatido: removerInimigo passa a mira ao vizinho da lista; o mais próximo é mais útil. */
-    if (tinhaAlvo && (g->inimigos.alvo == NULL || g->inimigos.alvo->dado.id != idAlvo))
+    if (tinhaAlvo && (g->inimigos.alvo == NULL || g->inimigos.alvo->dado.id != idAlvo)) {
         mirarMaisProximo(g);
+        if (g->inimigos.alvo != NULL)
+            audioTrocaAlvo();
+    }
     colidirLasersInimigos(g, PASSO_FIXO);
     atualizarExplosoes(g, PASSO_FIXO);
 }
@@ -107,6 +129,8 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
  */
 static void tratarMira(Jogo *g, const Comandos *cmd)
 {
+    NoInimigo *antes = g->inimigos.alvo;
+
     if (cmd->proximoAlvo || cmd->alvoAnterior)
         ordenarPorDistancia(&g->inimigos);
     if (cmd->proximoAlvo)
@@ -115,6 +139,8 @@ static void tratarMira(Jogo *g, const Comandos *cmd)
         alvoAnterior(&g->inimigos);
     if (cmd->alvoMaisProximo)
         mirarMaisProximo(g);
+    if (g->inimigos.alvo != antes && g->inimigos.alvo != NULL)
+        audioTrocaAlvo();
 }
 
 EstadoJogo simularCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd, float dtFrame)
@@ -224,6 +250,7 @@ void jogo_executar(void)
     iniciarEntrada(&cfg);
     carregarAssets();
     hud_carregar();
+    iniciarAudio();
     jogo.estado = EST_MENU;
 
     while (jogo.estado != EST_SAIR && !WindowShouldClose()) {
@@ -234,6 +261,7 @@ void jogo_executar(void)
         BeginDrawing();
         ClearBackground(BLACK);
         EstadoJogo proximo = atualizarEstado(&jogo, &cfg, &cmd, controleCaiu);
+        audioAtualizar(&jogo, &cmd, jogo.estado == EST_COMBATE, GetFrameTime());
         EndDrawing();
 
         if (proximo != jogo.estado)
@@ -246,5 +274,6 @@ void jogo_executar(void)
     jogo.placar = NULL;
     descarregarTelas();
     hud_descarregar();
+    encerrarAudio();
     CloseWindow();
 }
