@@ -31,6 +31,7 @@ static int contarAtivos(const Jogo *g)
 static void novoJogo(void)
 {
     liberarListaInimigos(&jogo.inimigos);
+    limparQuedasInimigas();
     memset(&jogo, 0, sizeof jogo);
     iniciarJogador(&jogo.jogador);
     jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, 0.0f };   /* origem, para contas simples */
@@ -436,6 +437,36 @@ static int contarExplosoes(const Jogo *g)
     return n;
 }
 
+static int contarQuedas(void)
+{
+    const QuedaInimigo *q = quedasInimigas();
+    int i, n = 0;
+
+    for (i = 0; i < MAX_QUEDAS_INIMIGO; i++)
+        n += q[i].ativo != 0;
+    return n;
+}
+
+static int primeiraQueda(void)
+{
+    const QuedaInimigo *q = quedasInimigas();
+    int i;
+
+    for (i = 0; i < MAX_QUEDAS_INIMIGO; i++)
+        if (q[i].ativo)
+            return i;
+    return -1;
+}
+
+/* Avança só as quedas (sem atualizar explosões): as explosões criadas ficam ativas para contar. */
+static void esperarQuedas(float segundos)
+{
+    int i;
+
+    for (i = 0; i < (int)lroundf(segundos * 60.0f); i++)
+        atualizarQuedasInimigas(&jogo, 1.0f / 60.0f);
+}
+
 static void testarExplosoes(void)
 {
     int i;
@@ -510,16 +541,20 @@ static void testarAbate(void)
     VERIFICA(resolverLasers(&jogo, dt) == 1);
     VERIFICA(!jogo.lasers[0].ativo);
     VERIFICA(jogo.inimigos.tamanho == 1 && proximo(jogo.inimigos.inicio->dado.escudo, 40.0f));
-    VERIFICA(jogo.abates == 0 && jogo.pontos == 0 && contarExplosoes(&jogo) == 0);
+    VERIFICA(jogo.abates == 0 && jogo.pontos == 0 && contarExplosoes(&jogo) == 0 && contarQuedas() == 0);
     limparHeap();
 
-    /* Casco zera: pontua, explode na posição, sai da lista. */
+    /* Casco zera: pontua, vira destroço girando e sai da lista; explosão/BOOM só no fim. */
     novoJogo();
     listaHeap(1, 0.0f, 10.0f);
     laserEm(0, 100.0f, 10.0f);
     VERIFICA(resolverLasers(&jogo, dt) == 1);
     VERIFICA(jogo.inimigos.tamanho == 0 && jogo.inimigos.inicio == NULL && jogo.inimigos.fim == NULL);
     VERIFICA(jogo.abates == 1 && jogo.pontos == PONTOS_XWING);
+    VERIFICA(contarQuedas() == 1 && contarExplosoes(&jogo) == 0);
+    VERIFICA(proximo(quedasInimigas()[primeiraQueda()].pos.z, 100.0f));
+    esperarQuedas(QUEDA_INIMIGO_MAX + 0.1f);
+    VERIFICA(contarQuedas() == 0);
     VERIFICA(contarExplosoes(&jogo) == 1 && proximo(jogo.explosoes[0].pos.z, 100.0f));
 
     /* O alvo da mira continua válido após o abate do próprio alvo (meio, ponta, único). */
@@ -546,7 +581,9 @@ static void testarAbate(void)
     laserEm(0, 100.0f, 10.0f);
     laserEm(1, 200.0f, 10.0f);
     VERIFICA(resolverLasers(&jogo, dt) == 2);
-    VERIFICA(jogo.inimigos.tamanho == 0 && jogo.abates == 2 && contarExplosoes(&jogo) == 2);
+    VERIFICA(jogo.inimigos.tamanho == 0 && jogo.abates == 2 && contarQuedas() == 2);
+    esperarQuedas(QUEDA_INIMIGO_MAX + 0.1f);
+    VERIFICA(contarQuedas() == 0 && contarExplosoes(&jogo) == 2);
 
     /* Dois lasers no mesmo inimigo, o primeiro abate: o segundo não acha mais nada. */
     novoJogo();
@@ -562,6 +599,56 @@ static void testarAbate(void)
     laserEm(0, 100.0f, 10.0f);
     jogo.lasers[0].doJogador = 0;
     VERIFICA(resolverLasers(&jogo, dt) == 0 && jogo.inimigos.tamanho == 1);
+    limparHeap();
+}
+
+/* O destroço continua no vetor de velocidade do caça e só explode ao fim do giro. */
+static void testarQuedaInimiga(void)
+{
+    const float dt = 1.0f / 60.0f;
+    const QuedaInimigo *q;
+    int idx;
+
+    novoJogo();
+    listaHeap(1, 0.0f, 10.0f);
+    jogo.inimigos.inicio->dado.vel = (Vector3){ 120.0f, 0.0f, 0.0f };
+    laserEm(0, 100.0f, 10.0f);
+    VERIFICA(resolverLasers(&jogo, dt) == 1);
+    VERIFICA(jogo.inimigos.tamanho == 0 && contarQuedas() == 1);
+
+    idx = primeiraQueda();
+    q = quedasInimigas();
+    VERIFICA(idx >= 0 && q[idx].tipo == XWING);
+    VERIFICA(proximo(q[idx].vel.x, 120.0f));
+    VERIFICA(proximo(q[idx].tempo, 0.0f) && q[idx].duracao > 1.0f && q[idx].duracao < 4.75f);
+
+    {
+        float xAntes = q[idx].pos.x;
+
+        atualizarQuedasInimigas(&jogo, dt);
+        VERIFICA(q[idx].pos.x > xAntes);
+        VERIFICA(q[idx].ativo);
+        VERIFICA(contarExplosoes(&jogo) == 0);
+    }
+
+    esperarQuedas(QUEDA_INIMIGO_MAX + 0.1f);
+    VERIFICA(contarQuedas() == 0);
+    VERIFICA(contarExplosoes(&jogo) == 1);
+
+    /* Frente exatamente -Z (caso antiparalelo): a rotação inicial não degenera. */
+    novoJogo();
+    listaHeap(1, 0.0f, 10.0f);
+    jogo.inimigos.inicio->dado.vel = (Vector3){ 0.0f, 0.0f, -120.0f };
+    laserEm(0, 100.0f, 10.0f);
+    VERIFICA(resolverLasers(&jogo, dt) == 1);
+    idx = primeiraQueda();
+    q = quedasInimigas();
+    {
+        float norma = q[idx].rot.w * q[idx].rot.w + q[idx].rot.x * q[idx].rot.x
+                    + q[idx].rot.y * q[idx].rot.y + q[idx].rot.z * q[idx].rot.z;
+
+        VERIFICA(idx >= 0 && fabsf(norma - 1.0f) < 1e-4f);
+    }
     limparHeap();
 }
 
@@ -761,6 +848,7 @@ int main(void)
     testarAplicarDano();
     testarExplosoes();
     testarAbate();
+    testarQuedaInimiga();
     testarDisparoInimigo();
     testarColisaoLasersInimigos();
     liberarListaInimigos(&jogo.inimigos);

@@ -56,9 +56,17 @@ void audioTiroInimigo(TipoNave tipo, Vector3 pos);   /* WEAPON do caça rebelde 
 void audioDanoJogador(void);                         /* SHOT_HIT: tiro inimigo acertou o TIE */
 void audioColisaoJogador(void);                      /* COLLISION_HIT: TIE bateu no casco */
 void audioTrocaAlvo(void);                           /* TARGET ACQUISITION */
-void audioDestruicaoInimigo(TipoNave tipo, Vector3 pos); /* SPIN agora, BOOM depois */
+/*
+ * Destruição de um caça inimigo: o jogo controla o tempo (o destroço gira) e avisa o áudio.
+ * `audioSpinInimigo` devolve a voz usada (>= 0) ou -1; `audioBoomInimigo` para essa voz de
+ * SPIN e toca o BOOM no fim do giro.
+ */
+int audioSpinInimigo(TipoNave tipo, Vector3 pos);
+void audioBoomInimigo(TipoNave tipo, Vector3 pos, int vozSpin);
 void audioSpinJogador(void);                         /* início da queda do TIE */
-void audioBoomJogador(Vector3 pos);                  /* explosão final do TIE */
+void audioBoomJogador(Vector3 pos);                  /* para o SPIN e toca a explosão final do TIE */
+/* Para todos os SPINs (inimigos e jogador); usar ao limpar uma partida. */
+void audioPararSpins(void);
 void audioDestroierDestruido(void);                  /* DESTROYED do Destróier */
 void audioEscudoDestroier(int ligado);               /* SHIELD enable/disable (uso futuro) */
 

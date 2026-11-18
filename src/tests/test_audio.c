@@ -24,12 +24,17 @@ static void testarSemDispositivo(void)
     audioDanoJogador();
     audioColisaoJogador();
     audioTrocaAlvo();
-    audioDestruicaoInimigo(AWING, (Vector3){ 1.0f, 2.0f, 3.0f });
     audioSpinJogador();
     audioBoomJogador((Vector3){ 0.0f, 0.0f, 0.0f });
+    audioPararSpins();
     audioDestroierDestruido();
     audioEscudoDestroier(1);
     audioEscudoDestroier(0);
+    {
+        int voz = audioSpinInimigo(AWING, (Vector3){ 1.0f, 2.0f, 3.0f });
+
+        audioBoomInimigo(AWING, (Vector3){ 1.0f, 2.0f, 3.0f }, voz);
+    }
     audioMotorRegistrar(AUDIO_MOTOR_ALIADO, 1, XWING, (Vector3){ 0.0f, 0.0f, 100.0f },
                         (Vector3){ 0.0f, 0.0f, -100.0f });
 

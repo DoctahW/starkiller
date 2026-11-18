@@ -1,6 +1,7 @@
 #include "combate.h"
 #include <math.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "raymath.h"
 #include "audio.h"
@@ -176,15 +177,113 @@ int colidirLasers(Jogo *g, float dt)
     return acertos;
 }
 
-/* Abate: pontua, cria a explosão na posição do caça e o tira da lista (que mantém o alvo válido). */
+/* Destroços dos caças abatidos: giram na mesma direção e explodem ao fim (SPIN → BOOM). */
+static QuedaInimigo quedas[MAX_QUEDAS_INIMIGO];
+
+const QuedaInimigo *quedasInimigas(void)
+{
+    return quedas;
+}
+
+void limparQuedasInimigas(void)
+{
+    memset(quedas, 0, sizeof quedas);
+    audioPararSpins();
+}
+
+static float sorteio(float minimo, float maximo)
+{
+    return minimo + (maximo - minimo) * ((float)GetRandomValue(0, 10000) / 10000.0f);
+}
+
+/* Mesma orientação do caça vivo: +Z alinhado à frente, inclusive no caso antiparalelo (-Z). */
+static Quaternion rotacaoDaFrente(Vector3 frente)
+{
+    Vector3 eixo = { -frente.y, frente.x, 0.0f };
+    float comprimento = Vector3LengthSqr(eixo);
+
+    if (comprimento < 1e-6f) {
+        if (frente.z >= 0.0f)
+            return (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f };
+        return QuaternionFromAxisAngle((Vector3){ 0.0f, 1.0f, 0.0f }, PI);
+    }
+    return QuaternionFromAxisAngle(Vector3Scale(eixo, 1.0f / sqrtf(comprimento)),
+                                   acosf(Clamp(frente.z, -1.0f, 1.0f)));
+}
+
+/* Cria o destroço no primeiro slot livre. Devolve 0 se o pool estiver cheio. */
+static int criarQuedaInimigo(TipoNave tipo, Vector3 pos, Vector3 vel)
+{
+    int i;
+
+    for (i = 0; i < MAX_QUEDAS_INIMIGO; i++) {
+        QuedaInimigo *q = &quedas[i];
+        Vector3 eixo;
+
+        if (q->ativo)
+            continue;
+
+        q->ativo = 1;
+        q->tipo = tipo;
+        q->pos = pos;
+        q->vel = vel;
+
+        /* A orientação inicial é a mesma do caça vivo: +Z alinhado à velocidade. */
+        if (Vector3LengthSqr(vel) > 1e-6f)
+            q->rot = rotacaoDaFrente(Vector3Normalize(vel));
+        else
+            q->rot = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f };
+
+        eixo = (Vector3){ sorteio(-1.0f, 1.0f), sorteio(-1.0f, 1.0f), sorteio(-1.0f, 1.0f) };
+        if (Vector3LengthSqr(eixo) < 1e-4f)
+            eixo = (Vector3){ 1.0f, 0.0f, 0.0f };
+        q->eixo = Vector3Normalize(eixo);
+        q->giro = sorteio(3.5f, 7.0f);
+        q->tempo = 0.0f;
+        q->duracao = sorteio(QUEDA_INIMIGO_MIN, QUEDA_INIMIGO_MAX);
+        q->vozSpin = audioSpinInimigo(tipo, pos);
+        return 1;
+    }
+    return 0;
+}
+
+void atualizarQuedasInimigas(Jogo *g, float dt)
+{
+    int i;
+
+    for (i = 0; i < MAX_QUEDAS_INIMIGO; i++) {
+        QuedaInimigo *q = &quedas[i];
+
+        if (!q->ativo)
+            continue;
+
+        q->tempo += dt;
+        q->pos = Vector3Add(q->pos, Vector3Scale(q->vel, dt));
+        q->rot = QuaternionNormalize(QuaternionMultiply(
+            q->rot, QuaternionFromAxisAngle(q->eixo, q->giro * dt)));
+
+        if (q->tempo >= q->duracao) {
+            q->ativo = 0;
+            criarExplosao(g, q->pos, RAIO_EXPLOSAO);
+            audioBoomInimigo(q->tipo, q->pos, q->vozSpin);
+            q->vozSpin = -1;
+        }
+    }
+}
+
+/* Abate: pontua, transforma o caça em destroço girando (explosão/BOOM ao fim) e o tira da lista. */
 static void abaterInimigo(Jogo *g, NoInimigo *no)
 {
     TipoNave tipo = no->dado.tipo;
     Vector3 pos = no->dado.pos;
+    Vector3 vel = no->dado.vel;
 
     registrarAbate(g, tipo);
-    criarExplosao(g, pos, RAIO_EXPLOSAO);
-    audioDestruicaoInimigo(tipo, pos);
+    if (!criarQuedaInimigo(tipo, pos, vel)) {
+        /* Sem slot no pool de destroços: explode na hora, sem o giro visual. */
+        criarExplosao(g, pos, RAIO_EXPLOSAO);
+        audioBoomInimigo(tipo, pos, -1);
+    }
     removerInimigo(&g->inimigos, no);
 }
 

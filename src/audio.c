@@ -29,7 +29,7 @@
 #define TAU_PITCH           0.06f
 
 #define VOZES_POR_TIPO 3
-#define MAX_PENDENTES  32
+#define SPIN_VOZES 12
 #define MAX_VARIANTES  20
 #define MAX_FONTES_MOTOR 64
 #define NUM_MOTORES_JOGADOR 5
@@ -78,13 +78,6 @@ typedef struct {
 } FonteMotor;
 
 typedef struct {
-    int ativo;
-    TipoNave tipo;
-    Vector3 pos;
-    float restante;
-} Pendente;
-
-typedef struct {
     float volume;
     float pan;
 } VozEspacial;
@@ -111,7 +104,8 @@ static Sound avisoLowHp;
 static Banco bancoBoomJogador;
 static Sound spinJogador;
 static Banco bancoBoomInimigo[3];
-static Sound spinInimigo[3];
+static Sound spinInimigoBase[3];
+static Sound spinInimigoVoz[3][SPIN_VOZES];
 static Sound isdDestroyed;
 static Sound isdShieldEnable;
 static Sound isdShieldDisable;
@@ -124,10 +118,9 @@ static Loop posQueimadorIsd;
 static Loop alarmeIsd;
 static VozMotor vozes[3][VOZES_POR_TIPO];
 
-/* Fontes móveis registradas neste frame e agendamentos/temporizadores. */
+/* Fontes móveis registradas neste frame e temporizadores. */
 static FonteMotor fontes[MAX_FONTES_MOTOR];
 static int nFontes;
-static Pendente pendentes[MAX_PENDENTES];
 static float lowHpRuidoRestante;
 static float avisoRestante;
 static float aceleracaoAntes;
@@ -180,6 +173,30 @@ static void liberarBanco(Banco *b)
     for (i = 0; i < b->n; i++)
         liberarSom(&b->s[i]);
     b->n = 0;
+}
+
+/* Cada caça abatido precisa de uma voz própria de SPIN para poder pará-la no BOOM. */
+static void carregarSpins(TipoNave tipo, const char *caminho)
+{
+    int i;
+
+    spinInimigoBase[tipo] = carregarSom(caminho);
+    if (!IsSoundValid(spinInimigoBase[tipo]))
+        return;
+    for (i = 0; i < SPIN_VOZES; i++)
+        spinInimigoVoz[tipo][i] = LoadSoundAlias(spinInimigoBase[tipo]);
+}
+
+static void liberarSpins(TipoNave tipo)
+{
+    int i;
+
+    for (i = 0; i < SPIN_VOZES; i++) {
+        if (IsSoundValid(spinInimigoVoz[tipo][i]))
+            UnloadSoundAlias(spinInimigoVoz[tipo][i]);
+        spinInimigoVoz[tipo][i] = (Sound){ 0 };
+    }
+    liberarSom(&spinInimigoBase[tipo]);
 }
 
 static Sound somAleatorio(const Banco *b)
@@ -584,24 +601,6 @@ static void silenciarMotoresJogador(float dt)
         loopAtualizar(&cabineJogador[k], 0.0f, 0.0f, dt);
 }
 
-static void atualizarPendentes(float dt)
-{
-    int i;
-
-    for (i = 0; i < MAX_PENDENTES; i++) {
-        Pendente *p = &pendentes[i];
-
-        if (!p->ativo)
-            continue;
-        p->restante -= dt;
-        if (p->restante <= 0.0f) {
-            p->ativo = 0;
-            tocarEspacial(somAleatorio(&bancoBoomInimigo[p->tipo]), p->pos, 1.0f,
-                          ALCANCE_BOOM_INIMIGO);
-        }
-    }
-}
-
 void iniciarAudio(void)
 {
     int k;
@@ -634,9 +633,9 @@ void iniciarAudio(void)
 
     spinJogador = carregarSom(PASTA_SONS "tie/spin.ogg");
     carregarBanco(&bancoBoomJogador, PASTA_SONS "tie/boom_%d.ogg", 4);
-    spinInimigo[XWING] = carregarSom(PASTA_SONS "rebel/spin_xwing.ogg");
-    spinInimigo[YWING] = carregarSom(PASTA_SONS "rebel/spin_ywing.ogg");
-    spinInimigo[AWING] = carregarSom(PASTA_SONS "rebel/spin_awing.ogg");
+    carregarSpins(XWING, PASTA_SONS "rebel/spin_xwing.ogg");
+    carregarSpins(YWING, PASTA_SONS "rebel/spin_ywing.ogg");
+    carregarSpins(AWING, PASTA_SONS "rebel/spin_awing.ogg");
     carregarBanco(&bancoBoomInimigo[XWING], PASTA_SONS "rebel/boom_xwing_%d.ogg", 2);
     carregarBanco(&bancoBoomInimigo[YWING], PASTA_SONS "rebel/boom_ywing_%d.ogg", 2);
     carregarBanco(&bancoBoomInimigo[AWING], PASTA_SONS "rebel/boom_awing_%d.ogg", 2);
@@ -708,7 +707,7 @@ void encerrarAudio(void)
     liberarSom(&spinJogador);
     liberarBanco(&bancoBoomJogador);
     for (t = 0; t < 3; t++) {
-        liberarSom(&spinInimigo[t]);
+        liberarSpins(t);
         liberarBanco(&bancoBoomInimigo[t]);
     }
     liberarSom(&isdDestroyed);
@@ -823,9 +822,6 @@ void audioAtualizar(const Jogo *g, const Comandos *cmd, int emCombate, float dt)
     } else {
         silenciarVozesMotores(dt);
     }
-
-    /* BOOMs agendados das destruições continuam mesmo depois do fim da partida. */
-    atualizarPendentes(dt);
 }
 
 void audioTiroJogador(void)
@@ -865,25 +861,39 @@ void audioTrocaAlvo(void)
     tocar(somAleatorio(&bancoAlvo), 0.6f, 0.0f);
 }
 
-void audioDestruicaoInimigo(TipoNave tipo, Vector3 pos)
+int audioSpinInimigo(TipoNave tipo, Vector3 pos)
 {
+    VozEspacial v;
     int i;
 
     if (!audioPronto || (int)tipo < 0 || (int)tipo > 2)
+        return -1;
+
+    v = espacial(pos, ALCANCE_SPIN_INIMIGO, 0.9f);
+    if (v.volume <= 0.005f)
+        return -1;
+
+    for (i = 0; i < SPIN_VOZES; i++) {
+        Sound s = spinInimigoVoz[tipo][i];
+
+        if (IsSoundValid(s) && !IsSoundPlaying(s)) {
+            tocar(s, v.volume, v.pan);
+            return i;
+        }
+    }
+    return -1;
+}
+
+void audioBoomInimigo(TipoNave tipo, Vector3 pos, int vozSpin)
+{
+    if (!audioPronto || (int)tipo < 0 || (int)tipo > 2)
         return;
 
-    tocarEspacial(spinInimigo[tipo], pos, 0.9f, ALCANCE_SPIN_INIMIGO);
+    if (vozSpin >= 0 && vozSpin < SPIN_VOZES
+        && IsSoundValid(spinInimigoVoz[tipo][vozSpin]))
+        StopSound(spinInimigoVoz[tipo][vozSpin]);
 
-    for (i = 0; i < MAX_PENDENTES; i++) {
-        if (pendentes[i].ativo)
-            continue;
-        pendentes[i].ativo = 1;
-        pendentes[i].tipo = tipo;
-        pendentes[i].pos = pos;
-        /* O giro antecede a explosão; o tempo fica abaixo da duração dos áudios de SPIN. */
-        pendentes[i].restante = aleatorioEntre(1.0f, 2.0f);
-        break;
-    }
+    tocarEspacial(somAleatorio(&bancoBoomInimigo[tipo]), pos, 1.0f, ALCANCE_BOOM_INIMIGO);
 }
 
 void audioSpinJogador(void)
@@ -894,7 +904,23 @@ void audioSpinJogador(void)
 void audioBoomJogador(Vector3 pos)
 {
     (void)pos;   /* a explosão é do próprio ouvinte: centro, sem atenuação */
+    if (IsSoundValid(spinJogador))
+        StopSound(spinJogador);
     tocar(somAleatorio(&bancoBoomJogador), 0.95f, 0.0f);
+}
+
+void audioPararSpins(void)
+{
+    int t, i;
+
+    if (!audioPronto)
+        return;
+    if (IsSoundValid(spinJogador))
+        StopSound(spinJogador);
+    for (t = 0; t < 3; t++)
+        for (i = 0; i < SPIN_VOZES; i++)
+            if (IsSoundValid(spinInimigoVoz[t][i]))
+                StopSound(spinInimigoVoz[t][i]);
 }
 
 void audioDestroierDestruido(void)
