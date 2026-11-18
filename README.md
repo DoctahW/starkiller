@@ -180,7 +180,7 @@ Outros comandos:
 | Disparar                | Espaço                   | RT                       |
 | Próximo / anterior alvo | T / Y                    | D-pad → / ←              |
 | Alvo na mira            | R                        | LT                       |
-| Reparar casco (25)      | F                        | D-pad ↑                  |
+| Reparar casco           | F                        | D-pad ↑                  |
 | Pausa                   | Esc                      | Start                    |
 | Confirmar / voltar      | Enter / Esc ou Backspace | A / B                    |
 
