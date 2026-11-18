@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "combate.h"
 #include "destroier.h"
@@ -516,6 +517,105 @@ static void desenharLasers(const Jogo *g)
     }
 }
 
+/*
+ * VIS-10: explosões do pool. Somadas à cena com a textura do brilho e sem gravar profundidade:
+ * clarão branco no começo, bola de fogo com o raio de raioExplosao e fagulhas voando para fora.
+ * Tudo esfria de amarelo para vermelho e some com 1 - progresso.
+ */
+#define BOLHAS_EXPLOSAO   6
+#define FAGULHAS_EXPLOSAO 16
+
+/* Semente fixa por explosão (da posição): o render recebe const Jogo * e não guarda estado. */
+static unsigned int sementeExplosao(const Explosao *e)
+{
+    float v[3] = { e->pos.x, e->pos.y, e->pos.z };
+    unsigned int h = 2166136261u;
+
+    for (int i = 0; i < 3; i++) {
+        unsigned int bits;
+        memcpy(&bits, &v[i], sizeof bits);
+        h = (h ^ bits) * 16777619u;
+    }
+    return h;
+}
+
+/* xorshift32: valor em [0, 1). */
+static float sortear(unsigned int *s)
+{
+    *s ^= *s << 13;
+    *s ^= *s >> 17;
+    *s ^= *s << 5;
+    return (float)(*s >> 8) * (1.0f / 16777216.0f);
+}
+
+static Vector3 direcaoAleatoria(unsigned int *s)
+{
+    float z = sortear(s) * 2.0f - 1.0f;
+    float fi = sortear(s) * 2.0f * PI;
+    float r = sqrtf(1.0f - z * z);
+
+    return (Vector3){ r * cosf(fi), r * sinf(fi), z };
+}
+
+/* Cor do fogo pelo progresso: branco-amarelo, laranja, vermelho escuro; `alfa` em [0, 1]. */
+static Color corFogo(float p, float alfa)
+{
+    static const Vector3 PARADAS[3] = { { 255, 240, 200 }, { 255, 140, 40 }, { 150, 35, 10 } };
+    Vector3 c = p < 0.35f ? Vector3Lerp(PARADAS[0], PARADAS[1], p / 0.35f)
+                          : Vector3Lerp(PARADAS[1], PARADAS[2], (p - 0.35f) / 0.65f);
+
+    return (Color){ (unsigned char)c.x, (unsigned char)c.y, (unsigned char)c.z,
+                    (unsigned char)(255.0f * Clamp(alfa, 0.0f, 1.0f)) };
+}
+
+static void desenharExplosao(const Camera3D *cam, const Explosao *e)
+{
+    float p = progressoExplosao(e);
+    float raio = raioExplosao(e);
+    float some = 1.0f - p;
+    unsigned int s = sementeExplosao(e) | 1u;   /* xorshift não sai do zero */
+
+    /* Clarão: grande e branco, apaga no primeiro quinto da vida. */
+    if (p < 0.2f)
+        DrawBillboard(*cam, texturaBrilho, e->pos, e->raioMax * 3.0f, corFogo(0.0f, 1.0f - p / 0.2f));
+
+    /* Bola de fogo: o billboard tem o diâmetro da explosão; as bolhas tiram o contorno de disco. */
+    DrawBillboard(*cam, texturaBrilho, e->pos, raio * 2.0f, corFogo(p, some));
+    for (int i = 0; i < BOLHAS_EXPLOSAO; i++) {
+        Vector3 d = direcaoAleatoria(&s);
+        float tam = raio * (0.9f + 0.5f * sortear(&s));
+
+        DrawBillboard(*cam, texturaBrilho, Vector3Add(e->pos, Vector3Scale(d, raio * 0.5f)), tam,
+                      corFogo(Clamp(p * 1.2f, 0.0f, 1.0f), some * 0.7f));
+    }
+
+    /* Fagulhas: saem mais longe que a bola de fogo, encolhem e somem antes dela. */
+    for (int i = 0; i < FAGULHAS_EXPLOSAO; i++) {
+        Vector3 d = direcaoAleatoria(&s);
+        float alcance = e->raioMax * (1.0f + 0.8f * sortear(&s));
+        float tam = e->raioMax * (0.12f + 0.08f * sortear(&s)) * some;
+        float dist = alcance * p * (2.0f - p);
+
+        DrawBillboard(*cam, texturaBrilho, Vector3Add(e->pos, Vector3Scale(d, dist)), tam,
+                      corFogo(p * 0.6f, some * some));
+    }
+}
+
+static void desenharExplosoes(const Jogo *g, const Camera3D *cam)
+{
+    if (!temTexturaBrilho)
+        return;
+
+    /* Depois dos opacos: o teste de profundidade ainda esconde o que está atrás das naves. */
+    rlDisableDepthMask();
+    BeginBlendMode(BLEND_ADDITIVE);
+    for (int i = 0; i < MAX_EXPLOSOES; i++)
+        if (g->explosoes[i].ativa)
+            desenharExplosao(cam, &g->explosoes[i]);
+    EndBlendMode();
+    rlEnableDepthMask();
+}
+
 void render_cena(const Jogo *g, Camera3D cam)
 {
     desenharFundo(&g->jogador);
@@ -525,6 +625,7 @@ void render_cena(const Jogo *g, Camera3D cam)
     for (const NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox)
         desenharInimigo(&no->dado);
     desenharLasers(g);
+    desenharExplosoes(g, &cam);
     /* A poeira não grava profundidade: vem depois dos objetos opacos da arena. */
     desenharPoeira(&g->jogador);
     EndMode3D();
