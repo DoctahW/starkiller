@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string.h>
 
 #include "audio.h"
@@ -119,6 +120,17 @@ static void testarDoppler(void)
                                (Vector3){ 0.0f, 0.0f, -10000.0f }) <= 1.35f);
     VERIFICA(audioFatorDoppler((Vector3){ 0.0f, 0.0f, 500.0f },
                                (Vector3){ 0.0f, 0.0f, 10000.0f }) >= 0.72f);
+
+    /* Com o alcance maior, a fonte distante tem o mesmo Doppler atenuado. */
+    {
+        float perto = audioFatorDoppler((Vector3){ 0.0f, 0.0f, 500.0f },
+                                        (Vector3){ 0.0f, 0.0f, -300.0f });
+        float longe = audioFatorDoppler((Vector3){ 0.0f, 0.0f, 2000.0f },
+                                        (Vector3){ 0.0f, 0.0f, -300.0f });
+
+        VERIFICA(longe > 1.0f);
+        VERIFICA(fabsf(longe - 1.0f) < fabsf(perto - 1.0f));
+    }
 }
 
 int main(void)

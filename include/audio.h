@@ -40,7 +40,9 @@ typedef enum {
 /*
  * Fator de pitch do efeito Doppler para uma fonte móvel em `pos` com velocidade `vel`,
  * relativa ao ouvinte atual (o TIE do jogador). 1,0 = sem deslocamento; > 1 ao se aproximar
- * e < 1 ao se afastar. Já vem limitado a uma faixa segura. Serve para qualquer nave.
+ * e < 1 ao se afastar. O deslocamento perde força com a distância, para fontes no limite do
+ * alcance não competirem com as próximas. Já vem limitado a uma faixa segura. Serve para
+ * qualquer nave.
  */
 float audioFatorDoppler(Vector3 pos, Vector3 vel);
 
