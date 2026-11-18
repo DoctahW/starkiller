@@ -15,7 +15,8 @@
 #include "telas.h"
 
 static RelogioCombate relogio;
-static int avisoArena;   /* 1 enquanto a nave está além do RAIO_ARENA; o HUD mostra o aviso */
+static int avisoArena;       /* 1 enquanto a nave está além do RAIO_ARENA; o HUD mostra o aviso */
+static int pausaSelecionada; /* item do menu de pausa */
 
 /* Libera as estruturas da partida em andamento; seguro de chamar mais de uma vez. */
 static void encerrarPartida(Jogo *g)
@@ -180,32 +181,47 @@ static EstadoJogo combate(Jogo *g, const ConfigEntrada *cfg, const Comandos *cmd
     return proximo;
 }
 
-/* A cena e a cabine ficam congeladas e escurecidas atrás do aviso. */
+/* A cena e a cabine ficam congeladas e escurecidas atrás do menu. */
 static EstadoJogo pausa(const Jogo *g, const Comandos *cmd)
 {
-    const char *dica = "Esc/Start: continuar   Enter/A: voltar ao menu";
+    int antes = pausaSelecionada;
+
+    if (cmd->menuCima)
+        pausaSelecionada = (pausaSelecionada + PAUSA_QTD - 1) % PAUSA_QTD;
+    if (cmd->menuBaixo)
+        pausaSelecionada = (pausaSelecionada + 1) % PAUSA_QTD;
+    if (pausaSelecionada != antes)
+        audioUIMover();
 
     render_cena(g, cameraComTremor(g));
     hud_desenhar(g, avisoArena);
-    DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, Fade(BLACK, 0.6f));
-    DrawText("PAUSA", (LARGURA_TELA - MeasureText("PAUSA", 40)) / 2, ALTURA_TELA / 2 - 50, 40, RAYWHITE);
-    DrawText(dica, (LARGURA_TELA - MeasureText(dica, 20)) / 2, ALTURA_TELA / 2 + 4, 20, GRAY);
+    telasDesenharPausa(pausaSelecionada);
 
-    if (cmd->pausa)
+    if (cmd->pausa || cmd->voltar) {
+        audioUIVoltar();
         return EST_COMBATE;
-    if (cmd->confirmar)
-        return EST_MENU;
+    }
+    if (cmd->confirmar) {
+        audioUISelecionar();
+        if (pausaSelecionada == PAUSA_OPCOES) {
+            telasOpcoesDefinirOrigem(EST_PAUSA);
+            return EST_CONTROLES;
+        }
+        if (pausaSelecionada == PAUSA_VOLTAR_MENU)
+            return EST_MENU;
+        return EST_COMBATE;
+    }
     return EST_PAUSA;
 }
 
 /*
  * Transições:
- *   MENU      -> COMBATE (inicia partida) | PLACAR | CONTROLES | SAIR
+ *   MENU      -> COMBATE (inicia partida) | PLACAR | CONTROLES (Opções) | SAIR
  *   COMBATE   -> PAUSA (Esc/Start ou controle desconectado) | FIM
- *   PAUSA     -> COMBATE | MENU (libera a partida)
+ *   PAUSA     -> COMBATE | CONTROLES (Opções) | MENU (libera a partida)
+ *   CONTROLES -> MENU (origem menu) | PAUSA (origem pausa)
  *   FIM       -> PLACAR
  *   PLACAR    -> MENU
- *   CONTROLES -> MENU
  */
 static EstadoJogo atualizarEstado(Jogo *g, ConfigEntrada *cfg, const Comandos *cmd, int controleCaiu)
 {
@@ -221,13 +237,49 @@ static EstadoJogo atualizarEstado(Jogo *g, ConfigEntrada *cfg, const Comandos *c
     return EST_SAIR;
 }
 
+/* Faixa de fundo de cada estado; Opções herda o contexto de quem a abriu. */
+static void definirMusica(EstadoJogo anterior, EstadoJogo novo)
+{
+    switch (novo) {
+    case EST_MENU:
+        audioMusicaTocar(AUDIO_MUSICA_MENU, 1.0f);
+        break;
+    case EST_COMBATE:
+        audioMusicaTocar(AUDIO_MUSICA_COMBATE, 1.0f);
+        break;
+    case EST_PAUSA:
+        audioMusicaTocar(AUDIO_MUSICA_COMBATE, AUDIO_FATOR_PAUSA);
+        break;
+    case EST_CONTROLES:
+        if (anterior == EST_PAUSA)
+            audioMusicaTocar(AUDIO_MUSICA_COMBATE, AUDIO_FATOR_PAUSA);
+        else
+            audioMusicaTocar(AUDIO_MUSICA_MENU, 1.0f);
+        break;
+    case EST_FIM:
+    case EST_PLACAR:
+        audioMusicaTocar(AUDIO_MUSICA_RANKING, 1.0f);
+        break;
+    case EST_SAIR:
+        audioMusicaTocar(AUDIO_MUSICA_NENHUMA, 0.0f);
+        break;
+    }
+}
+
 static void trocarEstado(Jogo *g, EstadoJogo novo)
 {
-    if (g->estado == EST_MENU && novo == EST_COMBATE)
+    EstadoJogo anterior = g->estado;
+
+    if (anterior == EST_MENU && novo == EST_COMBATE)
         iniciarPartida(g);
     else if (novo == EST_MENU)
         encerrarPartida(g);
+
+    if (novo == EST_PAUSA && anterior == EST_COMBATE)
+        pausaSelecionada = 0;
+
     g->estado = novo;
+    definirMusica(anterior, novo);
 }
 
 void jogo_executar(void)
@@ -254,6 +306,7 @@ void jogo_executar(void)
     hud_carregar();
     iniciarAudio();
     jogo.estado = EST_MENU;
+    audioMusicaTocar(AUDIO_MUSICA_MENU, 1.0f);
 
     while (jogo.estado != EST_SAIR && !WindowShouldClose()) {
         Comandos cmd = lerComandos(&cfg);
