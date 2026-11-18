@@ -29,8 +29,8 @@ int audioDisponivel(void);
 void audioAtualizar(const Jogo *g, const Comandos *cmd, int emCombate, float dt);
 
 /*
- * Grupos de fontes móveis de motor. O grupo separa os ids de listas diferentes (inimigos
- * hoje, aliados no futuro) para que não colidam na mesma voz.
+ * Grupos de fontes móveis de motor. O grupo separa os ids de inimigos e aliados
+ * para que não colidam na mesma voz.
  */
 typedef enum {
     AUDIO_MOTOR_INIMIGO = 0,
@@ -47,8 +47,8 @@ typedef enum {
 float audioFatorDoppler(Vector3 pos, Vector3 vel);
 
 /*
- * Registra uma fonte de motor móvel neste frame. `id` é único dentro de `grupo`. Inimigos e
- * futuros aliados usam a mesma voz genérica: as fontes mais próximas de cada tipo ocupam as
+ * Registra uma fonte de motor móvel neste frame. `id` é único dentro de `grupo`.
+ * As fontes mais próximas de cada tipo ocupam as
  * vozes disponíveis, com volume por distância, pan e Doppler. Fonte que não for registrada
  * em um frame desvanece. Chamar antes de audioAtualizar, que consome os registros.
  */
@@ -56,9 +56,12 @@ void audioMotorRegistrar(GrupoMotor grupo, int id, TipoNave tipo, Vector3 pos, V
 
 /* Eventos pontuais do combate. */
 void audioTiroJogador(void);                         /* TIE WEAPON, alterna os dois sons */
+void audioTiroAliado(Vector3 pos);                   /* TIE WEAPON com posição no espaço */
+void audioBoomAliado(Vector3 pos);                   /* explosão do TIE aliado */
 void audioTiroInimigo(TipoNave tipo, Vector3 pos);   /* WEAPON do caça rebelde */
 void audioDanoJogador(void);                         /* SHOT_HIT: tiro inimigo acertou o TIE */
 void audioColisaoJogador(void);                      /* COLLISION_HIT: TIE bateu no casco */
+void audioRepararJogador(void);                      /* TIE_SKILL: reparo de campo do TIE */
 void audioTrocaAlvo(void);                           /* TARGET ACQUISITION */
 /*
  * Destruição de um caça inimigo: o jogo controla o tempo (o destroço gira) e avisa o áudio.
@@ -72,7 +75,7 @@ void audioBoomJogador(Vector3 pos);                  /* para o SPIN e toca a exp
 /* Para todos os SPINs (inimigos e jogador); usar ao limpar uma partida. */
 void audioPararSpins(void);
 void audioDestroierDestruido(void);                  /* DESTROYED do Destróier */
-void audioEscudoDestroier(int ligado);               /* SHIELD enable/disable (uso futuro) */
+void audioEscudoDestroier(int ligado);               /* SHIELD enable/disable (volume do alarme do ISD) */
 
 /*
  * Configuração de áudio (AUD-02), persistida em CAMINHO_CONFIG_AUDIO.

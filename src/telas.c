@@ -3,6 +3,7 @@
 
 #include "audio.h"
 #include "entrada.h"
+#include "jogo.h"
 #include "placar.h"
 #include "pontuacao.h"
 #include "telas.h"
@@ -181,7 +182,7 @@ static void desenharFundoMenu(void)
     if (fundoMenu.id != 0) {
         DrawTexturePro(fundoMenu,
                        (Rectangle){ 0.0f, 0.0f, (float)fundoMenu.width, (float)fundoMenu.height },
-                       (Rectangle){ 0.0f, 0.0f, (float)GetScreenWidth(), (float)GetScreenHeight() },
+                       (Rectangle){ 0.0f, 0.0f, (float)LARGURA_TELA, (float)ALTURA_TELA },
                        (Vector2){ 0.0f, 0.0f }, 0.0f, WHITE);
     }
 }
@@ -192,7 +193,7 @@ EstadoJogo telaMenu(Jogo *g, const Comandos *cmd)
     static const EstadoJogo destinos[] = { EST_COMBATE, EST_PLACAR, EST_CONTROLES, EST_SAIR };
     enum { QTD_OPCOES = sizeof opcoes / sizeof opcoes[0] };
     static int selecionada = 0;
-    int centroX = (int)(GetScreenWidth() * MENU_CENTRO_X);
+    int centroX = (int)(LARGURA_TELA * MENU_CENTRO_X);
     int antes = selecionada;
     int i;
 
@@ -396,7 +397,7 @@ static void desenharSeletorLetras(void)
         largura += MeasureTextEx(fonte, letra, tamanho, ESPACO_FONTE).x + espaco;
     }
 
-    x = ((float)GetScreenWidth() - largura) / 2.0f;
+    x = ((float)LARGURA_TELA - largura) / 2.0f;
     for (p = LETRAS_FIM; *p != '\0'; p++) {
         char letra[2] = { *p, '\0' };
         float larguraLetra = MeasureTextEx(fonte, letra, tamanho, ESPACO_FONTE).x;
@@ -412,7 +413,7 @@ static void desenharSeletorLetras(void)
 static void desenharNomeFim(void)
 {
     Font fonte = fonteDoMenu();
-    int x = (GetScreenWidth() - LARGURA_NOME) / 2;
+    int x = (LARGURA_TELA - LARGURA_NOME) / 2;
     int tx = x + 16;
     int ty = Y_NOME + 11;
     char antes[PLACAR_MAX_NOME + 1];
@@ -434,7 +435,7 @@ static void desenharNomeFim(void)
 
 EstadoJogo telaFim(Jogo *g, const Comandos *cmd)
 {
-    int centro = GetScreenWidth() / 2;
+    int centro = LARGURA_TELA / 2;
     int bonus = bonusCasco(g);
     int total = calcularPontuacao(g);
 
@@ -491,7 +492,7 @@ EstadoJogo telaPlacar(Jogo *g, const Comandos *cmd)
 {
     NoPlacar ranking[RANKING_MAX];
     int total = exibirRankingEmOrdem(g->placar, ranking, RANKING_MAX);
-    int centro = GetScreenWidth() / 2;
+    int centro = LARGURA_TELA / 2;
     int i;
 
     (void)entrouEm(EST_PLACAR);
@@ -548,7 +549,7 @@ static const LinhaControle CONTROLES[] = {
     { "Acelerar / frear", "Shift / Ctrl", "Analógico dir. ↑ / ↓" },
     { "Disparar lasers", "Espaço", "RT" },
     { "Próximo / anterior alvo", "T / Y", "D-pad → / ←" },
-    { "Alvo mais próximo", "R", "LT" },
+    { "Alvo na mira", "R", "LT" },
     { "Pausa", "Esc", "Start" },
     { "Navegar nos menus", "Setas", "D-pad / analógico esq." },
     { "Confirmar", "Enter", "A" },
@@ -667,7 +668,7 @@ static void desenharBarraVolume(int x, int y, int largura, int altura, float val
 static void desenharAbas(int aba, int foco)
 {
     static const char *ABAS[] = { "Controles", "Áudio" };
-    int centro = GetScreenWidth() / 2;
+    int centro = LARGURA_TELA / 2;
     int x[QTD_ABAS];
     int i;
 
@@ -693,7 +694,7 @@ EstadoJogo telaControles(ConfigEntrada *cfg, const Comandos *cmd)
     static int aba = ABA_CONTROLES;
     static int foco = 0;   /* 0 = barra de abas; 1..N = linha da aba atual */
     ConfigAudio *acfg = audioConfig();
-    int centro = GetScreenWidth() / 2;
+    int centro = LARGURA_TELA / 2;
     int nLinhas;
     int antesAba, antesFoco;
     int i;
@@ -835,10 +836,10 @@ void telasDesenharPausa(int selecionada)
     static const char *ITENS[PAUSA_QTD] = {
         "Continuar", "Opções", "Voltar ao menu principal"
     };
-    int centro = GetScreenWidth() / 2;
+    int centro = LARGURA_TELA / 2;
     int i;
 
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.65f));
+    DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, Fade(BLACK, 0.65f));
     textoNoMenu("PAUSA", centro, 150, 48, RAYWHITE);
 
     for (i = 0; i < PAUSA_QTD; i++) {

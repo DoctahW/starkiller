@@ -6,12 +6,17 @@
 #include "reforcos.h"
 
 #define PRIMEIRA_ONDA    3.0f
-#define INTERVALO_ONDAS  20.0f
+#define INTERVALO_ONDAS  15.0f
+
+/* Multiplicadores por tipo: X-Wing 2×, Y-Wing e A-Wing 2×. */
+#define MULT_XWING 2
+#define MULT_YWING 2
+#define MULT_AWING 2
 
 /* Os reforços nascem numa esfera de raio 8200, dentro da arena (RAIO_ARENA = 9000). */
 #define RAIO_REFORCO     8200.0f
-#define ESPACO_FORMACAO  30.0f
-#define COLUNAS_FORMACAO 3
+#define ESPACO_FORMACAO  45.0f
+#define COLUNAS_FORMACAO 4
 
 /* O grupo nasce longe do jogador: fora do alcance de tiro (1840) com folga para ele reagir. */
 #define DIST_MIN_JOGADOR 3000.0f
@@ -68,7 +73,8 @@ int desenfileirarReforco(FilaReforcos *f, NoReforco *saida)
 
 /*
  * Seção 2.2: primeira onda em 3 s, depois uma a cada 20 s, com tamanho 2 + t/40.
- * A proporção de A-Wings cresce com o tempo e há pelo menos 1 Y-Wing da 2ª onda em diante.
+ * A proporção de A-Wings cresce com o tempo. Após a primeira onda, Y-Wings vêm em pares
+ * assim que há espaço para dois bombardeiros e um X-Wing; a segunda onda ainda tem um só.
  * Os clamps garantem pelo menos 1 X-Wing por onda e que X + Y + A seja sempre o tamanho da onda.
  */
 void gerarReforcos(FilaReforcos *f, float duracao)
@@ -77,15 +83,16 @@ void gerarReforcos(FilaReforcos *f, float duracao)
     float t;
 
     for (onda = 0, t = PRIMEIRA_ONDA; t < duracao; onda++, t += INTERVALO_ONDAS) {
-        int total = 2 + (int)(t / 40.0f);
-        int qtdA = (int)(total * (t / duracao));
-        int qtdY = onda == 0 ? 0 : 1 + onda / 6;
+        int totalBase = 2 + (int)(t / 40.0f);
+        int qtdABase = (int)(totalBase * (t / duracao));
+        int qtdYBase = onda == 0 ? 0 : (totalBase >= 3 ? 2 : 1);
+        int qtdXBase;
 
-        if (qtdY > total - qtdA)
-            qtdY = total - qtdA;
-        if (qtdA > total - 1 - qtdY)
-            qtdA = total - 1 - qtdY;
-        enfileirarReforco(f, t, total - qtdY - qtdA, qtdY, qtdA);
+        if (qtdABase > totalBase - 1 - qtdYBase)
+            qtdABase = totalBase - 1 - qtdYBase;
+        qtdXBase = totalBase - qtdYBase - qtdABase;
+        /* Reforços mais frequentes e por tipo: X-Wing 3×, Y-Wing/A-Wing 2×. */
+        enfileirarReforco(f, t, qtdXBase * MULT_XWING, qtdYBase * MULT_YWING, qtdABase * MULT_AWING);
     }
 }
 
@@ -141,6 +148,7 @@ static void criarGrupo(Jogo *g, const NoReforco *grupo)
     int colunas, linhas;
     Vector3 centro, direita, cima;
     int i;
+    int grupoBombardeio = g->proximoId;
 
     if (total <= 0)
         return;
@@ -159,6 +167,7 @@ static void criarGrupo(Jogo *g, const NoReforco *grupo)
         Inimigo in = criarInimigo(tipoDoIndice(grupo, i), Vector3Add(centro, desloc), g->proximoId++);
 
         in.distancia = Vector3Distance(in.pos, g->jogador.pos);
+        in.grupoBombardeio = grupoBombardeio;
         inserirInimigo(&g->inimigos, in);
     }
 }

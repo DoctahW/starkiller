@@ -15,6 +15,14 @@ Inimigo criarInimigo(TipoNave tipo, Vector3 pos, int id)
     in.vel = (Vector3){ 0.0f, 0.0f, 0.0f };
     in.distancia = 0.0f;
     in.cooldownTiro = 0.0f;
+    in.alvoAliado = -1;
+    in.escoltaYwing = -1;
+    in.escoltaYwing2 = -1;
+    in.focoDestroier = 0;
+    in.pontoReagrupamento = tipo == YWING ? ywingPontoEstagio(id)
+        : (Vector3LengthSqr(pos) > 1e-6f
+               ? Vector3Scale(Vector3Normalize(pos), RAIO_ARENA)
+               : (Vector3){ RAIO_ARENA, 0.0f, 0.0f });
 
     switch (tipo) {
     case YWING:
@@ -38,6 +46,7 @@ Inimigo criarInimigo(TipoNave tipo, Vector3 pos, int id)
 
     in.escudo = in.escudoMax;
     in.casco = in.cascoMax;
+    in.estadoAtaque = in.estadoIA;
     return in;
 }
 
@@ -98,6 +107,7 @@ void removerInimigo(ListaInimigos *l, NoInimigo *no){
 
 
 void atualizarInimigos(Jogo *g, float dt){
+    ia_atribuirEscolta(g);
     for(NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox){
         Inimigo *in = &no->dado;
         float dist;

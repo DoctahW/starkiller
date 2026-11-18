@@ -78,8 +78,8 @@ static void testarCooldown(void)
     VERIFICA(dispararLaser(&jogo) == 0);
     VERIFICA(contarAtivos(&jogo) == 2);
 
-    /* Passados 0,15 s, dispara de novo. */
-    atualizarLasers(&jogo, 0.06f);
+    /* Passados 0,20 s, dispara de novo. */
+    atualizarLasers(&jogo, 0.11f);
     VERIFICA(jogo.jogador.cooldownLaser == 0.0f);
     VERIFICA(dispararLaser(&jogo) == 1);
     VERIFICA(contarAtivos(&jogo) == 4);
@@ -168,19 +168,19 @@ static void testarCadenciaContinua(void)
 {
     int i, disparos = 0;
 
-    /* Segurando o gatilho por 3 s a 60 fps: 1 disparo a cada 9 ou 10 frames (0,15 s), o pool nunca enche. */
+    /* Segurando o gatilho por 3 s a 60 fps: 1 disparo a cada 12 frames (0,20 s), o pool nunca enche. */
     novoJogo();
     for (i = 0; i < 180; i++) {
         disparos += dispararLaser(&jogo);
         atualizarLasers(&jogo, 1.0f / 60.0f);
     }
-    VERIFICA(disparos >= 19 && disparos <= 21);        /* 0,15 s = 9 frames: 20 disparos em 180 frames */
-    VERIFICA(contarAtivos(&jogo) <= 2 * 14);
+    VERIFICA(disparos >= 13 && disparos <= 16);        /* 0,20 s = 12 frames: 15 disparos em 180 frames */
+    VERIFICA(contarAtivos(&jogo) <= 2 * 16);
 
-    /* O erro de float de 9 passos de 1/60 s não pode empurrar o disparo para o 10º frame. */
+    /* O erro de float de 12 passos de 1/60 s não pode empurrar o disparo para o 13º frame. */
     novoJogo();
     VERIFICA(dispararLaser(&jogo) == 1);
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < 11; i++) {
         atualizarLasers(&jogo, 1.0f / 60.0f);
         VERIFICA(dispararLaser(&jogo) == 0);
     }
@@ -761,15 +761,14 @@ static void testarColisaoLasersInimigos(void)
     int passos;
     const float proa = Z_PROA_DESTROIER * ESCALA_DESTROIER;
 
-    /* Acerto no TIE: o escudo absorve, sequência zera, laser some. O TIE fica à frente da proa. */
+    /* Acerto no TIE: o casco cai direto (sem escudo), sequência zera, laser some. O TIE fica à frente da proa. */
     novoJogo();
     jogo.jogador.pos = (Vector3){ 0.0f, 0.0f, proa + 400.0f };
     jogo.sequenciaSemDano = 4;
     in = inimigoEm((Vector3){ 0.0f, 0.0f, proa + 1400.0f }, IA_ATACAR_JOGADOR);
     dispararLaserInimigo(&jogo, &in);
     VERIFICA(voarLasersInimigos(dt, 600, &passos) == 1);
-    VERIFICA(proximo(jogo.jogador.escudo, ESCUDO_JOGADOR - DANO_LASER_INIMIGO));
-    VERIFICA(proximo(jogo.jogador.casco, CASCO_JOGADOR));
+    VERIFICA(proximo(jogo.jogador.casco, CASCO_JOGADOR - DANO_LASER_INIMIGO));
     VERIFICA(jogo.sequenciaSemDano == 0);
     VERIFICA(contarAtivos(&jogo) == 0);
     VERIFICA(proximo(jogo.cascoDestroier, 0.0f));   /* Jogo zerado: o Destróier não foi tocado */
@@ -782,7 +781,32 @@ static void testarColisaoLasersInimigos(void)
     dispararLaserInimigo(&jogo, &in);
     voarLasersInimigos(dt, 600, &passos);
     VERIFICA(proximo(jogo.cascoDestroier, 100.0f - DANO_LASER_INIMIGO * FRACAO_DANO_DESTROIER));
-    VERIFICA(proximo(jogo.jogador.casco, 100.0f));
+    VERIFICA(proximo(jogo.jogador.casco, CASCO_JOGADOR));
+    VERIFICA(contarAtivos(&jogo) == 0);
+
+    /* Com escudo, o mesmo laser preserva o casco e reinicia a espera da recarga. */
+    novoJogo();
+    iniciarDestroier(&jogo);
+    jogo.cascoDestroier = 100.0f;
+    jogo.jogador.pos = (Vector3){ 4000.0f, 0.0f, 0.0f };
+    in = inimigoEm((Vector3){ 0.0f, 0.0f, proa + 1400.0f }, IA_ATACAR_DESTROIER);
+    dispararLaserInimigo(&jogo, &in);
+    voarLasersInimigos(dt, 600, &passos);
+    VERIFICA(proximo(jogo.escudoDestroier,
+        ESCUDO_MAX_DESTROIER - DANO_LASER_INIMIGO * FRACAO_DANO_DESTROIER));
+    VERIFICA(proximo(jogo.cascoDestroier, 100.0f));
+    VERIFICA(jogo.esperaEscudoDestroier == ATRASO_ESCUDO_DESTROIER);
+    VERIFICA(contarAtivos(&jogo) == 0);
+
+    /* Um escudo quase esgotado absorve parte do laser e deixa só o excedente passar. */
+    jogo.escudoDestroier = 1.0f;
+    jogo.esperaEscudoDestroier = 0.5f;
+    dispararLaserInimigo(&jogo, &in);
+    voarLasersInimigos(dt, 600, &passos);
+    VERIFICA(jogo.escudoDestroier == 0.0f);
+    VERIFICA(proximo(jogo.cascoDestroier,
+        100.0f - (DANO_LASER_INIMIGO * FRACAO_DANO_DESTROIER - 1.0f)));
+    VERIFICA(jogo.esperaEscudoDestroier == ATRASO_ESCUDO_DESTROIER);
     VERIFICA(contarAtivos(&jogo) == 0);
 
     /* Passo grande: o segmento evita o túnel pelo TIE (esfera pequena). */
@@ -800,7 +824,7 @@ static void testarColisaoLasersInimigos(void)
     jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 100.0f }, .vel = { 0.0f, 0.0f, -VEL_LASER_INIMIGO },
                               .vida = 1.0f, .ativo = 1, .doJogador = 0, .dano = 5.0f };
     VERIFICA(colidirLasersInimigos(&jogo, 2.0f) == 1);   /* segmento longo, do TIE até dentro do casco */
-    VERIFICA(proximo(jogo.jogador.escudo, ESCUDO_JOGADOR - 5.0f));
+    VERIFICA(proximo(jogo.jogador.casco, CASCO_JOGADOR - 5.0f));
     VERIFICA(proximo(jogo.cascoDestroier, 100.0f));
     VERIFICA(contarAtivos(&jogo) == 0);
 
@@ -811,7 +835,7 @@ static void testarColisaoLasersInimigos(void)
     jogo.lasers[0] = (Laser){ .pos = { 0.0f, 0.0f, 700.0f }, .vel = { 0.0f, 0.0f, -VEL_LASER_INIMIGO },
                               .vida = 1.0f, .ativo = 1, .doJogador = 0, .dano = 5.0f };
     VERIFICA(colidirLasersInimigos(&jogo, 0.1f) == 0);  /* segmento curto já dentro do casco */
-    VERIFICA(proximo(jogo.jogador.casco, 100.0f));
+    VERIFICA(proximo(jogo.jogador.casco, CASCO_JOGADOR));
     VERIFICA(proximo(jogo.cascoDestroier, 100.0f - 5.0f * FRACAO_DANO_DESTROIER));
     VERIFICA(contarAtivos(&jogo) == 0);
 
@@ -827,7 +851,7 @@ static void testarColisaoLasersInimigos(void)
                               .vida = 1.0f, .ativo = 0, .doJogador = 0, .dano = 5.0f };
     VERIFICA(colidirLasersInimigos(&jogo, dt) == 0);
     VERIFICA(jogo.lasers[0].ativo && jogo.lasers[1].ativo);
-    VERIFICA(proximo(jogo.jogador.casco, 100.0f));
+    VERIFICA(proximo(jogo.jogador.casco, CASCO_JOGADOR));
     VERIFICA(proximo(jogo.cascoDestroier, 100.0f));
 }
 

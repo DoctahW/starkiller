@@ -1,15 +1,19 @@
+#include <math.h>
 #include <string.h>
 
 #include <SDL3/SDL.h>
 
 #include "jogo.h"
 #include "audio.h"
+#include "aliados.h"
 #include "combate.h"
+#include "destroier.h"
 #include "entrada.h"
 #include "hud.h"
 #include "inimigos.h"
 #include "nave.h"
 #include "placar.h"
+#include "raymath.h"
 #include "reforcos.h"
 #include "render.h"
 #include "telas.h"
@@ -35,10 +39,11 @@ static void iniciarPartida(Jogo *g)
     memset(g, 0, sizeof *g);
     g->placar = placar;
     g->tempoRestante = DURACAO_PARTIDA;
-    g->cascoDestroier = CASCO_MAX_DESTROIER;
+    iniciarDestroier(g);
     g->proximoId = 1;
     gerarReforcos(&g->reforcos, DURACAO_PARTIDA);
     iniciarJogador(&g->jogador);
+    iniciarAliados(g);
     relogio = (RelogioCombate){ 0 };
     avisoArena = 0;
 }
@@ -46,6 +51,8 @@ static void iniciarPartida(Jogo *g)
 /*
  * Derrota tem precedência sobre o tempo esgotado. Com o casco do TIE em 0, a nave primeiro
  * rodopia (iniciarQuedaJogador + SPIN) e só depois explode (BOOM), como pede a AUD-01.
+ * Se ainda há respawns, a partida continua e o jogador volta em TEMPO_RESPAWN_JOGADOR;
+ * na última vida, a explosão encerra a partida.
  */
 static int verificarFim(Jogo *g)
 {
@@ -55,14 +62,31 @@ static int verificarFim(Jogo *g)
         if (fase == 0) {
             iniciarQuedaJogador();
             audioSpinJogador();
+            g->jogador.morto = 1;
+            g->jogador.explodiu = 0;
+            g->jogador.tempoRespawn = 0.0f;
+            g->pontos = g->pontos > PENALIDADE_MORTE_JOGADOR
+                ? g->pontos - PENALIDADE_MORTE_JOGADOR : 0;
+            g->sequenciaSemDano = 0;
             return 0;
         }
         if (fase == 1)   /* ainda rodopiando */
             return 0;
-        criarExplosao(g, g->jogador.pos, RAIO_EXPLOSAO);
-        audioBoomJogador(g->jogador.pos);
-        g->vitoria = 0;
-        return 1;
+        if (!g->jogador.explodiu) {
+            criarExplosao(g, g->jogador.pos, RAIO_EXPLOSAO);
+            audioBoomJogador(g->jogador.pos);
+            g->jogador.explodiu = 1;
+            g->jogador.tempoRespawn = TEMPO_RESPAWN_JOGADOR;
+            g->jogador.tempoExplosao = 0.0f;
+        }
+        if (g->jogador.respawnsRestantes <= 0) {
+            /* Deixa o zoom out da câmera mostrar a explosão antes do fim de jogo. */
+            if (g->jogador.tempoExplosao < 1.8f)
+                return 0;
+            g->vitoria = 0;
+            return 1;
+        }
+        return 0;
     }
     if (g->cascoDestroier <= 0.0f) {
         g->vitoria = 0;
@@ -82,6 +106,43 @@ static void mirarMaisProximo(Jogo *g)
     g->inimigos.alvo = g->inimigos.inicio;
 }
 
+/*
+ * R/LT: trava o caça que está sob a retícula, não o mais próximo em geral.
+ * Escolhe o menor desvio angular em relação à frente da nave, dentro de um cone curto;
+ * se nenhum estiver na mira, mantém o alvo atual.
+ */
+static void mirarNaReticula(Jogo *g)
+{
+    const Jogador *j = &g->jogador;
+    NoInimigo *melhor = NULL;
+    float melhorCosseno = COSSENO_CONE_MIRA;
+    float melhorDist = 1e30f;
+
+    for (NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox) {
+        Vector3 rel = Vector3Subtract(no->dado.pos, j->pos);
+        float dist = Vector3Length(rel);
+        float cosseno;
+
+        if (dist < 1e-4f) {
+            melhor = no;
+            melhorCosseno = 1.0f;
+            melhorDist = 0.0f;
+            continue;
+        }
+        cosseno = Vector3DotProduct(Vector3Scale(rel, 1.0f / dist), j->frente);
+        if (cosseno < COSSENO_CONE_MIRA)
+            continue;
+        if (melhor == NULL || cosseno > melhorCosseno + 1e-5f
+            || (fabsf(cosseno - melhorCosseno) <= 1e-5f && dist < melhorDist)) {
+            melhor = no;
+            melhorCosseno = cosseno;
+            melhorDist = dist;
+        }
+    }
+    if (melhor != NULL)
+        g->inimigos.alvo = melhor;
+}
+
 /* Seção 3.4, passos 2 a 5: nave → reforços → inimigos → combate. */
 static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
 {
@@ -93,10 +154,30 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
         if (g->tempoDano < 0.0f)
             g->tempoDano = 0.0f;
     }
-    atualizarEscudo(&g->jogador, PASSO_FIXO);   /* antes do dano e do disparo do passo, que reiniciam a espera */
+    atualizarEscudoDestroier(g, PASSO_FIXO);
 
-    avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
-    colidirDestroier(g, PASSO_FIXO);
+    /* Morto e explodido: o mundo continua, mas o TIE do jogador só volta no respawn. */
+    if (g->jogador.explodiu) {
+        g->jogador.tempoExplosao += PASSO_FIXO;
+        if (g->jogador.morto && g->jogador.respawnsRestantes > 0) {
+            g->jogador.tempoRespawn -= PASSO_FIXO;
+            if (g->jogador.tempoRespawn <= 0.0f) {
+                respawnJogador(g);
+                g->tempoDano = 0.0f;
+                avisoArena = 0;
+            }
+        }
+    }
+
+    if (!g->jogador.morto) {
+        avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
+        colidirDestroier(g, PASSO_FIXO);
+        if (cmd->reparar)
+            repararJogador(g);
+    } else if (faseQuedaJogador() == 1) {
+        /* A queda precisa continuar girando para terminar e liberar a explosão/respawn. */
+        avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
+    }
 
     /* O tempo do passo entra antes dos reforços: o grupo de t = 3 s nasce no passo 180. */
     r->passos++;
@@ -105,10 +186,11 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
 
     processarReforcos(g);               /* seção 3.4, passo 3 */
     atualizarInimigos(g, PASSO_FIXO);   /* seção 3.4, passo 4 */
+    atualizarAliados(g, PASSO_FIXO);
 
     /* disparar vale enquanto segurado; o cooldown é contado em passos, então o disparo fica no passo.
      * resolverLasers roda logo depois de atualizarLasers: o segmento do laser é pos - vel * dt → pos. */
-    if (cmd->disparar)
+    if (cmd->disparar && !g->jogador.morto)
         dispararLaser(g);
     atualizarLasers(g, PASSO_FIXO);
     tinhaAlvo = g->inimigos.alvo != NULL;
@@ -140,8 +222,8 @@ static void tratarMira(Jogo *g, const Comandos *cmd)
         proximoAlvo(&g->inimigos);
     if (cmd->alvoAnterior)
         alvoAnterior(&g->inimigos);
-    if (cmd->alvoMaisProximo)
-        mirarMaisProximo(g);
+    if (cmd->alvoNaMira)
+        mirarNaReticula(g);
     if (g->inimigos.alvo != antes && g->inimigos.alvo != NULL)
         audioTrocaAlvo();
 }
@@ -165,12 +247,12 @@ static EstadoJogo combate(Jogo *g, const ConfigEntrada *cfg, const Comandos *cmd
     EstadoJogo proximo = EST_PAUSA;
 
     if (!cmd->pausa && !controleCaiu) {
-        float vidaAntes = g->jogador.casco + g->jogador.escudo;
+        float vidaAntes = g->jogador.casco;
         int abatesAntes = g->abates;
 
         proximo = simularCombate(g, &relogio, cmd, GetFrameTime());
         /* Dano ao jogador pesa mais que o abate; o abate só vibra se não houve dano no frame. */
-        if (g->jogador.casco + g->jogador.escudo < vidaAntes)
+        if (g->jogador.casco < vidaAntes)
             vibrar(cfg, 0.8f, 0.4f);
         else if (g->abates > abatesAntes)
             vibrar(cfg, 0.6f, 0.3f);
@@ -299,11 +381,18 @@ void jogo_executar(void)
      */
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO) || !SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24))
         TraceLog(LOG_WARNING, "JOGO: sem profundidade de 24 bits: %s", SDL_GetError());
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(LARGURA_TELA, ALTURA_TELA, "TIE Fighter: Esquadrão Imperial");
+    SetWindowMinSize(960, 540);
+    SetWindowState(FLAG_WINDOW_MAXIMIZED);   /* abre grande, mas ainda em janela */
     ChangeDirectory(GetApplicationDirectory());
     jogo.placar = carregarPlacar(CAMINHO_PLACAR);
     SetExitKey(KEY_NULL);   /* Esc é pausa/voltar, não fecha a janela */
     SetTargetFPS(60);
+
+    /* A cena e a HUD são desenhadas em 1280×720 e escaladas para a janela, sem esticar. */
+    RenderTexture2D tela = LoadRenderTexture(LARGURA_TELA, ALTURA_TELA);
+    SetTextureFilter(tela.texture, TEXTURE_FILTER_BILINEAR);
 
     iniciarEntrada(&cfg);
     carregarAssets();
@@ -315,18 +404,41 @@ void jogo_executar(void)
     while (jogo.estado != EST_SAIR && !WindowShouldClose()) {
         Comandos cmd = lerComandos(&cfg);
         int controleCaiu = controleAntes && !cmd.controleConectado;
+        int larguraTela, alturaTela;
+        float escala, larguraDestino, alturaDestino;
+        Rectangle origem = { 0.0f, 0.0f, (float)tela.texture.width, -(float)tela.texture.height };
+        Rectangle destino;
+
         controleAntes = cmd.controleConectado;
+        if (IsKeyPressed(KEY_F11))
+            ToggleBorderlessWindowed();   /* tela cheia sem modo exclusivo */
+
+        BeginTextureMode(tela);
+        ClearBackground(BLACK);
+        EstadoJogo proximo = atualizarEstado(&jogo, &cfg, &cmd, controleCaiu);
+        EndTextureMode();
+
+        audioAtualizar(&jogo, &cmd, jogo.estado == EST_COMBATE, GetFrameTime());
+
+        larguraTela = GetScreenWidth();
+        alturaTela = GetScreenHeight();
+        escala = fminf((float)larguraTela / LARGURA_TELA, (float)alturaTela / ALTURA_TELA);
+        larguraDestino = LARGURA_TELA * escala;
+        alturaDestino = ALTURA_TELA * escala;
+        destino = (Rectangle){ ((float)larguraTela - larguraDestino) * 0.5f,
+                               ((float)alturaTela - alturaDestino) * 0.5f,
+                               larguraDestino, alturaDestino };
 
         BeginDrawing();
         ClearBackground(BLACK);
-        EstadoJogo proximo = atualizarEstado(&jogo, &cfg, &cmd, controleCaiu);
-        audioAtualizar(&jogo, &cmd, jogo.estado == EST_COMBATE, GetFrameTime());
+        DrawTexturePro(tela.texture, origem, destino, (Vector2){ 0.0f, 0.0f }, 0.0f, WHITE);
         EndDrawing();
 
         if (proximo != jogo.estado)
             trocarEstado(&jogo, proximo);
     }
 
+    UnloadRenderTexture(tela);
     encerrarPartida(&jogo);
     descarregarAssets();
     liberarPlacar(jogo.placar);

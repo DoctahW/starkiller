@@ -37,8 +37,21 @@ um dos dois for destruído.
 
 - **Voo em cabine**: arfagem, guinada, rolagem e controle de velocidade.
 - **Combate**: lasers, escudo regenerável, mira adiantada e travamento de alvo.
+- **Defesa do Destróier**: 150 pontos de escudo absorvem lasers e bombas antes
+  dos 300 pontos de casco. Após 5 segundos sem dano, o escudo regenera 15 pontos
+  por segundo; cada acerto reinicia a espera. O casco não regenera. O HUD mostra
+  escudo e casco separadamente, com indicação de recarga.
 - **Inimigos com IA**: cada caça rebelde tem seu comportamento e chega em ondas
   de reforços cada vez maiores.
+- **Passagens dos Y-Wings**: os bombardeiros da mesma onda se reagrupam, aproximam-se
+  juntos e lançam até dois torpedos por passagem, com 1,2 segundo entre lançamentos.
+  Depois se afastam para preparar outro ataque. A espera pelos companheiros é de
+  no máximo 8 segundos após chegar ao ponto de reunião. O dano acontece no impacto.
+- **Caças aliados**: seis TIEs começam a partida, três defendendo o Destróier
+  (com prioridade para bombardeiros) e três interceptando inimigos no espaço aberto.
+  Eles patrulham, atiram e podem ser abatidos. Seus abates não somam pontos ao jogador
+  e seus tiros não causam dano amigo. No radar, cruzes verdes indicam defensores e
+  cruzes ciano indicam interceptadores; o HUD mostra quantos continuam ativos.
 - **HUD**: retícula, medidores, tempo, pontos, radar e alvo travado.
 - **Feedback de dano**: tremor de câmera, flash vermelho e vibração do controle.
 - **Som 3D**: motores, armas e explosões com volume, pan e Doppler de acordo
@@ -166,7 +179,8 @@ Outros comandos:
 | Acelerar / frear        | Shift / Ctrl             | Analógico direito ↑ / ↓  |
 | Disparar                | Espaço                   | RT                       |
 | Próximo / anterior alvo | T / Y                    | D-pad → / ←              |
-| Alvo mais próximo       | R                        | LT                       |
+| Alvo na mira            | R                        | LT                       |
+| Reparar casco (25)      | F                        | D-pad ↑                  |
 | Pausa                   | Esc                      | Start                    |
 | Confirmar / voltar      | Enter / Esc ou Backspace | A / B                    |
 

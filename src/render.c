@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "combate.h"
+#include "aliados.h"
 #include "destroier.h"
 #include "espaco.h"
 #include "raymath.h"
@@ -75,9 +76,16 @@ static Shader sombraCasco;
 static int temDestroier, temSombraCasco;
 static Vector3 sol;
 
-/* Modelos dos caças: X-Wing CC (assets/models/xwing.glb) e Y-Wing/A-Wing locais do BF2. */
-static Model modeloXwing, modeloYwing, modeloAwing;
-static int temModeloXwing, temModeloYwing, temModeloAwing;
+/* Modelos dos caças: X-Wing CC (assets/models/xwing.glb), Y-Wing/A-Wing locais do BF2 e TIE. */
+static Model modeloXwing, modeloYwing, modeloAwing, modeloTie;
+static int temModeloXwing, temModeloYwing, temModeloAwing, temModeloTie;
+
+/* Todos os caças cresceram 1,5×; os modelos foram desenhados na escala antiga. */
+#define ESCALA_MODELO_CACA 1.5f
+
+/* O low_poly_tie_fighter.glb tem ~2,6 × 3,3 × 2,7 unidades; 3,6 o leva aos ~9,4 m
+ * (1,5× a escala anterior), coerente com os demais caças. */
+#define ESCALA_MODELO_TIE 3.6f
 
 int carregarShader(const char *nome, Shader *s)
 {
@@ -228,6 +236,7 @@ void carregarAssets(void)
     temModeloXwing = carregarModeloInimigo("assets/models/xwing.glb", &modeloXwing);
     temModeloYwing = carregarModeloInimigo("assets/models/bf2/ywing.glb", &modeloYwing);
     temModeloAwing = carregarModeloInimigo("assets/models/bf2/awing.glb", &modeloAwing);
+    temModeloTie = carregarModeloInimigo("assets/models/tie.glb", &modeloTie);
 }
 
 void descarregarAssets(void)
@@ -247,8 +256,10 @@ void descarregarAssets(void)
         descarregarModelo(modeloYwing);
     if (temModeloAwing)
         descarregarModelo(modeloAwing);
+    if (temModeloTie)
+        descarregarModelo(modeloTie);
     temDestroier = temSombraCasco = 0;
-    temModeloXwing = temModeloYwing = temModeloAwing = 0;
+    temModeloXwing = temModeloYwing = temModeloAwing = temModeloTie = 0;
     encerrarEspaco();
 }
 
@@ -457,7 +468,7 @@ static void desenharCorpoInimigo(TipoNave tipo)
     switch (tipo) {
         case XWING:
             if (temModeloXwing) {
-                DrawModel(modeloXwing, (Vector3){0}, 1.0f, WHITE);
+                DrawModel(modeloXwing, (Vector3){0}, ESCALA_MODELO_CACA, WHITE);
             } else {
                 rlScalef(raio, raio, raio);
                 desenharXWing();
@@ -465,7 +476,7 @@ static void desenharCorpoInimigo(TipoNave tipo)
             break;
         case YWING:
             if (temModeloYwing) {
-                DrawModel(modeloYwing, (Vector3){0}, 1.0f, WHITE);
+                DrawModel(modeloYwing, (Vector3){0}, ESCALA_MODELO_CACA, WHITE);
             } else {
                 rlScalef(raio, raio, raio);
                 desenharYWing();
@@ -473,7 +484,7 @@ static void desenharCorpoInimigo(TipoNave tipo)
             break;
         case AWING:
             if (temModeloAwing) {
-                DrawModel(modeloAwing, (Vector3){0}, 1.0f, WHITE);
+                DrawModel(modeloAwing, (Vector3){0}, ESCALA_MODELO_CACA, WHITE);
             } else {
                 rlScalef(raio, raio, raio);
                 desenharAWing();
@@ -514,17 +525,54 @@ static void desenharQuedaInimiga(const QuedaInimigo *queda)
     rlPopMatrix();
 }
 
+/* TIE aliado: cabine esférica e dois painéis hexagonais, na escala da colisão. */
+static void desenharAliado(const Aliado *a)
+{
+    Vector3 frente = Vector3LengthSqr(a->vel) > 1e-6f ? Vector3Normalize(a->vel) : (Vector3){ 0, 0, 1 };
+    Vector3 eixo = { -frente.y, frente.x, 0 };
+    float angulo = acosf(Clamp(frente.z, -1.0f, 1.0f)) * RAD2DEG;
+
+    if (Vector3LengthSqr(eixo) < 1e-6f)
+        eixo = (Vector3){ 0, 1, 0 };
+    rlPushMatrix();
+    rlTranslatef(a->pos.x, a->pos.y, a->pos.z);
+    rlRotatef(angulo, eixo.x, eixo.y, eixo.z);
+    if (temModeloTie) {
+        DrawModel(modeloTie, (Vector3){ 0 }, ESCALA_MODELO_TIE, WHITE);
+    } else {
+        DrawSphereEx((Vector3){ 0 }, 2.5f, 10, 12, LIGHTGRAY);
+        DrawSphereEx((Vector3){ 0, 0, 1.7f }, 1.6f, 8, 10, (Color){ 25, 40, 55, 255 });
+        DrawCylinderEx((Vector3){ -5, 0, 0 }, (Vector3){ 5, 0, 0 }, 0.6f, 0.6f, 8, GRAY);
+        for (int lado = -1; lado <= 1; lado += 2) {
+            float x = 5.0f * lado;
+            DrawCylinderEx((Vector3){ x - 0.2f, 0, 0 }, (Vector3){ x + 0.2f, 0, 0 }, 6.0f, 6.0f, 6, LIGHTGRAY);
+            DrawCylinderEx((Vector3){ x - 0.25f, 0, 0 }, (Vector3){ x + 0.25f, 0, 0 }, 5.3f, 5.3f, 6,
+                           (Color){ 25, 28, 34, 255 });
+            DrawSphereEx((Vector3){ lado * 1.4f, -1.2f, 2.2f }, 0.25f, 4, 6, GREEN);
+        }
+    }
+    rlPopMatrix();
+}
+
 static void desenharLasers(const Jogo *g)
 {
     /* A posição da simulação é a ponta do tiro; a cauda fica atrás dela.
      * Comprimento visual fixo, independente da velocidade e do frame. */
-    const float comprimento = 12.0f;
-    const float raio = 0.22f;
     for (int i = 0; i < MAX_LASERS; i++) {
         const Laser *laser = &g->lasers[i];
         if (!laser->ativo)
             continue;
-        Color cor = laser->doJogador ? GREEN : RED; /* VIS-04: TIE imperial verde, rebeldes vermelhos. */
+        Color cor;
+        if (laser->doJogador || laser->doAliado)
+            cor = GREEN;                       /* TIEs: jogador e aliados */
+        else if (laser->torpedo)
+            cor = (Color){ 255, 130, 200, 255 }; /* bomba do Y-Wing: meio rosada */
+        else if (laser->tipoOrigem == AWING)
+            cor = YELLOW;                      /* A-Wing */
+        else
+            cor = RED;                         /* X-Wing e canhão do Y-Wing */
+        float comprimento = laser->torpedo ? 24.0f : 12.0f;
+        float raio = laser->torpedo ? 1.2f : 0.22f;
         if (Vector3LengthSqr(laser->vel) < 0.000001f) {
             DrawSphereEx(laser->pos, raio, 4, 6, cor);
             continue;
@@ -642,6 +690,9 @@ void render_cena(const Jogo *g, Camera3D cam)
     desenharDestroier(&cam);
     for (const NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox)
         desenharInimigo(&no->dado);
+    for (int i = 0; i < MAX_ALIADOS; i++)
+        if (g->aliados[i].ativo)
+            desenharAliado(&g->aliados[i]);
     {
         const QuedaInimigo *quedas = quedasInimigas();
 

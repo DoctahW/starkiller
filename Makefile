@@ -70,3 +70,10 @@ build/preview_inimigos: tools/preview_inimigos.c $(MODULOS) | build $(DLL)
 
 preview-inimigos: build/preview_inimigos
 	./build/preview_inimigos
+
+# Prévia da HUD com estado fixo; --capturar grava build/hud.png (ou build/hud_critico.png).
+build/preview_hud: tools/preview_hud.c $(MODULOS) | build $(DLL)
+	$(CC) $(CFLAGS) $< $(MODULOS) -o $@ $(LDLIBS)
+
+preview-hud: build/preview_hud
+	./build/preview_hud
