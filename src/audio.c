@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stddef.h>
 
+#include "combate.h"
 #include "destroier.h"
 #include "jogo.h"
 #include "nave.h"
@@ -93,7 +94,23 @@ static ConfigAudio configAudio = {
  * BOOM com curva mais suave que os demais pontuais: a explosão carrega mais longe mesmo
  * com o volume base já no teto.
  */
-#define CURVA_BOOM_INIMIGO    1.50f
+#define CURVA_BOOM_INIMIGO    1.35f
+
+/*
+ * Telemetria da cabine (sem atenuação por distância): o aviso de busca fica bem baixo sob o
+ * alvo travado e os tons de mira aparecem só quando a retícula cobre a área laranja ou a verde.
+ */
+#define VOLUME_TELEMETRIA_BUSCA   0.18f
+#define VOLUME_TELEMETRIA_LARANJA 0.28f
+#define VOLUME_TELEMETRIA_VERDE   0.28f
+
+/*
+ * Multiplicadores por faixa de música. O combate fica abafado mesmo com a música em 100%
+ * (é fundo durante a ação); menu e vitória sobem um pouco para não perderem presença.
+ */
+#define FATOR_MUSICA_COMBATE  0.60f
+#define FATOR_MUSICA_MENU     1.10f
+#define FATOR_MUSICA_VITORIA  1.10f
 
 typedef struct {
     Sound s[MAX_VARIANTES];
@@ -177,7 +194,7 @@ static Sound uiTeclaVoz[VOZES_TECLA];
 static int proximaTecla;
 
 /* Músicas de fundo, indexadas por FaixaMusica - 1. */
-static MusicaFundo musicas[3];
+static MusicaFundo musicas[4];
 static FaixaMusica faixaAtual = AUDIO_MUSICA_NENHUMA;
 static float fatorMusica = 1.0f;
 
@@ -187,6 +204,9 @@ static Loop cabineJogador[NUM_CABINE_JOGADOR];
 static Loop motorIsd;
 static Loop posQueimadorIsd;
 static Loop alarmeIsd;
+static Loop telemetriaBusca;
+static Loop telemetriaLaranja;
+static Loop telemetriaVerde;
 static VozMotor vozes[3][VOZES_POR_TIPO];
 
 /* Fontes móveis registradas neste frame e temporizadores. */
@@ -407,6 +427,22 @@ static void liberarMusica(MusicaFundo *mf)
 }
 
 /*
+ * Ganho relativo de cada faixa. O combate nunca chega ao volume configurado: mesmo em 100%
+ * ele fica abaixo dos efeitos; menu e vitória ganham um pouco de corpo.
+ */
+static float fatorDaFaixa(FaixaMusica faixa)
+{
+    switch (faixa) {
+    case AUDIO_MUSICA_COMBATE: return FATOR_MUSICA_COMBATE;
+    case AUDIO_MUSICA_MENU:    return FATOR_MUSICA_MENU;
+    case AUDIO_MUSICA_VITORIA: return FATOR_MUSICA_VITORIA;
+    case AUDIO_MUSICA_RANKING:
+    case AUDIO_MUSICA_NENHUMA:
+    default:                   return 1.0f;
+    }
+}
+
+/*
  * A faixa atual sobe até o alvo; todas as outras descem e param. Assim a troca de tela
  * é um crossfade curto e o duck da pausa só muda o alvo, sem reiniciar a música.
  */
@@ -414,19 +450,20 @@ static void atualizarMusicas(float dt)
 {
     float alvoAtual = 0.0f;
     float k;
-    int i;
+    int i, n = (int)(sizeof musicas / sizeof musicas[0]);
 
     if (!audioPronto)
         return;
 
     if (faixaAtual != AUDIO_MUSICA_NENHUMA) {
-        alvoAtual = configAudio.geral * configAudio.musica * fatorMusica;
+        alvoAtual = configAudio.geral * configAudio.musica * fatorMusica
+                    * fatorDaFaixa(faixaAtual);
         if (alvoAtual < 0.0f)
             alvoAtual = 0.0f;
     }
 
     k = 1.0f - expf(-dt / TAU_MUSICA);
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < n; i++) {
         MusicaFundo *mf = &musicas[i];
         int eAtual = (int)faixaAtual == i + 1;
         float alvo = eAtual ? alvoAtual : 0.0f;
@@ -724,6 +761,43 @@ static void silenciarVozesMotores(float dt)
     nFontes = 0;
 }
 
+/* A retícula é o anel verde central: 1 se o caça (colchetes laranja) está sob ela agora. */
+static int miraNoAlvoAtual(const Jogador *j, const Inimigo *alvo)
+{
+    Vector3 rel = Vector3Subtract(alvo->pos, j->pos);
+    float aFrente = Vector3DotProduct(rel, j->frente);
+    float r;
+
+    if (aFrente <= 0.0f || aFrente > VEL_LASER * VIDA_LASER)
+        return 0;
+    rel = Vector3Subtract(rel, Vector3Scale(j->frente, aFrente));
+    r = raioDeAcerto(alvo->tipo, aFrente);
+    return Vector3DotProduct(rel, rel) + CANHAO_LATERAL * CANHAO_LATERAL <= r * r;
+}
+
+/*
+ * Telemetria da cabine. Com alvo travado toca a busca bem baixo; os tons de mira entram só
+ * quando a retícula cobre a área laranja (caça na posição atual) ou a verde (ponto de
+ * interceptação — o mesmo teste que pinta o pipper do HUD de verde). A verde tem precedência.
+ */
+static void atualizarTelemetria(const Jogo *g, int emCombate, float dt)
+{
+    const Inimigo *alvo = g->inimigos.alvo != NULL ? &g->inimigos.alvo->dado : NULL;
+    float busca = 0.0f, laranja = 0.0f, verde = 0.0f;
+
+    if (emCombate && g->jogador.casco > 0.0f && alvo != NULL) {
+        busca = VOLUME_TELEMETRIA_BUSCA;
+        if (tiroAcerta(&g->jogador, alvo))
+            verde = VOLUME_TELEMETRIA_VERDE;
+        else if (miraNoAlvoAtual(&g->jogador, alvo))
+            laranja = VOLUME_TELEMETRIA_LARANJA;
+    }
+
+    loopAtualizar(&telemetriaBusca, busca, 0.0f, dt);
+    loopAtualizar(&telemetriaLaranja, laranja, 0.0f, dt);
+    loopAtualizar(&telemetriaVerde, verde, 0.0f, dt);
+}
+
 /* Setores de velocidade 0..4 em crossfade linear; cabine em 2 setores. */
 static void atualizarMotoresJogador(const Jogo *g, float dt)
 {
@@ -796,8 +870,6 @@ void iniciarAudio(void)
     carregarBanco(&bancoColisao, PASTA_SONS "tie/collision_%d.ogg", 6);
     carregarBanco(&bancoDano, PASTA_SONS "tie/shot_%02d.ogg", 20);
     carregarBanco(&bancoAlvo, PASTA_SONS "tie/target_%d.ogg", 6);
-    /* TELEMETRY_RANDOM fica reservado para uso futuro: os arquivos continuam em
-     * assets/sounds/tie/telemetry_*.ogg, mas não são carregados nem tocados agora. */
     carregarBanco(&bancoLowHp, PASTA_SONS "tie/low_hp_%d.ogg", 7);
     avisoLowHp = carregarSom(PASTA_SONS "tie/low_hp_warning.ogg");
     carregarBanco(&bancoAceleracao, PASTA_SONS "tie/accel_%d.ogg", 4);
@@ -825,6 +897,10 @@ void iniciarAudio(void)
     carregarLoop(&posQueimadorIsd, PASTA_SONS "isd/afterburner.ogg");
     carregarLoop(&alarmeIsd, PASTA_SONS "isd/alarm.ogg");
 
+    carregarLoop(&telemetriaBusca, PASTA_SONS "tie/telemetry/searching.wav");
+    carregarLoop(&telemetriaLaranja, PASTA_SONS "tie/telemetry/aim_orange.wav");
+    carregarLoop(&telemetriaVerde, PASTA_SONS "tie/telemetry/aim_green.wav");
+
     for (k = 0; k < VOZES_POR_TIPO; k++) {
         carregarLoop(&vozes[XWING][k].principal, PASTA_SONS "rebel/engine_xwing_idle.ogg");
         carregarLoop(&vozes[XWING][k].thrusters, PASTA_SONS "rebel/engine_xwing_thrusters.ogg");
@@ -845,6 +921,7 @@ void iniciarAudio(void)
     carregarMusica(&musicas[AUDIO_MUSICA_MENU - 1], PASTA_MUSICAS "menuMusic2.mp3");
     carregarMusica(&musicas[AUDIO_MUSICA_COMBATE - 1], PASTA_MUSICAS "in_gameMusic.mp3");
     carregarMusica(&musicas[AUDIO_MUSICA_RANKING - 1], PASTA_MUSICAS "ranking_menuMusic.mp3");
+    carregarMusica(&musicas[AUDIO_MUSICA_VITORIA - 1], PASTA_MUSICAS "imperial_victory.wav");
 
     ouvintePos = (Vector3){ 0.0f, 0.0f, 0.0f };
     ouvinteVel = (Vector3){ 0.0f, 0.0f, 0.0f };
@@ -871,6 +948,9 @@ void encerrarAudio(void)
     liberarLoop(&motorIsd);
     liberarLoop(&posQueimadorIsd);
     liberarLoop(&alarmeIsd);
+    liberarLoop(&telemetriaBusca);
+    liberarLoop(&telemetriaLaranja);
+    liberarLoop(&telemetriaVerde);
     for (t = 0; t < 3; t++)
         for (k = 0; k < VOZES_POR_TIPO; k++) {
             liberarLoop(&vozes[t][k].principal);
@@ -910,7 +990,7 @@ void encerrarAudio(void)
     }
     liberarSom(&uiTeclaBase);
 
-    for (i = 0; i < 3; i++)
+    for (i = 0; i < (int)(sizeof musicas / sizeof musicas[0]); i++)
         liberarMusica(&musicas[i]);
     faixaAtual = AUDIO_MUSICA_NENHUMA;
     fatorMusica = 1.0f;
@@ -1026,6 +1106,8 @@ void audioAtualizar(const Jogo *g, const Comandos *cmd, int emCombate, float dt)
     } else {
         silenciarVozesMotores(dt);
     }
+
+    atualizarTelemetria(g, emCombate, dt);
 }
 
 void audioTiroJogador(void)
@@ -1167,7 +1249,7 @@ int audioSalvarConfiguracao(void)
 
 void audioMusicaTocar(FaixaMusica faixa, float fator)
 {
-    if (faixa < AUDIO_MUSICA_NENHUMA || faixa > AUDIO_MUSICA_RANKING)
+    if (faixa < AUDIO_MUSICA_NENHUMA || faixa > AUDIO_MUSICA_VITORIA)
         faixa = AUDIO_MUSICA_NENHUMA;
     if (!(fator >= 0.0f))           /* também pega NaN */
         fator = 0.0f;

@@ -38,6 +38,7 @@ static void testarSemDispositivo(void)
     audioMusicaTocar(AUDIO_MUSICA_MENU, 1.0f);
     audioMusicaTocar(AUDIO_MUSICA_COMBATE, AUDIO_FATOR_PAUSA);
     audioMusicaTocar(AUDIO_MUSICA_RANKING, 1.0f);
+    audioMusicaTocar(AUDIO_MUSICA_VITORIA, 1.0f);
     audioMusicaTocar(AUDIO_MUSICA_NENHUMA, 0.0f);
     audioAplicarVolumes();
     VERIFICA(audioConfig() != NULL);
