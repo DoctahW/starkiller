@@ -6,15 +6,15 @@
 //Atributos da tabela 2.2; o VEL_* e lido pela IA-01 (#49)
 #define ESCUDO_XWING 50.0f
 #define CASCO_XWING  100.0f
-#define VEL_XWING    275.0f
+#define VEL_XWING    325.0f
 
 #define ESCUDO_YWING 75.0f
 #define CASCO_YWING  160.0f
-#define VEL_YWING    160.0f
+#define VEL_YWING    210.0f
 
 #define ESCUDO_AWING 0.0f
 #define CASCO_AWING  60.0f
-#define VEL_AWING    500.0f
+#define VEL_AWING    550.0f
 
 //Monta um inimigo com os atributos do tipo, escudo e casco cheios
 //O id vem de quem chama: Jogo.proximoId++

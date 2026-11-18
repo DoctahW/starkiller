@@ -8,10 +8,10 @@
 #define PRIMEIRA_ONDA    3.0f
 #define INTERVALO_ONDAS  15.0f
 
-/* Multiplicadores por tipo: X-Wing 2×, Y-Wing e A-Wing 2×. */
-#define MULT_XWING 2
-#define MULT_YWING 2
-#define MULT_AWING 2
+/* Multiplicadores por tipo: todos os caças rebeldes em 3×. */
+#define MULT_XWING 3
+#define MULT_YWING 3
+#define MULT_AWING 3
 
 /* Os reforços nascem numa esfera de raio 8200, dentro da arena (RAIO_ARENA = 9000). */
 #define RAIO_REFORCO     8200.0f
@@ -91,7 +91,7 @@ void gerarReforcos(FilaReforcos *f, float duracao)
         if (qtdABase > totalBase - 1 - qtdYBase)
             qtdABase = totalBase - 1 - qtdYBase;
         qtdXBase = totalBase - qtdYBase - qtdABase;
-        /* Reforços mais frequentes e por tipo: X-Wing 3×, Y-Wing/A-Wing 2×. */
+        /* Reforços mais frequentes e por tipo: todos os caças rebeldes em 3×. */
         enfileirarReforco(f, t, qtdXBase * MULT_XWING, qtdYBase * MULT_YWING, qtdABase * MULT_AWING);
     }
 }

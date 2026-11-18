@@ -170,7 +170,7 @@ static void testarReforcosNoLoop(void)
     gerarReforcos(&jogo.reforcos, DURACAO_PARTIDA);
     VERIFICA(jogo.reforcos.tamanho == 20);
     VERIFICA(jogo.reforcos.inicio->tempoChegada == 3.0f);
-    VERIFICA(jogo.reforcos.inicio->qtdX == 4);
+    VERIFICA(jogo.reforcos.inicio->qtdX == 6);
 
     for (int i = 0; i < 179; i++)
         simular(PASSO_FIXO);
@@ -178,7 +178,7 @@ static void testarReforcosNoLoop(void)
     VERIFICA(jogo.reforcos.tamanho == 20);
 
     simular(PASSO_FIXO);
-    VERIFICA(jogo.inimigos.tamanho == 4);
+    VERIFICA(jogo.inimigos.tamanho == 6);
     VERIFICA(jogo.reforcos.tamanho == 19);
     VERIFICA(jogo.inimigos.inicio->dado.tipo == XWING);
     VERIFICA(jogo.inimigos.fim->dado.tipo == XWING);
@@ -191,7 +191,7 @@ static void testarReforcosNoLoop(void)
 
         for (int i = 0; i < 60; i++)
             simular(PASSO_FIXO);
-        VERIFICA(jogo.inimigos.tamanho == 4);
+        VERIFICA(jogo.inimigos.tamanho == 6);
         VERIFICA(comprimento(jogo.inimigos.inicio->dado.pos) < antes);
     }
 

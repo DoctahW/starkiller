@@ -78,15 +78,15 @@ static void testarInicioReforcosERespawn(void)
         VERIFICA(interceptores == ALIADOS_MAX - ALIADOS_GUARDA_MAX);
     }
 
-    /* Abatido, o aliado volta em 10 s; se todos caírem, um volta imediatamente. */
+    /* Abatido, o aliado volta em 5 s; se todos caírem, um volta imediatamente. */
     for (int i = 0; i < MAX_ALIADOS; i++)
         if (g.aliados[i].ativo)
             danificarAliado(&g, i, CASCO_ALIADO);
     VERIFICA(ativos(&g) == 0);
     atualizarAliados(&g, DT);
     VERIFICA(ativos(&g) >= 1);
-    g.tempoDecorrido = 400.0f + 10.5f;
-    for (int i = 0; i < ALIADOS_MAX * 60; i++)
+    g.tempoDecorrido = 400.0f + 5.5f;
+    for (int i = 0; i < 6 * 60; i++)
         atualizarAliados(&g, DT);
     VERIFICA(ativos(&g) >= ALIADOS_MAX - 1);
 }

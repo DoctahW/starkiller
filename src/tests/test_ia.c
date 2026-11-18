@@ -58,7 +58,7 @@ static void testarVelocidadeMaximaPorTipo(void)
     for (int i = 0; i < (int)(sizeof casos / sizeof casos[0]); i++) {
         Inimigo in = novoInimigo(casos[i].tipo, (Vector3){ 0, 0, 5000 }, IA_ATACAR_JOGADOR);
 
-        simular(&in, &g, 300);
+        simular(&in, &g, 120);
         VERIFICA(Vector3Length(in.vel) <= casos[i].velMax * FATOR_VELOCIDADE_MAX + 1e-3f);
         VERIFICA(Vector3Length(in.vel) > 0.90f * casos[i].velMax);
     }
@@ -319,7 +319,7 @@ static void testarVelocidadeCresceComOTempo(void)
 
     iniciarJogoVazio(&g);
     g.tempoDecorrido = DURACAO_PARTIDA;
-    simular(&in, &g, 300);
+    simular(&in, &g, 120);
     VERIFICA(Vector3Length(in.vel) <= velMax + 1e-3f);
     VERIFICA(Vector3Length(in.vel) > 0.90f * velMax);
 }

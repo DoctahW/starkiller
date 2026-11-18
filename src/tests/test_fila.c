@@ -104,7 +104,7 @@ static void testarLiberar(void)
     VERIFICA(f.inicio == NULL && f.fim == NULL && f.tamanho == 0);
 }
 
-/* gerarReforcos: onda a cada 15 s, X-Wing 2×, Y-Wing/A-Wing 2×. */
+/* gerarReforcos: onda a cada 15 s, todos os tipos em 3×. */
 static void testarGerarReforcos(void)
 {
     FilaReforcos f = { 0 };
@@ -126,17 +126,17 @@ static void testarGerarReforcos(void)
         qtdXBase = totalBase - qtdYBase - qtdABase;
 
         VERIFICA(grupo.tempoChegada == t);
-        VERIFICA(grupo.qtdX == qtdXBase * 2);
-        VERIFICA(grupo.qtdY == qtdYBase * 2);
-        VERIFICA(grupo.qtdA == qtdABase * 2);
-        VERIFICA(grupo.qtdX >= 2);
+        VERIFICA(grupo.qtdX == qtdXBase * 3);
+        VERIFICA(grupo.qtdY == qtdYBase * 3);
+        VERIFICA(grupo.qtdA == qtdABase * 3);
+        VERIFICA(grupo.qtdX >= 3);
 
         if (onda == 0)
             VERIFICA(grupo.qtdY == 0);
         else
-            VERIFICA(grupo.qtdY >= 2);
+            VERIFICA(grupo.qtdY >= 3);
         if (onda > 0 && totalBase >= 3)
-            VERIFICA(grupo.qtdY == 4);
+            VERIFICA(grupo.qtdY == 6);
 
         if (onda > 0) {
             VERIFICA(grupo.qtdA >= qtdAAnterior);

@@ -106,7 +106,7 @@ int dispararLaserInimigo(Jogo *g, const Inimigo *in);
 /* Torpedo antinave do Y-Wing: trajetória parabólica descendente, dano discreto no impacto.
  * A fração própria (0,4) é maior que a dos lasers (0,3): o Y-Wing é sempre a melhor nave
  * contra o Destróier, tanto no escudo quanto no casco. */
-#define VEL_TORPEDO_YWING  450.0f   /* componente horizontal, igual à velocidade da run */
+#define VEL_TORPEDO_YWING  500.0f   /* componente horizontal, igual à velocidade da run */
 #define VIDA_TORPEDO_YWING   8.0f
 #define DANO_TORPEDO_YWING  80.0f   /* bomba: mantém o Y-Wing como principal ameaça ao Destróier */
 #define GRAVIDADE_TORPEDO_YWING 900.0f

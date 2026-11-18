@@ -13,7 +13,7 @@
  * O caça nunca fica dentro do casco: usa afastarDoDestroier, com uma antecipação de rumo.
  *
  * Rebeldes:
- * - Y-Wing: faz passagens de bombardeio. Reagrupa na frente da proa do Destróier (~1500 u),
+ * - Y-Wing: faz passagens de bombardeio. Reagrupa na frente da proa do Destróier (~3000 u),
  *   acelera para YWING_VEL_RUN e segue reto, soltando até duas bombas em parábola. Depois
  *   dispersa por YWING_TEMPO_DISPERSAO e volta a se posicionar. Fora da run, defende-se com
  *   laser balístico a 20 tiros/min.
@@ -34,7 +34,7 @@ void ia_atribuirEscolta(Jogo *g);
 #define YWING_ALTURA_RUN          700.0f  /* corrida baixa, logo acima do convés */
 #define YWING_DIST_ESTAGIO       3000.0f  /* da proa do Destróier até o ponto de alinhamento */
 #define YWING_FIM_RUN_Z          -900.0f  /* antes da torre de comando (topo ~1140) */
-#define YWING_VEL_RUN             450.0f  /* velocidade da corrida reta */
+#define YWING_VEL_RUN             500.0f  /* velocidade da corrida reta */
 #define YWING_RAIO_ESTAGIO        600.0f
 #define YWING_ESPERA_GRUPO          8.0f
 #define YWING_TEMPO_DISPERSAO      10.0f

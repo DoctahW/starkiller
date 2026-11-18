@@ -7,10 +7,10 @@
 #define ALIADOS_MAX            12
 #define ALIADOS_INICIAIS       ALIADOS_MAX
 #define ALIADOS_GUARDA_MAX      4   /* 4 guardas; o resto intercepta */
-#define ALIADOS_TEMPO_RESPAWN   10.0f
+#define ALIADOS_TEMPO_RESPAWN   5.0f
 #define CASCO_ALIADO           125.0f
 #define RAIO_ALIADO              9.0f  /* esfera do TIE a 1,5× a escala anterior */
-#define VEL_ALIADO             500.0f
+#define VEL_ALIADO             550.0f
 #define ACELERACAO_ALIADO      650.0f
 #define RAIO_DEFESA           5600.0f
 #define RAIO_PATRULHA         4000.0f

@@ -53,8 +53,8 @@ int faseQuedaJogador(void);
  * com o Destróier no tamanho canônico (1600 m); distâncias e velocidades foram multiplicadas por
  * ~4,6 junto com ele, para o ritmo da partida não mudar. O tamanho dos caças não mudou.
  */
-#define VEL_MIN     180.0f
-#define VEL_MAX     550.0f
+#define VEL_MIN     230.0f
+#define VEL_MAX     600.0f
 #define ACELERACAO  180.0f
 
 /* Raio da arena, centrada na origem. */
