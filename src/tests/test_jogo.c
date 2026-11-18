@@ -45,6 +45,18 @@ static EstadoJogo simularCom(const Comandos *cmd, float dtFrame)
     return simularCombate(&jogo, &relogio, cmd, dtFrame);
 }
 
+/* Roda passos até a partida terminar; devolve quantos passos foram necessários. */
+static int simularAteFim(int limite)
+{
+    int passos = 0;
+
+    while (passos < limite && jogo.vitoria == -1) {
+        simular(PASSO_FIXO);
+        passos++;
+    }
+    return passos;
+}
+
 static void adicionarInimigo(Vector3 pos, float distancia)
 {
     Inimigo in = criarInimigo(XWING, pos, jogo.proximoId++);
@@ -271,11 +283,14 @@ int main(void)
     VERIFICA(relogio.passos == PASSOS_PARTIDA);
     VERIFICA(relogio.acumulador > DT_MAXIMO - 2.0f * PASSO_FIXO);
 
-    /* casco do TIE em 0 é derrota */
+    /* casco do TIE em 0: rodopia por mais de 1 s e só então explode (derrota) */
     novaPartida(600);
     jogo.jogador.casco = 0.0f;
-    VERIFICA(simular(PASSO_FIXO) == EST_FIM);
+    VERIFICA(simular(PASSO_FIXO) == EST_COMBATE);
+    VERIFICA(faseQuedaJogador() == 1);
+    VERIFICA(simularAteFim(400) > 60);
     VERIFICA(jogo.vitoria == 0);
+    VERIFICA(faseQuedaJogador() == 2);
 
     /* casco do Destróier abaixo de 0 é derrota */
     novaPartida(600);
@@ -286,7 +301,8 @@ int main(void)
     /* casco zerado no mesmo passo em que o tempo acaba: derrota tem precedência */
     novaPartida(PASSOS_PARTIDA - 1);
     jogo.jogador.casco = 0.0f;
-    VERIFICA(simular(PASSO_FIXO) == EST_FIM);
+    VERIFICA(simular(PASSO_FIXO) == EST_COMBATE);
+    simularAteFim(400);
     VERIFICA(jogo.vitoria == 0);
 
     /* casco positivo e tempo sobrando: a partida continua */

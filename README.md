@@ -83,7 +83,7 @@ A CI (`.github/workflows/ci.yml`) roda `make` e `make test` em `ubuntu-latest` c
 ## Estrutura
 
 ```
-assets/          models/ (fontes/: scripts do Blender), shaders/ (GLSL 330), textures/, sounds/
+assets/          models/ (fontes/: scripts do Blender), shaders/ (GLSL 330), textures/, sounds/ (efeitos em OGG Vorbis), fonts/, img/
 include/         headers públicos de cada módulo
   tipos.h        contrato compartilhado entre os módulos
   teste.h        verificações dos testes de console
@@ -92,7 +92,7 @@ src/
   destroier.c    medidas do Destróier e colisão com o casco (mapa de colunas em casco_destroier.inc)
   jogo.c         janela, máquina de estados e loop de combate
   entrada.c      teclado e controle -> Comandos
-  nave.c         voo e câmera de cabine
+  nave.c         voo, câmera de cabine e queda do TIE
   combate.c      lasers, colisões, dano e explosões
   inimigos.c     lista duplamente encadeada e computador de mira
   reforcos.c     fila de reforços
@@ -103,11 +103,25 @@ src/
   placar.c       árvore binária de busca do placar
   pontuacao.c    pontuação
   telas.c        menu, fim de partida, ranking e controles
-  audio.c        efeitos e música
+  audio.c        efeitos sonoros, loops e espacialização (AUD-01)
   tests/         testes de console das estruturas de dados e do loop de combate (test_*.c)
 ```
 
 Cada módulo tem um `include/<modulo>.h` e um `src/<modulo>.c`, criados pelo dono na primeira story do módulo. A pasta `dados/` (placar e configuração) é criada pelo jogo no primeiro salvamento e não é versionada.
+
+## Áudio
+
+Os efeitos da AUD-01 ficam em `assets/sounds/`, em OGG Vorbis (os WAV originais somavam ~85 MB; a conversão deixou o repositório em ~8 MB). `iniciarAudio` e `encerrarAudio` entram no ciclo do jogo; arquivo ou dispositivo ausente só gera aviso e a partida segue sem som. Os loops usam `Music` (loop nativo da raylib) e os one-shots usam `Sound`, com volume e pan calculados pela distância e pela direção do TIE.
+
+| Pasta | Conteúdo |
+| --- | --- |
+| `isd/` | motor (5 variações, uma sorteada na inicialização), pós-combustor, alarme de casco < 25%, `destroyed` e `shield_enable`/`shield_disable` (uso futuro) |
+| `rebel/` | motor de cada caça (X-Wing = idle + thrusters), armas (A-Wing tem som próprio; Y-Wing usa mísseis), SPIN e BOOM de cada tipo |
+| `tie/` | armas, motor em 5 setores de velocidade, cabine em 2 setores (Noise Scream Low/Med), ACCEL/DECCEL, troca de alvo, dano de tiro/colisão, aviso e ruídos de casco baixo, SPIN e BOOM do jogador; `telemetry_*` fica reservado para uso futuro |
+
+O X-Wing toca idle e thrusters juntos, com o thrusters um pouco mais baixo. O motor dos caças rebeldes só é audível até 1850 u e cresce ao se aproximar; as fontes móveis recebem Doppler (o pitch sobe na aproximação e desce no afastamento) por um registro genérico de vozes — inimigos hoje e aliados no futuro usam a mesma API. O motor do TIE faz crossfade linear entre setores vizinhos (transição suave) e a cabine faz o mesmo em 2 setores, com os dois Noise Scream. O alarme do Destróier entra em loop a 25% do casco; o aviso de casco baixo do TIE toca a cada 0,75 s e os ruídos aleatórios só nessa faixa. Ao zerar o casco do TIE, a cabine gira incontrolavelmente por 1,2-2,6 s (abaixo da duração do áudio de SPIN) e só então explode; o BOOM marca o fim da partida.
+
+As armas são disparadas por evento: cada tiro que realmente sai chama o som correspondente, então mudar o cooldown do jogador ou da IA muda o ritmo automaticamente. O `TELEMETRY_RANDOM` está desligado por enquanto; os arquivos continuam em `assets/sounds/tie/telemetry_*.ogg` para reutilização. Para os futuros caças aliados, basta registrar cada nave com `audioMotorRegistrar(AUDIO_MOTOR_ALIADO, id, tipo, pos, vel)` antes de `audioAtualizar`: ela entra no mesmo sistema de vozes, distância, pan e Doppler dos inimigos.
 
 ## Modelos 3D
 
@@ -149,6 +163,7 @@ Modelos de teste: o X-Wing usa `assets/models/xwing.glb` ("Low Poly X-Wing", de 
 - `assets/models/death_star.glb`: adaptado de ["Death Star - Star Wars"](https://sketchfab.com/3d-models/death-star-star-wars-423fb92f677f4448aef407112a1fc032), de [Quiznos323](https://sketchfab.com/quiznos323), licença [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0/). Alterações: superlaser e esqueleto removidos, mapas de normal e emissivo removidos, casco com metade dos polígonos e texturas com metade da resolução. A versão adaptada é distribuída sob a mesma licença.
 - `assets/models/xwing.glb`: ["Low Poly X-Wing"](https://skfb.ly/6W8Rs), de [felipelunardelli](https://sketchfab.com/felipelunardelli), licença [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Alterações: escala para 12,5 m de comprimento, origem no centro e exportação em GLB único (sem decimate).
 - `assets/models/bf2/ywing.glb` e `assets/models/bf2/awing.glb`: adaptados do Battlefront II (2005), © LucasArts/EA. Uso **temporário** para os testes do grupo; remover antes de qualquer distribuição pública.
+- `assets/sounds/`: efeitos sonoros do projeto (AUD-01), fornecidos pelo grupo.
 
 ## Pipeline de modelos - VIS-01 (#55)
 
