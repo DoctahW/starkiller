@@ -29,10 +29,13 @@ static ConfigAudio configAudio = {
     AUDIO_VOLUME_MUSICA_PADRAO
 };
 
-/* Alcances (u) das fontes posicionais. */
-#define ALCANCE_ENGINE_INIMIGO     1850.0f
-#define ALCANCE_SPIN_INIMIGO       1850.0f
-#define ALCANCE_BOOM_INIMIGO       1900.0f
+/*
+ * Alcances (u) das fontes posicionais. Os sons de voo, SPIN e BOOM dos caças ganharam
+ * 500 u para o combate próximo do Destróier não ficar mudo logo atrás do jogador.
+ */
+#define ALCANCE_ENGINE_INIMIGO     2350.0f
+#define ALCANCE_SPIN_INIMIGO       2350.0f
+#define ALCANCE_BOOM_INIMIGO       2400.0f
 #define ALCANCE_TIRO_INIMIGO       4000.0f
 #define ALCANCE_ISD                9000.0f
 #define ALCANCE_AFTERBURNER        1500.0f
@@ -43,6 +46,11 @@ static ConfigAudio configAudio = {
 #define PITCH_DOPPLER_MIN   0.72f
 #define PITCH_DOPPLER_MAX   1.35f
 #define TAU_PITCH           0.06f
+/*
+ * Com o alcance maior as fontes distantes passam a ser ouvidas; o deslocamento de pitch
+ * delas perde força para não competir com as naves próximas.
+ */
+#define FORCA_DOPPLER_MINIMA 0.35f
 
 #define VOZES_POR_TIPO 3
 #define SPIN_VOZES 12
@@ -54,12 +62,38 @@ static ConfigAudio configAudio = {
 #define FRACAO_CASCO_CRITICO  0.25f
 #define INTERVALO_AVISO_CASCO 0.75f
 
+/*
+ * Barramento dos sons do jogador (motor, cabine, tiros e avisos). O TIE está sempre no centro
+ * da mixagem; sem esse corte o motor e os tiros abafam os inimigos posicionais.
+ */
+#define VOLUME_JOGADOR        0.68f
+
 /* Volumes dos eventos (antes dos volumes geral/efeitos). */
-#define VOLUME_TIRO_JOGADOR   0.80f
-#define VOLUME_TIRO_INIMIGO   0.75f
-#define VOLUME_ACELERACAO     0.45f
-#define VOLUME_CABINE         0.55f
-#define VOLUME_MOTOR_INIMIGO  0.90f
+#define VOLUME_TIRO_JOGADOR   (0.80f * VOLUME_JOGADOR)
+#define VOLUME_TIRO_INIMIGO   0.85f
+#define VOLUME_ACELERACAO     (0.45f * VOLUME_JOGADOR)
+#define VOLUME_CABINE         (0.55f * VOLUME_JOGADOR)
+#define VOLUME_MOTOR_JOGADOR  (0.70f * VOLUME_JOGADOR)
+#define VOLUME_MOTOR_INIMIGO  1.00f
+#define VOLUME_SPIN_INIMIGO   1.00f
+#define VOLUME_BOOM_INIMIGO   1.00f
+
+#define VOLUME_DANO_JOGADOR   (0.75f * VOLUME_JOGADOR)
+#define VOLUME_COLISAO_JOGADOR (0.80f * VOLUME_JOGADOR)
+#define VOLUME_ALVO_JOGADOR   (0.60f * VOLUME_JOGADOR)
+#define VOLUME_AVISO_CASCO    (0.70f * VOLUME_JOGADOR)
+#define VOLUME_RUIDO_CASCO    (0.60f * VOLUME_JOGADOR)
+#define VOLUME_SPIN_JOGADOR   (0.90f * VOLUME_JOGADOR)
+#define VOLUME_BOOM_JOGADOR   (0.95f * VOLUME_JOGADOR)
+
+/* Alarme de casco baixo do Destróier: precisa atravessar o motor do TIE e a música. */
+#define VOLUME_ALARME_ISD     1.00f
+
+/*
+ * BOOM com curva mais suave que os demais pontuais: a explosão carrega mais longe mesmo
+ * com o volume base já no teto.
+ */
+#define CURVA_BOOM_INIMIGO    1.50f
 
 typedef struct {
     Sound s[MAX_VARIANTES];
@@ -475,19 +509,24 @@ static VozEspacial espacial(Vector3 pos, float alcance, float volumeBase)
     return espacialComCurva(pos, alcance, volumeBase, 2.0f);
 }
 
-static void tocarEspacial(Sound s, Vector3 pos, float base, float alcance)
+static void tocarEspacialComCurva(Sound s, Vector3 pos, float base, float alcance, float curva)
 {
-    VozEspacial v = espacial(pos, alcance, base);
+    VozEspacial v = espacialComCurva(pos, alcance, base, curva);
 
     if (v.volume > 0.005f)
         tocar(s, v.volume, v.pan);
+}
+
+static void tocarEspacial(Sound s, Vector3 pos, float base, float alcance)
+{
+    tocarEspacialComCurva(s, pos, base, alcance, 2.0f);
 }
 
 float audioFatorDoppler(Vector3 pos, Vector3 vel)
 {
     Vector3 rel = Vector3Subtract(pos, ouvintePos);
     float dist = Vector3Length(rel);
-    float radial, fator;
+    float radial, fator, forcaDoppler;
 
     if (dist < 1.0f)   /* em cima do ouvinte a direção é instável */
         return 1.0f;
@@ -500,6 +539,13 @@ float audioFatorDoppler(Vector3 pos, Vector3 vel)
         radial = -0.8f * VELOCIDADE_SOM_JOGO;
 
     fator = VELOCIDADE_SOM_JOGO / (VELOCIDADE_SOM_JOGO + radial);
+
+    /* Fonte distante (o alcance novo a deixa audível) desloca menos o pitch. */
+    forcaDoppler = 1.0f - dist / ALCANCE_ENGINE_INIMIGO;
+    if (forcaDoppler < FORCA_DOPPLER_MINIMA)
+        forcaDoppler = FORCA_DOPPLER_MINIMA;
+    fator = 1.0f + (fator - 1.0f) * forcaDoppler;
+
     if (fator < PITCH_DOPPLER_MIN)
         fator = PITCH_DOPPLER_MIN;
     if (fator > PITCH_DOPPLER_MAX)
@@ -652,10 +698,10 @@ static void atualizarVozesMotores(float dt)
 
                 if (t == XWING) {
                     /* X-Wing: idle + thrusters; o thrusters um pouco mais baixo. */
-                    loopAtualizarComPitch(&v->principal, e.volume * 0.65f, e.pan, pitch, dt);
-                    loopAtualizarComPitch(&v->thrusters, e.volume * 0.45f, e.pan, pitch, dt);
+                    loopAtualizarComPitch(&v->principal, e.volume * 0.80f, e.pan, pitch, dt);
+                    loopAtualizarComPitch(&v->thrusters, e.volume * 0.60f, e.pan, pitch, dt);
                 } else {
-                    loopAtualizarComPitch(&v->principal, e.volume * 0.8f, e.pan, pitch, dt);
+                    loopAtualizarComPitch(&v->principal, e.volume, e.pan, pitch, dt);
                     loopAtualizarComPitch(&v->thrusters, 0.0f, 0.0f, pitch, dt);
                 }
             }
@@ -701,9 +747,9 @@ static void atualizarMotoresJogador(const Jogo *g, float dt)
         float alvo = 0.0f;
 
         if (k == setor)
-            alvo = (1.0f - fracao) * 0.7f;
+            alvo = (1.0f - fracao) * VOLUME_MOTOR_JOGADOR;
         else if (k == setor + 1)
-            alvo = fracao * 0.7f;
+            alvo = fracao * VOLUME_MOTOR_JOGADOR;
         loopAtualizar(&motoresJogador[k], alvo, 0.0f, dt);
     }
 
@@ -933,7 +979,8 @@ void audioAtualizar(const Jogo *g, const Comandos *cmd, int emCombate, float dt)
         loopAtualizar(&posQueimadorIsd, queimador.volume, queimador.pan, dt);
 
         if (g->cascoDestroier <= CASCO_MAX_DESTROIER * FRACAO_CASCO_CRITICO) {
-            VozEspacial alarme = espacial((Vector3){ 0.0f, 0.0f, 0.0f }, ALCANCE_ALARME, 0.7f);
+            VozEspacial alarme = espacial((Vector3){ 0.0f, 0.0f, 0.0f }, ALCANCE_ALARME,
+                                          VOLUME_ALARME_ISD);
 
             loopAtualizar(&alarmeIsd, alarme.volume, alarme.pan, dt);
         } else {
@@ -951,12 +998,12 @@ void audioAtualizar(const Jogo *g, const Comandos *cmd, int emCombate, float dt)
         if (fracaoCasco < FRACAO_CASCO_CRITICO) {
             avisoRestante -= dt;
             if (avisoRestante <= 0.0f) {
-                tocar(avisoLowHp, 0.7f, 0.0f);
+                tocar(avisoLowHp, VOLUME_AVISO_CASCO, 0.0f);
                 avisoRestante = INTERVALO_AVISO_CASCO;
             }
             lowHpRuidoRestante -= dt;
             if (lowHpRuidoRestante <= 0.0f) {
-                tocar(somAleatorio(&bancoLowHp), 0.6f, 0.0f);
+                tocar(somAleatorio(&bancoLowHp), VOLUME_RUIDO_CASCO, 0.0f);
                 lowHpRuidoRestante = aleatorioEntre(1.2f, 3.2f);
             }
         } else {
@@ -1005,17 +1052,17 @@ void audioTiroInimigo(TipoNave tipo, Vector3 pos)
 
 void audioDanoJogador(void)
 {
-    tocar(somAleatorio(&bancoDano), 0.75f, 0.0f);
+    tocar(somAleatorio(&bancoDano), VOLUME_DANO_JOGADOR, 0.0f);
 }
 
 void audioColisaoJogador(void)
 {
-    tocar(somAleatorio(&bancoColisao), 0.8f, 0.0f);
+    tocar(somAleatorio(&bancoColisao), VOLUME_COLISAO_JOGADOR, 0.0f);
 }
 
 void audioTrocaAlvo(void)
 {
-    tocar(somAleatorio(&bancoAlvo), 0.6f, 0.0f);
+    tocar(somAleatorio(&bancoAlvo), VOLUME_ALVO_JOGADOR, 0.0f);
 }
 
 int audioSpinInimigo(TipoNave tipo, Vector3 pos)
@@ -1026,7 +1073,7 @@ int audioSpinInimigo(TipoNave tipo, Vector3 pos)
     if (!audioPronto || (int)tipo < 0 || (int)tipo > 2)
         return -1;
 
-    v = espacial(pos, ALCANCE_SPIN_INIMIGO, 0.9f);
+    v = espacial(pos, ALCANCE_SPIN_INIMIGO, VOLUME_SPIN_INIMIGO);
     if (v.volume <= 0.005f)
         return -1;
 
@@ -1050,12 +1097,13 @@ void audioBoomInimigo(TipoNave tipo, Vector3 pos, int vozSpin)
         && IsSoundValid(spinInimigoVoz[tipo][vozSpin]))
         StopSound(spinInimigoVoz[tipo][vozSpin]);
 
-    tocarEspacial(somAleatorio(&bancoBoomInimigo[tipo]), pos, 1.0f, ALCANCE_BOOM_INIMIGO);
+    tocarEspacialComCurva(somAleatorio(&bancoBoomInimigo[tipo]), pos, VOLUME_BOOM_INIMIGO,
+                          ALCANCE_BOOM_INIMIGO, CURVA_BOOM_INIMIGO);
 }
 
 void audioSpinJogador(void)
 {
-    tocar(spinJogador, 0.9f, 0.0f);
+    tocar(spinJogador, VOLUME_SPIN_JOGADOR, 0.0f);
 }
 
 void audioBoomJogador(Vector3 pos)
@@ -1063,7 +1111,7 @@ void audioBoomJogador(Vector3 pos)
     (void)pos;   /* a explosão é do próprio ouvinte: centro, sem atenuação */
     if (IsSoundValid(spinJogador))
         StopSound(spinJogador);
-    tocar(somAleatorio(&bancoBoomJogador), 0.95f, 0.0f);
+    tocar(somAleatorio(&bancoBoomJogador), VOLUME_BOOM_JOGADOR, 0.0f);
 }
 
 void audioPararSpins(void)
