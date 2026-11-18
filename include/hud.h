@@ -12,9 +12,9 @@ void hud_descarregar(void);
  * Desenha a cabine do TIE em 2D por cima da cena (depois de render_cena, fora do BeginMode3D):
  * moldura da janela, retícula central, medidores de casco do TIE e do Destróier, tempo restante,
  * pontos e multiplicador de sequência, e o console com velocidade, status, missão e navegação.
+ * No visor, o radar com todos os caças na cor do tipo e o alvo travado destacado.
  * Com alvo travado: colchetes, tipo e distância sobre o caça, indicador de tiro adiantado (verde
- * dentro da retícula) e seta quando ele está fora do vidro; no console, tipo, distância e
- * integridade, e no visor um escopo com a direção dele.
+ * dentro da retícula) e seta quando ele está fora do vidro; no console, tipo, distância e integridade.
  * Enquanto g->tempoDano > 0 (dano recente), tinge o vidro com um flash vermelho que se apaga em DURACAO_FEEDBACK_DANO.
  * `foraDaArena` (retorno de atualizarJogador) liga o aviso de limite da arena. Não altera o jogo.
  */
