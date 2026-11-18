@@ -1,6 +1,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "audio.h"
 #include "entrada.h"
 #include "placar.h"
 #include "pontuacao.h"
@@ -46,6 +47,16 @@ static EstadoJogo telaAnterior = EST_SAIR;
 static int aguardandoTeclasSoltas;
 static double fimBloqueadoAte;
 static int erroSalvarPlacar;
+
+/* Tela de Opções: de onde ela foi aberta e aviso de que o estado interno deve reiniciar. */
+static EstadoJogo origemOpcoes = EST_MENU;
+static int opcoesRecemAbertas;
+
+void telasOpcoesDefinirOrigem(EstadoJogo origem)
+{
+    origemOpcoes = origem == EST_PAUSA ? EST_PAUSA : EST_MENU;
+    opcoesRecemAbertas = 1;
+}
 
 static int entrouEm(EstadoJogo tela)
 {
@@ -177,11 +188,12 @@ static void desenharFundoMenu(void)
 
 EstadoJogo telaMenu(Jogo *g, const Comandos *cmd)
 {
-    static const char *opcoes[] = { "Iniciar Missão", "Placar de Pilotos", "Controles", "Sair" };
+    static const char *opcoes[] = { "Iniciar Missão", "Placar de Pilotos", "Opções", "Sair" };
     static const EstadoJogo destinos[] = { EST_COMBATE, EST_PLACAR, EST_CONTROLES, EST_SAIR };
     enum { QTD_OPCOES = sizeof opcoes / sizeof opcoes[0] };
     static int selecionada = 0;
     int centroX = (int)(GetScreenWidth() * MENU_CENTRO_X);
+    int antes = selecionada;
     int i;
 
     (void)entrouEm(EST_MENU);
@@ -191,6 +203,8 @@ EstadoJogo telaMenu(Jogo *g, const Comandos *cmd)
         selecionada = (selecionada + QTD_OPCOES - 1) % QTD_OPCOES;
     if (cmd->menuBaixo)
         selecionada = (selecionada + 1) % QTD_OPCOES;
+    if (selecionada != antes)
+        audioUIMover();
 
     desenharFundoMenu();
 
@@ -214,7 +228,13 @@ EstadoJogo telaMenu(Jogo *g, const Comandos *cmd)
     textoNoMenu("Setas: navegar   Enter/A: selecionar",
                 centroX, MENU_TOPO_Y + QTD_OPCOES * MENU_ESPACO + 16, TAM_DICA, LIGHTGRAY);
 
-    return cmd->confirmar ? destinos[selecionada] : EST_MENU;
+    if (cmd->confirmar) {
+        audioUISelecionar();
+        if (destinos[selecionada] == EST_CONTROLES)
+            telasOpcoesDefinirOrigem(EST_MENU);
+        return destinos[selecionada];
+    }
+    return EST_MENU;
 }
 
 static const char LETRAS_FIM[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .-";
@@ -289,6 +309,10 @@ static const char *nomeFinalFim(void)
 static void atualizarNomeFim(const Comandos *cmd)
 {
     int c;
+    int cursorAntes = nomeCursor;
+    int editou = 0;
+    int moveu = 0;
+    char letraAntes = letraAtual;
 
     if (aguardandoTeclasSoltas) {
         while (GetCharPressed() != 0) { }
@@ -300,21 +324,42 @@ static void atualizarNomeFim(const Comandos *cmd)
     while ((c = GetCharPressed()) != 0) {
         int ascii = letraAscii(c);
 
-        if (ascii != 0 && ascii != ';')
+        if (ascii != 0 && ascii != ';') {
+            int antes = nomeTam;
+
             inserirLetraNome((char)ascii);
+            if (nomeTam > antes) {
+                audioUITecla();
+                editou = 1;
+            }
+        }
     }
 
-    if (IsKeyPressed(KEY_BACKSPACE) || (cmd->usandoControle && cmd->voltar))
+    if (IsKeyPressed(KEY_BACKSPACE) || (cmd->usandoControle && cmd->voltar)) {
+        int antes = nomeTam;
+
         apagarLetraNome();
+        if (nomeTam < antes) {
+            audioUIVoltar();
+            editou = 1;
+        }
+    }
 
     if (cmd->menuEsquerda && nomeCursor > 0)
         nomeCursor--;
 
     if (cmd->menuDireita) {
-        if (cmd->usandoControle && nomeCursor == nomeTam)
+        if (cmd->usandoControle && nomeCursor == nomeTam) {
+            int antes = nomeTam;
+
             inserirLetraNome(letraAtual);
-        else if (nomeCursor < nomeTam)
+            if (nomeTam > antes) {
+                audioUITecla();
+                editou = 1;
+            }
+        } else if (nomeCursor < nomeTam) {
             nomeCursor++;
+        }
     }
 
     if (cmd->usandoControle) {
@@ -326,6 +371,11 @@ static void atualizarNomeFim(const Comandos *cmd)
         if ((cmd->menuCima || cmd->menuBaixo) && nomeCursor < nomeTam)
             nomeFim[nomeCursor] = letraAtual;
     }
+
+    if (nomeCursor != cursorAntes || letraAtual != letraAntes)
+        moveu = 1;
+    if (moveu && !editou)
+        audioUIMover();
 
     if (nomeCursor < nomeTam)
         letraAtual = nomeFim[nomeCursor];
@@ -418,6 +468,7 @@ EstadoJogo telaFim(Jogo *g, const Comandos *cmd)
     if (cmd->confirmar && !aguardandoTeclasSoltas) {
         const char *nomeFinal = nomeFinalFim();
 
+        audioUISelecionar();
         g->placar = inserirPontuacao(g->placar, nomeFinal, total);
         erroSalvarPlacar = salvarPlacar(g->placar, CAMINHO_PLACAR) ? 0 : 1;
 
@@ -476,6 +527,7 @@ EstadoJogo telaPlacar(Jogo *g, const Comandos *cmd)
         textoNoMenu("Falha ao salvar o placar em disco.", centro, 610, 18, RED);
 
     if (cmd->voltar || cmd->confirmar) {
+        audioUIVoltar();
         destacarUltima = 0;
         erroSalvarPlacar = 0;
         return EST_MENU;
@@ -511,8 +563,22 @@ static const char *ROTULOS_CONFIG[] = {
 
 enum { QTD_CONFIG = (int)(sizeof ROTULOS_CONFIG / sizeof ROTULOS_CONFIG[0]) };
 
-static void ajustarConfig(ConfigEntrada *cfg, int selecionada, int direcao)
+static const char *ROTULOS_AUDIO[] = {
+    "Volume geral", "Efeitos", "Música"
+};
+
+enum { QTD_AUDIO = (int)(sizeof ROTULOS_AUDIO / sizeof ROTULOS_AUDIO[0]) };
+
+enum { ABA_CONTROLES = 0, ABA_AUDIO, QTD_ABAS };
+
+/* Ajusta uma opção de entrada e devolve 1 se o valor mudou. */
+static int ajustarConfig(ConfigEntrada *cfg, int selecionada, int direcao)
 {
+    float sensibilidadeAntes = cfg->sensibilidade;
+    float zonaMortaAntes = cfg->zonaMorta;
+    int inverterAntes = cfg->inverterArfagem;
+    int vibracaoAntes = cfg->vibracao;
+
     switch (selecionada) {
     case 0:
         cfg->sensibilidade += direcao * 0.05f;
@@ -548,77 +614,248 @@ static void ajustarConfig(ConfigEntrada *cfg, int selecionada, int direcao)
         break;
     }
 
+    if (cfg->sensibilidade == sensibilidadeAntes && cfg->zonaMorta == zonaMortaAntes
+        && cfg->inverterArfagem == inverterAntes && cfg->vibracao == vibracaoAntes)
+        return 0;
+
     salvarConfigEntrada(cfg, CAMINHO_CONFIG);
+    return 1;
+}
+
+/* Ajusta um volume em passos de 5% e devolve 1 se mudou. */
+static int ajustarVolume(ConfigAudio *cfg, int selecionada, int direcao)
+{
+    float *valor;
+    float novo;
+
+    if (selecionada == 0)
+        valor = &cfg->geral;
+    else if (selecionada == 1)
+        valor = &cfg->efeitos;
+    else
+        valor = &cfg->musica;
+
+    novo = roundf((*valor + direcao * AUDIO_VOLUME_PASSO) * 20.0f) / 20.0f;
+    if (novo < AUDIO_VOLUME_MIN)
+        novo = AUDIO_VOLUME_MIN;
+    if (novo > AUDIO_VOLUME_MAX)
+        novo = AUDIO_VOLUME_MAX;
+    if (novo == *valor)
+        return 0;
+
+    *valor = novo;
+    audioAplicarVolumes();
+    audioSalvarConfiguracao();
+    return 1;
+}
+
+static void desenharBarraVolume(int x, int y, int largura, int altura, float valor)
+{
+    int preenchida;
+
+    if (valor < 0.0f)
+        valor = 0.0f;
+    if (valor > 1.0f)
+        valor = 1.0f;
+    preenchida = (int)(largura * valor);
+
+    DrawRectangle(x, y, largura, altura, Fade(GRAY, 0.25f));
+    DrawRectangle(x, y, preenchida, altura, YELLOW);
+    DrawRectangleLines(x, y, largura, altura, GRAY);
+}
+
+static void desenharAbas(int aba, int foco)
+{
+    static const char *ABAS[] = { "Controles", "Áudio" };
+    int centro = GetScreenWidth() / 2;
+    int x[QTD_ABAS];
+    int i;
+
+    x[0] = centro - 150;
+    x[1] = centro + 150;
+
+    for (i = 0; i < QTD_ABAS; i++) {
+        Font fonte = fonteDoMenu();
+        float largura = MeasureTextEx(fonte, ABAS[i], 24.0f, ESPACO_FONTE).x;
+        Color cor = i == aba ? YELLOW : LIGHTGRAY;
+
+        textoNoMenu(ABAS[i], x[i], 62, 24, cor);
+        DrawLine(x[i] - (int)(largura / 2.0f), 92,
+                 x[i] + (int)(largura / 2.0f), 92, i == aba ? YELLOW : DARKGRAY);
+        if (i == aba && foco == 0)
+            DrawRectangleLines(x[i] - (int)(largura / 2.0f) - 12, 54,
+                               (int)largura + 24, 42, YELLOW);
+    }
 }
 
 EstadoJogo telaControles(ConfigEntrada *cfg, const Comandos *cmd)
 {
-    static int selecionada = 0;
+    static int aba = ABA_CONTROLES;
+    static int foco = 0;   /* 0 = barra de abas; 1..N = linha da aba atual */
+    ConfigAudio *acfg = audioConfig();
+    int centro = GetScreenWidth() / 2;
+    int nLinhas;
+    int antesAba, antesFoco;
+    int i;
+
+    if (opcoesRecemAbertas) {
+        aba = ABA_CONTROLES;
+        foco = 0;
+        opcoesRecemAbertas = 0;
+    }
+
+    if (cmd->voltar) {
+        audioUIVoltar();
+        return origemOpcoes;
+    }
+
+    nLinhas = aba == ABA_CONTROLES ? QTD_CONFIG : QTD_AUDIO;
+    antesAba = aba;
+    antesFoco = foco;
+
+    if (foco == 0) {
+        if (cmd->menuEsquerda)
+            aba = (aba + QTD_ABAS - 1) % QTD_ABAS;
+        else if (cmd->menuDireita)
+            aba = (aba + 1) % QTD_ABAS;
+        else if (cmd->menuBaixo)
+            foco = 1;
+        else if (cmd->menuCima)
+            foco = nLinhas;
+        else if (cmd->confirmar) {
+            foco = 1;
+            audioUISelecionar();
+        }
+
+        if (aba != antesAba) {
+            foco = 0;
+            audioUIMover();
+        } else if (foco != antesFoco && foco != 0 && !cmd->confirmar)
+            audioUIMover();
+    } else {
+        if (cmd->menuCima) {
+            foco = foco == 1 ? 0 : foco - 1;
+            audioUIMover();
+        } else if (cmd->menuBaixo) {
+            if (foco < nLinhas) {
+                foco++;
+                audioUIMover();
+            }
+        } else if (cmd->menuEsquerda || cmd->menuDireita) {
+            int direcao = cmd->menuDireita ? 1 : -1;
+            int mudou = aba == ABA_CONTROLES
+                            ? ajustarConfig(cfg, foco - 1, direcao)
+                            : ajustarVolume(acfg, foco - 1, direcao);
+
+            if (mudou)
+                audioUIMover();
+        } else if (cmd->confirmar && aba == ABA_CONTROLES && foco - 1 >= 2) {
+            if (ajustarConfig(cfg, foco - 1, 0))
+                audioUISelecionar();
+        }
+    }
+
+    textoNoMenu("Opções", centro, 16, 34, RAYWHITE);
+    desenharAbas(aba, foco);
+
+    if (aba == ABA_CONTROLES) {
+        textoFonte("Ação", 120, 108, 18, GRAY);
+        textoFonte("Teclado", 520, 108, 18, GRAY);
+        textoFonte("Controle Xbox", 760, 108, 18, GRAY);
+        DrawLine(110, 134, 1170, 134, DARKGRAY);
+
+        for (i = 0; i < QTD_CONTROLES; i++) {
+            int y = 142 + i * 24;
+
+            textoFonte(CONTROLES[i].acao, 120, y, 17, LIGHTGRAY);
+            textoFonte(CONTROLES[i].teclado, 520, y, 17, LIGHTGRAY);
+            textoFonte(CONTROLES[i].controle, 760, y, 17, LIGHTGRAY);
+        }
+
+        DrawLine(110, 414, 1170, 414, DARKGRAY);
+        textoNoMenu("Configurações", centro, 424, 22, RAYWHITE);
+
+        for (i = 0; i < QTD_CONFIG; i++) {
+            int y = 458 + i * 32;
+            const char *valor;
+            Color cor = foco == i + 1 ? YELLOW : LIGHTGRAY;
+
+            switch (i) {
+            case 0:
+                valor = TextFormat("%.2f", cfg->sensibilidade);
+                break;
+            case 1:
+                valor = TextFormat("%.2f", cfg->zonaMorta);
+                break;
+            case 2:
+                valor = cfg->inverterArfagem ? "Sim" : "Não";
+                break;
+            default:
+                valor = cfg->vibracao ? "Ligada" : "Desligada";
+                break;
+            }
+
+            if (foco == i + 1)
+                textoFonte(">", 140, y, 22, YELLOW);
+            textoFonte(ROTULOS_CONFIG[i], 170, y, 22, cor);
+            textoFonteDireita(valor, 650, y, 22, cor);
+        }
+
+        textoNoMenu(foco == 0
+                        ? "←/→ troca aba   ↑/↓ ou Enter/A entra"
+                        : "↑/↓ seleciona   ←/→ altera   Enter/A alterna   Esc/B volta",
+                    centro, 640, 18, LIGHTGRAY);
+    } else {
+        for (i = 0; i < QTD_AUDIO; i++) {
+            int y = 220 + i * 90;
+            float valor = i == 0 ? acfg->geral : (i == 1 ? acfg->efeitos : acfg->musica);
+            Color cor = foco == i + 1 ? YELLOW : LIGHTGRAY;
+
+            if (foco == i + 1)
+                textoFonte(">", 340, y, 26, YELLOW);
+            textoFonte(ROTULOS_AUDIO[i], 380, y, 26, cor);
+            desenharBarraVolume(700, y + 6, 260, 20, valor);
+            textoFonteDireita(TextFormat("%d%%", (int)lroundf(valor * 100.0f)),
+                              1040, y, 26, cor);
+        }
+
+        textoNoMenu("A música fica abaixo dos efeitos por padrão.",
+                    centro, 540, 18, GRAY);
+        textoNoMenu(foco == 0
+                        ? "←/→ troca aba   ↑/↓ ou Enter/A entra"
+                        : "↑/↓ seleciona   ←/→ ajusta 5%   Esc/B volta",
+                    centro, 640, 18, LIGHTGRAY);
+    }
+
+    return EST_CONTROLES;
+}
+
+void telasDesenharPausa(int selecionada)
+{
+    static const char *ITENS[PAUSA_QTD] = {
+        "Continuar", "Opções", "Voltar ao menu principal"
+    };
     int centro = GetScreenWidth() / 2;
     int i;
 
-    (void)entrouEm(EST_CONTROLES);
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.65f));
+    textoNoMenu("PAUSA", centro, 150, 48, RAYWHITE);
 
-    if (cmd->menuCima)
-        selecionada = (selecionada + QTD_CONFIG - 1) % QTD_CONFIG;
-    if (cmd->menuBaixo)
-        selecionada = (selecionada + 1) % QTD_CONFIG;
-
-    if (cmd->menuEsquerda)
-        ajustarConfig(cfg, selecionada, -1);
-    else if (cmd->menuDireita)
-        ajustarConfig(cfg, selecionada, 1);
-    else if (cmd->confirmar && selecionada >= 2)
-        ajustarConfig(cfg, selecionada, 0);
-
-    textoNoMenu("Controles", centro, 24, 36, RAYWHITE);
-
-    textoFonte("Ação", 120, 80, 18, GRAY);
-    textoFonte("Teclado", 520, 80, 18, GRAY);
-    textoFonte("Controle Xbox", 760, 80, 18, GRAY);
-    DrawLine(110, 106, 1170, 106, DARKGRAY);
-
-    for (i = 0; i < QTD_CONTROLES; i++) {
-        int y = 114 + i * 26;
-
-        textoFonte(CONTROLES[i].acao, 120, y, 18, LIGHTGRAY);
-        textoFonte(CONTROLES[i].teclado, 520, y, 18, LIGHTGRAY);
-        textoFonte(CONTROLES[i].controle, 760, y, 18, LIGHTGRAY);
-    }
-
-    DrawLine(110, 402, 1170, 402, DARKGRAY);
-    textoNoMenu("Configurações", centro, 414, 24, RAYWHITE);
-
-    for (i = 0; i < QTD_CONFIG; i++) {
-        int y = 454 + i * 34;
-        const char *valor;
+    for (i = 0; i < PAUSA_QTD; i++) {
+        int y = 280 + i * 54;
         Color cor = i == selecionada ? YELLOW : LIGHTGRAY;
 
-        switch (i) {
-        case 0:
-            valor = TextFormat("%.2f", cfg->sensibilidade);
-            break;
-        case 1:
-            valor = TextFormat("%.2f", cfg->zonaMorta);
-            break;
-        case 2:
-            valor = cfg->inverterArfagem ? "Sim" : "Não";
-            break;
-        default:
-            valor = cfg->vibracao ? "Ligada" : "Desligada";
-            break;
-        }
+        if (i == selecionada) {
+            Font fonte = fonteDoMenu();
+            float largura = MeasureTextEx(fonte, ITENS[i], (float)TAM_MENU, ESPACO_FONTE).x;
 
-        if (i == selecionada)
-            textoFonte(">", 140, y, 22, YELLOW);
-        textoFonte(ROTULOS_CONFIG[i], 170, y, 22, cor);
-        textoFonteDireita(valor, 650, y, 22, cor);
+            textoFonte(">", centro - (int)(largura / 2.0f) - 28, y, TAM_MENU, YELLOW);
+        }
+        textoNoMenu(ITENS[i], centro, y, TAM_MENU, cor);
     }
 
-    textoNoMenu("↑/↓ seleciona   ←/→ altera   Enter/A alterna   Esc/B volta",
-                centro, 640, 18, LIGHTGRAY);
-
-    return cmd->voltar ? EST_MENU : EST_CONTROLES;
+    textoNoMenu("Esc/Start: continuar   ↑/↓: navegar   Enter/A: selecionar",
+                centro, 460, 18, LIGHTGRAY);
 }
 
 /* Libera fonte e textura antes de o contexto OpenGL ser destruído. */
