@@ -116,7 +116,7 @@ static const Inimigo *escolherAlvo(const Jogo *g, const Aliado *a)
             if (distCentro > RAIO_DEFESA)
                 custo -= 12000.0f;
         }
-        /* No máximo dois aliados por alvo: sem isso, 8 TIEs derretem um Y-Wing em um passo. */
+        /* No máximo dois aliados por alvo: sem isso, 11 TIEs derretem um Y-Wing em um passo. */
         {
             int parceiros = 0;
 
