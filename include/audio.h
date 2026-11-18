@@ -4,7 +4,9 @@
 #include "tipos.h"
 
 /*
- * Efeitos sonoros do jogo (AUD-01). Os arquivos ficam em assets/sounds/ (OGG Vorbis).
+ * Áudio do jogo (AUD-01/AUD-02): efeitos, música de fundo, sons de interface e volumes.
+ * Os efeitos ficam em assets/sounds/, as músicas em assets/sounds/musics/ e a interface
+ * em assets/sounds/menu/.
  *
  * O módulo é tolerante a falhas: sem dispositivo de áudio ou sem um arquivo, a função
  * correspondente vira no-op e o jogo continua. As funções de evento também são seguras antes de
@@ -69,5 +71,60 @@ void audioBoomJogador(Vector3 pos);                  /* para o SPIN e toca a exp
 void audioPararSpins(void);
 void audioDestroierDestruido(void);                  /* DESTROYED do Destróier */
 void audioEscudoDestroier(int ligado);               /* SHIELD enable/disable (uso futuro) */
+
+/*
+ * Configuração de áudio (AUD-02), persistida em CAMINHO_CONFIG_AUDIO.
+ * Os volumes vão de 0 a 1; a música é multiplicada por volumeGeral * volumeMusica e os
+ * efeitos (inclusive os de interface) por volumeGeral * volumeEfeitos.
+ */
+#define CAMINHO_CONFIG_AUDIO       "dados/audio.txt"
+#define AUDIO_VOLUME_MIN           0.0f
+#define AUDIO_VOLUME_MAX           1.0f
+#define AUDIO_VOLUME_PASSO         0.05f
+#define AUDIO_VOLUME_GERAL_PADRAO  0.80f
+#define AUDIO_VOLUME_EFEITOS_PADRAO 0.80f
+#define AUDIO_VOLUME_MUSICA_PADRAO 0.40f
+/* Multiplicador da música na pausa e nas opções abertas por ela. */
+#define AUDIO_FATOR_PAUSA          0.40f
+
+typedef struct {
+    float geral;
+    float efeitos;
+    float musica;
+} ConfigAudio;
+
+/* Padrões 0,80 / 0,80 / 0,40. */
+void audioConfigPadroes(ConfigAudio *cfg);
+/* Mesmo formato chave=valor de entrada.c; valor ausente/inválido mantém o atual. */
+int audioConfigCarregar(ConfigAudio *cfg, const char *caminho);
+/* Cria a pasta se preciso; devolve 1 se salvou. */
+int audioConfigSalvar(const ConfigAudio *cfg, const char *caminho);
+
+/* Configuração viva do jogo; nunca NULL. A tela de opções altera os campos diretamente. */
+ConfigAudio *audioConfig(void);
+/* Limita os três volumes a [0, 1]; chamar depois de alterar a configuração. */
+void audioAplicarVolumes(void);
+/* Salva em CAMINHO_CONFIG_AUDIO. */
+int audioSalvarConfiguracao(void);
+
+/* Faixa de fundo; a troca é um crossfade curto. */
+typedef enum {
+    AUDIO_MUSICA_NENHUMA = 0,
+    AUDIO_MUSICA_MENU,
+    AUDIO_MUSICA_COMBATE,
+    AUDIO_MUSICA_RANKING
+} FaixaMusica;
+
+/*
+ * Define a faixa desejada. Pode ser chamada antes de iniciarAudio; a faixa escolhida
+ * começa quando o áudio estiver pronto. `fator` 1,0 = normal; AUDIO_FATOR_PAUSA abaixa.
+ */
+void audioMusicaTocar(FaixaMusica faixa, float fator);
+
+/* Efeitos de interface; seguros antes de iniciarAudio. */
+void audioUIMover(void);        /* seleção mudou */
+void audioUISelecionar(void);   /* confirmou/alternou */
+void audioUIVoltar(void);       /* voltou/backspace */
+void audioUITecla(void);        /* uma letra foi inserida */
 
 #endif
