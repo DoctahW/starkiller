@@ -34,10 +34,10 @@ static ConfigAudio configAudio = {
  * Alcances (u) das fontes posicionais. Os sons de voo, SPIN e BOOM dos caças ganharam
  * 500 u para o combate próximo do Destróier não ficar mudo logo atrás do jogador.
  */
-#define ALCANCE_ENGINE_INIMIGO     2350.0f
-#define ALCANCE_SPIN_INIMIGO       2350.0f
-#define ALCANCE_BOOM_INIMIGO       2400.0f
-#define ALCANCE_TIRO_INIMIGO       4000.0f
+#define ALCANCE_ENGINE_INIMIGO     2700.0f
+#define ALCANCE_SPIN_INIMIGO       2700.0f
+#define ALCANCE_BOOM_INIMIGO       2800.0f
+#define ALCANCE_TIRO_INIMIGO       4800.0f
 #define ALCANCE_ISD                9000.0f
 #define ALCANCE_AFTERBURNER        1500.0f
 #define ALCANCE_ALARME             12000.0f
@@ -54,6 +54,8 @@ static ConfigAudio configAudio = {
 #define FORCA_DOPPLER_MINIMA 0.35f
 
 #define VOZES_POR_TIPO 3
+#define TIPOS_MOTOR 4
+#define MOTOR_TIE_ALIADO 3
 #define SPIN_VOZES 12
 #define MAX_VARIANTES  20
 #define MAX_FONTES_MOTOR 64
@@ -61,6 +63,7 @@ static ConfigAudio configAudio = {
 #define NUM_CABINE_JOGADOR  2
 
 #define FRACAO_CASCO_CRITICO  0.25f
+#define FRACAO_ALARME_ISD     0.50f   /* alarme de casco do Destróier a partir de 50% do hull */
 #define INTERVALO_AVISO_CASCO 0.75f
 
 /*
@@ -71,7 +74,7 @@ static ConfigAudio configAudio = {
 
 /* Volumes dos eventos (antes dos volumes geral/efeitos). */
 #define VOLUME_TIRO_JOGADOR   (0.80f * VOLUME_JOGADOR)
-#define VOLUME_TIRO_INIMIGO   0.85f
+#define VOLUME_TIRO_INIMIGO   1.00f
 #define VOLUME_ACELERACAO     (0.45f * VOLUME_JOGADOR)
 #define VOLUME_CABINE         (0.55f * VOLUME_JOGADOR)
 #define VOLUME_MOTOR_JOGADOR  (0.70f * VOLUME_JOGADOR)
@@ -82,6 +85,7 @@ static ConfigAudio configAudio = {
 #define VOLUME_DANO_JOGADOR   (0.75f * VOLUME_JOGADOR)
 #define VOLUME_COLISAO_JOGADOR (0.80f * VOLUME_JOGADOR)
 #define VOLUME_ALVO_JOGADOR   (0.60f * VOLUME_JOGADOR)
+#define VOLUME_REPARO_JOGADOR (0.85f * VOLUME_JOGADOR)
 #define VOLUME_AVISO_CASCO    (0.70f * VOLUME_JOGADOR)
 #define VOLUME_RUIDO_CASCO    (0.60f * VOLUME_JOGADOR)
 #define VOLUME_SPIN_JOGADOR   (0.90f * VOLUME_JOGADOR)
@@ -94,7 +98,7 @@ static ConfigAudio configAudio = {
  * BOOM com curva mais suave que os demais pontuais: a explosão carrega mais longe mesmo
  * com o volume base já no teto.
  */
-#define CURVA_BOOM_INIMIGO    1.35f
+#define CURVA_BOOM_INIMIGO    1.25f
 
 /*
  * Telemetria da cabine (sem atenuação por distância): o aviso de busca fica bem baixo sob o
@@ -145,10 +149,10 @@ typedef struct {
     Loop thrusters;     /* só X-Wing */
 } VozMotor;
 
-/* Fonte móvel registrada no frame (inimigos hoje, aliados no futuro). */
+/* Fonte móvel registrada no frame, incluindo o motor próprio do TIE aliado. */
 typedef struct {
     ChaveFonte chave;
-    TipoNave tipo;
+    int tipo;          /* XWING, YWING, AWING ou MOTOR_TIE_ALIADO */
     Vector3 pos, vel;
 } FonteMotor;
 
@@ -172,6 +176,7 @@ static Sound tiroAwing;
 static Banco bancoColisao;
 static Banco bancoDano;
 static Banco bancoAlvo;
+static Banco bancoReparo;
 static Banco bancoLowHp;
 static Banco bancoAceleracao;
 static Banco bancoFrenagem;
@@ -207,7 +212,7 @@ static Loop alarmeIsd;
 static Loop telemetriaBusca;
 static Loop telemetriaLaranja;
 static Loop telemetriaVerde;
-static VozMotor vozes[3][VOZES_POR_TIPO];
+static VozMotor vozes[TIPOS_MOTOR][VOZES_POR_TIPO];
 
 /* Fontes móveis registradas neste frame e temporizadores. */
 static FonteMotor fontes[MAX_FONTES_MOTOR];
@@ -216,6 +221,7 @@ static float lowHpRuidoRestante;
 static float avisoRestante;
 static float aceleracaoAntes;
 static int destroierEstavaVivo = 1;
+static int escudoDestroierLigado = 1;
 static int proximoTiroJogador;
 
 static Sound carregarSom(const char *caminho)
@@ -590,11 +596,11 @@ float audioFatorDoppler(Vector3 pos, Vector3 vel)
     return fator;
 }
 
-void audioMotorRegistrar(GrupoMotor grupo, int id, TipoNave tipo, Vector3 pos, Vector3 vel)
+static void registrarMotor(GrupoMotor grupo, int id, int tipo, Vector3 pos, Vector3 vel)
 {
     int i;
 
-    if (!audioPronto || id == 0)
+    if (!audioPronto || id == 0 || tipo < 0 || tipo >= TIPOS_MOTOR)
         return;
 
     for (i = 0; i < nFontes; i++)
@@ -613,6 +619,12 @@ void audioMotorRegistrar(GrupoMotor grupo, int id, TipoNave tipo, Vector3 pos, V
     fontes[nFontes].pos = pos;
     fontes[nFontes].vel = vel;
     nFontes++;
+}
+
+void audioMotorRegistrar(GrupoMotor grupo, int id, TipoNave tipo, Vector3 pos, Vector3 vel)
+{
+    if ((int)tipo >= 0 && (int)tipo <= AWING)
+        registrarMotor(grupo, id, (int)tipo, pos, vel);
 }
 
 static int vozLivre(int tipo)
@@ -661,14 +673,14 @@ static FonteMotor *buscarFonte(ChaveFonte chave)
 }
 
 /*
- * Vozes de motor de todas as fontes móveis registradas no frame. Vale para inimigos e, no
- * futuro, aliados: as mais próximas de cada tipo ocupam as vozes; as demais desvanecem.
+ * Vozes de motor de inimigos e aliados: as mais próximas de cada tipo ocupam as vozes;
+ * as demais desvanecem.
  */
 static void atualizarVozesMotores(float dt)
 {
     int t, k;
 
-    for (t = 0; t < 3; t++) {
+    for (t = 0; t < TIPOS_MOTOR; t++) {
         ChaveFonte desejados[VOZES_POR_TIPO];
         int nDesejados = 0;
 
@@ -717,7 +729,7 @@ static void atualizarVozesMotores(float dt)
     }
 
     /* Volume/pan/Doppler de cada voz; as livres desvanecem. */
-    for (t = 0; t < 3; t++)
+    for (t = 0; t < TIPOS_MOTOR; t++)
         for (k = 0; k < VOZES_POR_TIPO; k++) {
             VozMotor *v = &vozes[t][k];
             FonteMotor *f = v->chave.id ? buscarFonte(v->chave) : NULL;
@@ -751,7 +763,7 @@ static void silenciarVozesMotores(float dt)
 {
     int t, k;
 
-    for (t = 0; t < 3; t++)
+    for (t = 0; t < TIPOS_MOTOR; t++)
         for (k = 0; k < VOZES_POR_TIPO; k++) {
             vozes[t][k].chave.grupo = 0;
             vozes[t][k].chave.id = 0;
@@ -870,6 +882,7 @@ void iniciarAudio(void)
     carregarBanco(&bancoColisao, PASTA_SONS "tie/collision_%d.ogg", 6);
     carregarBanco(&bancoDano, PASTA_SONS "tie/shot_%02d.ogg", 20);
     carregarBanco(&bancoAlvo, PASTA_SONS "tie/target_%d.ogg", 6);
+    carregarBanco(&bancoReparo, PASTA_SONS "tie/skill_%d.ogg", 3);
     carregarBanco(&bancoLowHp, PASTA_SONS "tie/low_hp_%d.ogg", 7);
     avisoLowHp = carregarSom(PASTA_SONS "tie/low_hp_warning.ogg");
     carregarBanco(&bancoAceleracao, PASTA_SONS "tie/accel_%d.ogg", 4);
@@ -906,6 +919,7 @@ void iniciarAudio(void)
         carregarLoop(&vozes[XWING][k].thrusters, PASTA_SONS "rebel/engine_xwing_thrusters.ogg");
         carregarLoop(&vozes[YWING][k].principal, PASTA_SONS "rebel/engine_ywing.ogg");
         carregarLoop(&vozes[AWING][k].principal, PASTA_SONS "rebel/engine_awing.ogg");
+        carregarLoop(&vozes[MOTOR_TIE_ALIADO][k].principal, PASTA_SONS "tie/engine_3.ogg");
     }
 
     uiMover = carregarSom(PASTA_MENU "ui_menuMove.wav");
@@ -931,6 +945,7 @@ void iniciarAudio(void)
     avisoRestante = 0.0f;
     aceleracaoAntes = 0.0f;
     destroierEstavaVivo = 1;
+    escudoDestroierLigado = 1;
     proximoTiroJogador = 0;
 }
 
@@ -951,7 +966,7 @@ void encerrarAudio(void)
     liberarLoop(&telemetriaBusca);
     liberarLoop(&telemetriaLaranja);
     liberarLoop(&telemetriaVerde);
-    for (t = 0; t < 3; t++)
+    for (t = 0; t < TIPOS_MOTOR; t++)
         for (k = 0; k < VOZES_POR_TIPO; k++) {
             liberarLoop(&vozes[t][k].principal);
             liberarLoop(&vozes[t][k].thrusters);
@@ -966,6 +981,7 @@ void encerrarAudio(void)
     liberarBanco(&bancoColisao);
     liberarBanco(&bancoDano);
     liberarBanco(&bancoAlvo);
+    liberarBanco(&bancoReparo);
     liberarBanco(&bancoLowHp);
     liberarSom(&avisoLowHp);
     liberarBanco(&bancoAceleracao);
@@ -1033,6 +1049,15 @@ void audioAtualizar(const Jogo *g, const Comandos *cmd, int emCombate, float dt)
         destroierEstavaVivo = 0;
     }
 
+    /* Escudo do Destróier: DISABLE quando cai, ENABLE quando a recarga o traz de volta. */
+    {
+        int ligado = g->cascoDestroier > 0.0f && g->escudoDestroier > 0.001f;
+
+        if (emCombate && ligado != escudoDestroierLigado)
+            audioEscudoDestroier(ligado);
+        escudoDestroierLigado = ligado;
+    }
+
     if (emCombate && g->jogador.casco > 0.0f)
         atualizarMotoresJogador(g, dt);
     else
@@ -1058,7 +1083,7 @@ void audioAtualizar(const Jogo *g, const Comandos *cmd, int emCombate, float dt)
         loopAtualizar(&motorIsd, motor.volume, motor.pan, dt);
         loopAtualizar(&posQueimadorIsd, queimador.volume, queimador.pan, dt);
 
-        if (g->cascoDestroier <= CASCO_MAX_DESTROIER * FRACAO_CASCO_CRITICO) {
+        if (g->cascoDestroier <= CASCO_MAX_DESTROIER * FRACAO_ALARME_ISD) {
             VozEspacial alarme = espacial((Vector3){ 0.0f, 0.0f, 0.0f }, ALCANCE_ALARME,
                                           VOLUME_ALARME_ISD);
 
@@ -1095,13 +1120,16 @@ void audioAtualizar(const Jogo *g, const Comandos *cmd, int emCombate, float dt)
         lowHpRuidoRestante = aleatorioEntre(1.2f, 3.2f);
     }
 
-    /* Registra as fontes móveis do frame; inimigos hoje, aliados no futuro. */
+    /* Registra motores rebeldes e TIEs aliados em grupos distintos. */
     if (emCombate) {
         NoInimigo *no;
 
         for (no = g->inimigos.inicio; no != NULL; no = no->prox)
             audioMotorRegistrar(AUDIO_MOTOR_INIMIGO, no->dado.id, no->dado.tipo,
                                 no->dado.pos, no->dado.vel);
+        for (int i = 0; i < MAX_ALIADOS; i++)
+            if (g->aliados[i].ativo)
+                registrarMotor(AUDIO_MOTOR_ALIADO, i + 1, MOTOR_TIE_ALIADO, g->aliados[i].pos, g->aliados[i].vel);
         atualizarVozesMotores(dt);
     } else {
         silenciarVozesMotores(dt);
@@ -1132,6 +1160,17 @@ void audioTiroInimigo(TipoNave tipo, Vector3 pos)
     tocarEspacial(s, pos, VOLUME_TIRO_INIMIGO, ALCANCE_TIRO_INIMIGO);
 }
 
+void audioTiroAliado(Vector3 pos)
+{
+    tocarEspacial(somAleatorio(&bancoTiroJogador), pos, VOLUME_TIRO_INIMIGO, ALCANCE_TIRO_INIMIGO);
+}
+
+void audioBoomAliado(Vector3 pos)
+{
+    tocarEspacialComCurva(somAleatorio(&bancoBoomJogador), pos, 1.0f, ALCANCE_BOOM_INIMIGO,
+                          CURVA_BOOM_INIMIGO);
+}
+
 void audioDanoJogador(void)
 {
     tocar(somAleatorio(&bancoDano), VOLUME_DANO_JOGADOR, 0.0f);
@@ -1140,6 +1179,11 @@ void audioDanoJogador(void)
 void audioColisaoJogador(void)
 {
     tocar(somAleatorio(&bancoColisao), VOLUME_COLISAO_JOGADOR, 0.0f);
+}
+
+void audioRepararJogador(void)
+{
+    tocar(somAleatorio(&bancoReparo), VOLUME_REPARO_JOGADOR, 0.0f);
 }
 
 void audioTrocaAlvo(void)
@@ -1218,7 +1262,7 @@ void audioDestroierDestruido(void)
 void audioEscudoDestroier(int ligado)
 {
     tocarEspacial(ligado ? isdShieldEnable : isdShieldDisable,
-                  (Vector3){ 0.0f, 0.0f, 0.0f }, 0.9f, ALCANCE_ISD);
+                  (Vector3){ 0.0f, 0.0f, 0.0f }, VOLUME_ALARME_ISD, ALCANCE_ALARME);
 }
 
 static float limitarVolume(float v)

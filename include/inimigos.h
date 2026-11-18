@@ -8,11 +8,11 @@
 #define CASCO_XWING  100.0f
 #define VEL_XWING    275.0f
 
-#define ESCUDO_YWING 80.0f
+#define ESCUDO_YWING 75.0f
 #define CASCO_YWING  160.0f
 #define VEL_YWING    160.0f
 
-#define ESCUDO_AWING 30.0f
+#define ESCUDO_AWING 0.0f
 #define CASCO_AWING  60.0f
 #define VEL_AWING    500.0f
 

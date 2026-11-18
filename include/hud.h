@@ -9,13 +9,18 @@ void hud_carregar(void);
 void hud_descarregar(void);
 
 /*
- * Desenha a cabine do TIE em 2D por cima da cena (depois de render_cena, fora do BeginMode3D):
- * moldura da janela, retícula central, medidores de casco do TIE e do Destróier, tempo restante,
- * pontos e multiplicador de sequência, e o console com velocidade, status, missão e navegação.
- * No visor, o radar com todos os caças na cor do tipo e o alvo travado destacado.
- * Com alvo travado: colchetes, tipo e distância sobre o caça, indicador de tiro adiantado (verde
- * dentro da retícula) e seta quando ele está fora do vidro; no console, tipo, distância e integridade.
- * Enquanto g->tempoDano > 0 (dano recente), tinge o vidro com um flash vermelho que se apaga em DURACAO_FEEDBACK_DANO.
+ * Desenha a cabine do TIE em 2D por cima da cena (depois de render_cena, fora do BeginMode3D),
+ * com os instrumentos montados na parte de baixo do cockpit, em painéis com face lateral extruda
+ * para simular perspectiva:
+ * - esquerda: painel de sensores com o radar redondo (inimigos, aliados e alvo travado);
+ * - centro: console com a barra do Destróier (escudo sólido azul sobre o casco em segmentos
+ *   vermelhos), faixa vazia de aviso que só aparece quando um Y-Wing bombardeia e o visor de
+ *   combate com o modelo do alvo, nome acima, HP à esquerda e distância à direita;
+ * - direita: reparo (cruz azul em cooldown / verde quando pronto), contador de vidas, modelo
+ *   simples do TIE na cor do casco (verde/amarelo/vermelho piscando) e o HP atual;
+ * - canto superior direito: tempo, pontos, abates, sequência, aliados e distância à borda;
+ * - entre os painéis: a velocidade em barra vertical com o número do acelerador.
+ * Mantém a retícula central, os colchetes/seta do alvo no vidro e o flash de dano.
  * `foraDaArena` (retorno de atualizarJogador) liga o aviso de limite da arena. Não altera o jogo.
  */
 void hud_desenhar(const Jogo *g, int foraDaArena);

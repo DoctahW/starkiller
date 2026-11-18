@@ -31,8 +31,8 @@ void iniciarJogador(Jogador *j)
     faseQueda = 0;
     tempoQueda = duracaoQueda = 0.0f;
 
-    /* ~550 u à frente da proa, já com a escala do Destróier no jogo. */
-    j->pos = (Vector3){ 0.0f, 0.0f, Z_PROA_DESTROIER * ESCALA_DESTROIER + 550.0f };
+    /* Abaixo do casco do Destróier, no mesmo ponto de nascimento dos TIEs aliados. */
+    j->pos = (Vector3){ 0.0f, SPAWN_ALA_Y, 0.0f };
     j->rot = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f };
     j->frente = (Vector3){ 0.0f, 0.0f, 1.0f };
     j->cima = (Vector3){ 0.0f, 1.0f, 0.0f };
@@ -40,37 +40,49 @@ void iniciarJogador(Jogador *j)
     j->velocidade = VELOCIDADE_INICIAL;
     j->casco = CASCO_JOGADOR;
     j->cooldownLaser = 0.0f;
-    j->escudo = ESCUDO_JOGADOR;
-    j->esperaEscudo = 0.0f;
+    j->cooldownReparo = 0.0f;
+    j->morto = 0;
+    j->explodiu = 0;
+    j->tempoRespawn = 0.0f;
+    j->tempoExplosao = 0.0f;
+    j->respawnsRestantes = RESPAWNS_JOGADOR;
 }
 
 void danificarJogador(Jogo *g, float dano)
 {
     Jogador *j = &g->jogador;
 
-    if (dano <= 0.0f)
+    if (dano <= 0.0f || j->casco <= 0.0f)
         return;
-    if (dano <= j->escudo) {
-        j->escudo -= dano;
-    } else {
-        j->casco -= dano - j->escudo;
-        j->escudo = 0.0f;
-        if (j->casco < 0.0f)
-            j->casco = 0.0f;
-    }
-    j->esperaEscudo = ATRASO_ESCUDO;
+    j->casco -= dano;
+    if (j->casco < 0.0f)
+        j->casco = 0.0f;
     registrarDanoJogador(g);
 }
 
-void atualizarEscudo(Jogador *j, float dt)
+int repararJogador(Jogo *g)
 {
-    if (j->esperaEscudo > 0.0f) {
-        j->esperaEscudo -= dt;
-        return;
-    }
-    j->escudo += RECARGA_ESCUDO * dt;
-    if (j->escudo > ESCUDO_JOGADOR)
-        j->escudo = ESCUDO_JOGADOR;
+    Jogador *j = &g->jogador;
+
+    if (j->morto || j->casco <= 0.0f || j->cooldownReparo > 0.0f || j->casco >= CASCO_JOGADOR)
+        return 0;
+    j->casco = fminf(CASCO_JOGADOR, j->casco + REPARO_JOGADOR);
+    j->cooldownReparo = COOLDOWN_REPARO;
+    audioRepararJogador();
+    return 1;
+}
+
+int respawnJogador(Jogo *g)
+{
+    Jogador *j = &g->jogador;
+    int restantes;
+
+    if (j->respawnsRestantes <= 0)
+        return 0;
+    restantes = j->respawnsRestantes - 1;
+    iniciarJogador(j);
+    j->respawnsRestantes = restantes;
+    return 1;
 }
 
 /* Deriva os eixos da nave a partir de rot (frente +Z, cima +Y, direita -X no espaço local). */
@@ -139,6 +151,13 @@ int atualizarJogador(Jogador *j, const Comandos *cmd, float dt)
     float k = 1.0f - expf(-dt / TAU_GIRO);
     Vector3 media;
 
+    if (j->cooldownReparo > 0.0f) {
+        j->cooldownReparo -= dt;
+        if (j->cooldownReparo < 0.0f)
+            j->cooldownReparo = 0.0f;
+    }
+    if (j->morto && faseQueda != 1)
+        return 0;
     if (faseQueda == 1) {
         atualizarQueda(j, dt);
         return 0;
@@ -185,12 +204,48 @@ Camera3D cameraDoJogador(const Jogador *j)
     return cam;
 }
 
+/*
+ * Câmera de terceira pessoa depois da explosão: começa junto do TIE e se afasta em ~1,6 s,
+ * olhando para o ponto da explosão. Durante o giro da queda ainda é a cabine.
+ */
+static Camera3D cameraDaMorte(const Jogo *g)
+{
+    const Jogador *j = &g->jogador;
+    Camera3D cam = { 0 };
+    Vector3 dir = Vector3Add(Vector3Negate(j->frente), Vector3Scale(j->cima, 0.55f));
+    float progresso = 0.0f;
+    Vector3 posicao;
+
+    if (j->tempoExplosao > 0.0f)
+        progresso = j->tempoExplosao / 1.6f;
+    if (progresso < 0.0f)
+        progresso = 0.0f;
+    if (progresso > 1.0f)
+        progresso = 1.0f;
+    progresso = progresso * progresso * (3.0f - 2.0f * progresso);   /* suaviza o zoom */
+
+    if (Vector3LengthSqr(dir) < 1e-6f)
+        dir = (Vector3){ 0.0f, 0.6f, -1.0f };
+    dir = Vector3Normalize(dir);
+    posicao = Vector3Add(j->pos, Vector3Scale(dir, 28.0f + 120.0f * progresso));
+    afastarDoDestroier(&posicao, 4.0f);   /* se a morte foi junto ao casco, não entra nele */
+
+    cam.position = posicao;
+    cam.target = j->pos;
+    cam.up = (Vector3){ 0.0f, 1.0f, 0.0f };
+    cam.fovy = FOV_JOGADOR;
+    cam.projection = CAMERA_PERSPECTIVE;
+    return cam;
+}
+
 Camera3D cameraComTremor(const Jogo *g)
 {
     Camera3D cam = cameraDoJogador(&g->jogador);
     float fator, dx, dy;
     Vector3 direita, desloc;
 
+    if (g->jogador.explodiu)
+        return cameraDaMorte(g);
     if (g->tempoDano <= 0.0f)
         return cam;
 

@@ -8,60 +8,72 @@
 #define ACELERACAO_IA 550.0f
 
 /*
- * Seção 3.4, passo 4: direciona `vel` suavemente para o alvo do estado atual,
- * com a velocidade máxima da tabela 2.2 escalada pela dificuldade (IA-05); a aceleração
- * acompanha o quadrado do fator, então o raio de curva (v²/a) fica constante. Avança `pos` com `vel`.
- * Y-Wing em IA_ATACAR_DESTROIER orbita o Destróier e bombardeia a menos de 685 (no tamanho
- * canônico; a distância acompanha ESCALA_DESTROIER).
- * O caça nunca fica dentro do casco: usa afastarDoDestroier (IA-04).
- * IA-03: o X-Wing alterna entre atacar o Destróier e o jogador com período de 8–12 s;
- * a primeira troca pode ser menor se o caça nasce no meio do ciclo. O A-Wing persegue o
- * jogador. X-Wing e A-Wing atiram no cone de 15° a menos de ALCANCE_TIRO_INIMIGO,
- * respeitando `cooldownTiro`.
- * Passagem de ataque: X-Wing e A-Wing não voam até o ponto do alvo. A menos de DIST_ROMPER_*
- * dele, rompem (IA_FUGIR): afastam-se do alvo do seu estado de ataque, abrindo para o lado se
- * vinham de frente e deslizando na borda da arena. Além de DIST_RETOMAR_*, voltam a atacar.
- * Todos os tipos se afastam de outro caça a menos de DIST_SEPARACAO, para não se empilharem.
+ * Seção 3.4, passo 4: direciona `vel` suavemente para o alvo do estado atual, com a velocidade
+ * máxima da tabela 2.2 escalada pela dificuldade; a aceleração acompanha o quadrado do fator.
+ * O caça nunca fica dentro do casco: usa afastarDoDestroier, com uma antecipação de rumo.
+ *
+ * Rebeldes:
+ * - Y-Wing: faz passagens de bombardeio. Reagrupa na frente da proa do Destróier (~1500 u),
+ *   acelera para YWING_VEL_RUN e segue reto, soltando até duas bombas em parábola. Depois
+ *   dispersa por YWING_TEMPO_DISPERSAO e volta a se posicionar. Fora da run, defende-se com
+ *   laser balístico a 20 tiros/min.
+ * - X-Wing: prioriza caças TIE (jogador e aliados). Um X-Wing cobre até dois Y-Wings
+ *   (escolta); fora da escolta, só troca o foco para o Destróier quando o escudo dele zera,
+ *   com 10% de chance por janela de decisão.
+ * - A-Wing: sempre prioriza caças TIE.
+ * - Todos os tipos se afastam de outro caça a menos de DIST_SEPARACAO.
  */
 void ia_atualizar(Inimigo *in, Jogo *g, float dt);
 
-/*
- * IA-02: o Y-Wing bombardeia a menos de 685 do Destróier (no tamanho canônico). O dano antigo, 24/s,
- * derrubava os 300 do casco em 12,5 s com um único Y-Wing: o Destróier sumia antes de o jogador
- * reagir. Com 6/s, um Y-Wing sozinho leva 50 s, e o HUD avisa enquanto algum bombardeia.
- */
-#define ALCANCE_BOMBA_YWING (685.0f * ESCALA_DESTROIER)
-#define DANO_BOMBA_YWING    6.0f   /* por segundo no alcance */
-/* 1 se `in` é um Y-Wing atacando o Destróier dentro do ALCANCE_BOMBA_YWING (está tirando casco dele). */
-int ywingBombardeando(const Inimigo *in);
+/* Atribui os X-Wings de escolta aos pares de Y-Wings. Roda uma vez por frame em atualizarInimigos. */
+void ia_atribuirEscolta(Jogo *g);
 
-/* Passagem de ataque. O Destróier rompe a 1100 da origem: fora do casco (até ~900) e dentro do alcance. */
+/* Passagens de bombardeio. O Y-Wing se alinha a ~3000 u da proa, desce para uma corrida
+ * baixa sobre o casco (termina antes da torre de comando) e solta até duas bombas. */
+#define YWING_ALTURA_ESTAGIO     1400.0f  /* ponto de alinhamento, acima do casco */
+#define YWING_ALTURA_RUN          700.0f  /* corrida baixa, logo acima do convés */
+#define YWING_DIST_ESTAGIO       3000.0f  /* da proa do Destróier até o ponto de alinhamento */
+#define YWING_FIM_RUN_Z          -900.0f  /* antes da torre de comando (topo ~1140) */
+#define YWING_VEL_RUN             450.0f  /* velocidade da corrida reta */
+#define YWING_RAIO_ESTAGIO        600.0f
+#define YWING_ESPERA_GRUPO          8.0f
+#define YWING_TEMPO_DISPERSAO      10.0f
+#define YWING_TEMPO_RUN            25.0f
+#define YWING_DIST_SOLTURA        900.0f  /* distância horizontal em que a bomba já cai */
+#define YWING_INTERVALO_BOMBAS      1.2f
+#define YWING_MAX_BOMBAS              2
+#define ALCANCE_BOMBA_YWING        2000.0f
+/* 1 na aproximação de uma passagem, dentro do alcance de lançamento. */
+int ywingBombardeando(const Inimigo *in);
+/* Ponto de alinhamento da run, à frente da proa e acima do casco; variado pelo id. */
+Vector3 ywingPontoEstagio(int id);
+
+/* Cadência de tiro dos rebeldes, em segundos por disparo. */
+#define COOLDOWN_TIRO_XWING   0.20f     /* 300 tiros/min */
+#define COOLDOWN_TIRO_AWING   (1.0f / 6.0f) /* 360 tiros/min */
+#define COOLDOWN_TIRO_YWING   3.0f      /* 20 tiros/min, só fora da run */
+
+/* Passagem de ataque dos caças. O Destróier rompe a 1100 da origem: fora do casco e dentro do alcance. */
 #define DIST_ROMPER_JOGADOR    600.0f
 #define DIST_RETOMAR_JOGADOR   1600.0f
-/* A escala do Destróier entra aqui: 850 u canônicos ficam logo à frente da proa (823). */
 #define DIST_ROMPER_DESTROIER  (850.0f * ESCALA_DESTROIER)
 #define DIST_RETOMAR_DESTROIER (1750.0f * ESCALA_DESTROIER)
 /* Na fuga, a menos disto da borda da arena o rumo perde a componente para fora. */
 #define MARGEM_BORDA_FUGA      500.0f
 /* Separação entre caças: alcance (u) e peso do empurrão no rumo unitário, no máximo PESO por vizinho. */
-#define DIST_SEPARACAO 60.0f
+#define DIST_SEPARACAO 90.0f
 #define PESO_SEPARACAO 1.5f
 
-/* IA-03: intervalo de troca de alvo do X-Wing; o id do caça varia entre MIN e MAX. */
-#define TROCA_XWING_MIN      8.0f
-#define TROCA_XWING_VARIACAO 5     /* id % 5 -> 8..12 s por estado */
+/* Alcance de seleção de caças TIE e distância em que um X-Wing acompanha o Y-Wing escoltado. */
+#define ALCANCE_ALVO_TIE       8000.0f
+#define ALCANCE_AMEACA_ESCOLTA 1800.0f
+#define DIST_ESCOLTA           450.0f
 
-/* IA-03: tiro inimigo no cone de 15° e a menos de 1840 (400 × 4,6, a escala do mundo). */
+/* IA-03: alvo no cone de 15° e a menos de 1840 (400 × 4,6, a escala do mundo). */
 #define ALCANCE_TIRO_INIMIGO  1840.0f
 #define COSSENO_CONE_TIRO     0.9659258f   /* cos(15°) */
-#define COOLDOWN_TIRO_INIMIGO 1.5f
 
-/*
- * IA-05: a dificuldade cresce ao longo da partida, com os extremos em constantes.
- * A velocidade dos caças vai de 1,0 até FATOR_VELOCIDADE_MAX e o cooldown de tiro de
- * 1,0 até FATOR_COOLDOWN_MIN. A IA-03 multiplica o cooldown base por fatorCooldownIA
- * ao recarregar `cooldownTiro`.
- */
+/* IA-05: a dificuldade cresce ao longo da partida, com os extremos em constantes. */
 #define FATOR_VELOCIDADE_MAX 1.3f
 #define FATOR_COOLDOWN_MIN   0.7f
 
@@ -69,7 +81,7 @@ int ywingBombardeando(const Inimigo *in);
 float progressoDificuldade(float tempoDecorrido);
 /* Multiplicador da velocidade dos caças: 1,0 no início, FATOR_VELOCIDADE_MAX no fim. */
 float fatorVelocidadeIA(float tempoDecorrido);
-/* Multiplicador do cooldown de tiro: 1,0 no início, FATOR_COOLDOWN_MIN no fim. */
+/* Multiplicador de cooldown (mantido para compatibilidade; a cadência nova usa valores fixos). */
 float fatorCooldownIA(float tempoDecorrido);
 
 #endif

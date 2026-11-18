@@ -6,6 +6,7 @@
 #include "combate.h"
 #include "nave.h"
 #include "pontuacao.h"
+#include "raymath.h"
 #include "teste.h"
 
 #define EPS 1e-5f
@@ -291,75 +292,64 @@ static void testarSuavizacao(void)
 static Jogo jogoDestroier;
 
 /*
- * Partida zerada com o jogador em `pos` (a recarga de colisão volta a zero em iniciarJogador). Sem
- * escudo: o dano da colisão vai direto ao casco; o escudo é testado em testarEscudo.
+ * Partida zerada com o jogador em `pos` (a recarga de colisão volta a zero em iniciarJogador).
+ * O TIE não tem escudo: o dano da colisão vai direto ao casco.
  */
 static void novoJogoEm(Vector3 pos)
 {
     memset(&jogoDestroier, 0, sizeof jogoDestroier);
     iniciarJogador(&jogoDestroier.jogador);
     jogoDestroier.jogador.pos = pos;
-    jogoDestroier.jogador.escudo = 0.0f;
 }
 
-/* Roda `segundos` de atualizarEscudo em passos de 1/60 s. */
-static void esperarEscudo(Jogador *j, float segundos)
-{
-    int i;
-
-    for (i = 0; i < (int)lroundf(segundos * 60.0f); i++)
-        atualizarEscudo(j, 1.0f / 60.0f);
-}
-
-static void testarEscudo(void)
+static void testarReparoERespawn(void)
 {
     Jogo *g = &jogoDestroier;
     Jogador *j = &g->jogador;
 
     memset(g, 0, sizeof *g);
     iniciarJogador(j);
-    VERIFICA(proximo(j->escudo, ESCUDO_JOGADOR) && proximo(j->casco, CASCO_JOGADOR));
+    VERIFICA(proximo(j->casco, CASCO_JOGADOR));
+    VERIFICA(j->respawnsRestantes == RESPAWNS_JOGADOR);
 
-    /* O escudo absorve primeiro; o que passa dele vai para o casco; nada fica negativo. */
+    /* Dano vai direto ao casco e a sequência sem dano zera. */
     g->sequenciaSemDano = 3;
     danificarJogador(g, 30.0f);
-    VERIFICA(proximo(j->escudo, 20.0f) && proximo(j->casco, CASCO_JOGADOR));
+    VERIFICA(proximo(j->casco, CASCO_JOGADOR - 30.0f));
     VERIFICA(g->sequenciaSemDano == 0 && g->tempoDano > 0.0f);
-    danificarJogador(g, 30.0f);
-    VERIFICA(proximo(j->escudo, 0.0f) && proximo(j->casco, CASCO_JOGADOR - 10.0f));
     danificarJogador(g, 500.0f);
-    VERIFICA(proximo(j->escudo, 0.0f) && proximo(j->casco, 0.0f));
+    VERIFICA(proximo(j->casco, 0.0f));
 
-    /* Sem dano por ATRASO_ESCUDO: só então recarrega, aos poucos, até o máximo; o casco não volta. */
+    /* Reparo: +25, cooldown de 15 s, e não gasta com casco cheio. */
     j->casco = 40.0f;
-    danificarJogador(g, 1.0f);
-    esperarEscudo(j, ATRASO_ESCUDO - 0.1f);
-    VERIFICA(proximo(j->escudo, 0.0f));
-    esperarEscudo(j, 1.1f);
-    VERIFICA(j->escudo > 0.0f && j->escudo < ESCUDO_JOGADOR);
-    esperarEscudo(j, ESCUDO_JOGADOR / RECARGA_ESCUDO);
-    VERIFICA(proximo(j->escudo, ESCUDO_JOGADOR) && proximo(j->casco, 39.0f));
+    j->cooldownReparo = 0.0f;
+    VERIFICA(repararJogador(g) == 1);
+    VERIFICA(proximo(j->casco, 65.0f));
+    VERIFICA(proximo(j->cooldownReparo, COOLDOWN_REPARO));
+    VERIFICA(repararJogador(g) == 0);
+    for (int i = 0; i < (int)(COOLDOWN_REPARO * 60.0f); i++)
+        atualizarJogador(j, &(Comandos){ 0 }, 1.0f / 60.0f);
+    VERIFICA(j->cooldownReparo <= 1e-3f);
+    j->casco = CASCO_JOGADOR;
+    VERIFICA(repararJogador(g) == 0);
+    VERIFICA(proximo(j->casco, CASCO_JOGADOR));
 
-    /* Dano no meio da recarga: ela para na hora e a espera recomeça. */
-    danificarJogador(g, 40.0f);
-    esperarEscudo(j, ATRASO_ESCUDO + 1.0f);
-    {
-        float recarregado = j->escudo;
-
-        danificarJogador(g, 1.0f);
-        esperarEscudo(j, ATRASO_ESCUDO - 0.1f);
-        VERIFICA(proximo(j->escudo, recarregado - 1.0f));
-    }
-
-    /* Disparar também conta como combate: a recarga espera de novo. */
-    j->escudo = 0.0f;
-    j->esperaEscudo = 0.0f;
-    j->cooldownLaser = 0.0f;
-    VERIFICA(dispararLaser(g) == 1);
-    esperarEscudo(j, ATRASO_ESCUDO - 0.1f);
-    VERIFICA(proximo(j->escudo, 0.0f));
-    esperarEscudo(j, 1.0f);
-    VERIFICA(j->escudo > 0.0f);
+    /* Respawn gasta uma vida e volta ao ponto abaixo do Destróier. */
+    j->casco = 0.0f;
+    j->morto = 1;
+    j->explodiu = 1;
+    VERIFICA(respawnJogador(g) == 1);
+    VERIFICA(j->casco == CASCO_JOGADOR && !j->morto && !j->explodiu);
+    VERIFICA(j->respawnsRestantes == RESPAWNS_JOGADOR - 1);
+    VERIFICA(j->pos.y < SPAWN_ALA_Y + 1.0f);
+    j->casco = 0.0f;
+    j->morto = 1;
+    VERIFICA(respawnJogador(g) == 1);
+    j->casco = 0.0f;
+    j->morto = 1;
+    VERIFICA(respawnJogador(g) == 1);
+    VERIFICA(j->respawnsRestantes == 0);
+    VERIFICA(respawnJogador(g) == 0);
 }
 
 /* Primeira altura, descendo de cima em passos de 0,5 u, em que a nave em (x, ?, z) encosta no casco. */
@@ -474,8 +464,9 @@ int main(void)
 
     iniciarJogador(&j);
 
-    /* Início: fora do Destróier (origem), olhando para longe dele. */
-    VERIFICA(j.pos.x * j.frente.x + j.pos.y * j.frente.y + j.pos.z * j.frente.z > 0.0f);
+    /* Início: abaixo do Destróier (origem), fora do casco e olhando para +Z. */
+    VERIFICA(j.pos.y < 0.0f && !tocaDestroier(j.pos, RAIO_JOGADOR));
+    VERIFICA(j.frente.z > 0.99f);
     VERIFICA(proximo(j.frente.x * j.frente.x + j.frente.y * j.frente.y + j.frente.z * j.frente.z, 1.0f));
 
     cam = cameraDoJogador(&j);
@@ -533,6 +524,23 @@ int main(void)
         g.tempoDano = 0.0f;
         tr = cameraComTremor(&g);
         VERIFICA(tr.position.x == cam.position.x && tr.position.y == cam.position.y && tr.position.z == cam.position.z);
+
+        /* Morte: ao explodir, a câmera sai da cabine e se afasta (terceira pessoa). */
+        g.jogador.explodiu = 1;
+        g.jogador.morto = 1;
+        g.jogador.tempoRespawn = TEMPO_RESPAWN_JOGADOR;
+        g.jogador.tempoExplosao = 0.0f;
+        tr = cameraComTremor(&g);
+        {
+            float perto = Vector3Distance(tr.position, g.jogador.pos);
+
+            VERIFICA(perto > 10.0f);
+            VERIFICA(proximo(tr.target.x, g.jogador.pos.x) && proximo(tr.target.y, g.jogador.pos.y)
+                     && proximo(tr.target.z, g.jogador.pos.z));
+            g.jogador.tempoExplosao = 1.6f;
+            tr = cameraComTremor(&g);
+            VERIFICA(Vector3Distance(tr.position, g.jogador.pos) > perto + 50.0f);
+        }
     }
 
     testarRotacao();
@@ -542,7 +550,7 @@ int main(void)
     testarArena();
     testarSuavizacao();
     testarColisaoDestroier();
-    testarEscudo();
+    testarReparoERespawn();
 
     return RESULTADO_TESTES();
 }

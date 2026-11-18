@@ -13,7 +13,7 @@ typedef enum {
     ACAO_GUINADA_ESQUERDA, ACAO_GUINADA_DIREITA,
     ACAO_ROLAGEM_ESQUERDA, ACAO_ROLAGEM_DIREITA,
     ACAO_ACELERAR, ACAO_FREAR,
-    ACAO_DISPARAR, ACAO_PROXIMO_ALVO, ACAO_ALVO_ANTERIOR, ACAO_ALVO_MAIS_PROXIMO,
+    ACAO_DISPARAR, ACAO_PROXIMO_ALVO, ACAO_ALVO_ANTERIOR, ACAO_ALVO_NA_MIRA, ACAO_REPARAR,
     ACAO_PAUSA,
     ACAO_MENU_CIMA, ACAO_MENU_BAIXO, ACAO_MENU_ESQUERDA, ACAO_MENU_DIREITA,
     ACAO_CONFIRMAR, ACAO_VOLTAR,
@@ -37,7 +37,8 @@ static const Vinculo vinculos[ACAO_QTD] = {
     [ACAO_DISPARAR]          = { { KEY_SPACE },                          GAMEPAD_BUTTON_UNKNOWN },
     [ACAO_PROXIMO_ALVO]      = { { KEY_T },                              GAMEPAD_BUTTON_LEFT_FACE_RIGHT },
     [ACAO_ALVO_ANTERIOR]     = { { KEY_Y },                              GAMEPAD_BUTTON_LEFT_FACE_LEFT },
-    [ACAO_ALVO_MAIS_PROXIMO] = { { KEY_R },                              GAMEPAD_BUTTON_UNKNOWN },
+    [ACAO_ALVO_NA_MIRA] = { { KEY_R },                              GAMEPAD_BUTTON_UNKNOWN },
+    [ACAO_REPARAR]           = { { KEY_F },                              GAMEPAD_BUTTON_LEFT_FACE_UP },
     [ACAO_PAUSA]             = { { KEY_ESCAPE },                         GAMEPAD_BUTTON_MIDDLE_RIGHT },
     [ACAO_MENU_CIMA]         = { { KEY_UP },                             GAMEPAD_BUTTON_LEFT_FACE_UP },
     [ACAO_MENU_BAIXO]        = { { KEY_DOWN },                           GAMEPAD_BUTTON_LEFT_FACE_DOWN },
@@ -199,7 +200,8 @@ static Comandos lerTeclado(void)
     c.disparar = teclaSegurada(ACAO_DISPARAR);
     c.proximoAlvo = teclaPressionada(ACAO_PROXIMO_ALVO);
     c.alvoAnterior = teclaPressionada(ACAO_ALVO_ANTERIOR);
-    c.alvoMaisProximo = teclaPressionada(ACAO_ALVO_MAIS_PROXIMO);
+    c.alvoNaMira = teclaPressionada(ACAO_ALVO_NA_MIRA);
+    c.reparar = teclaPressionada(ACAO_REPARAR);
     c.pausa = teclaPressionada(ACAO_PAUSA);
     c.menuCima = teclaPressionada(ACAO_MENU_CIMA);
     c.menuBaixo = teclaPressionada(ACAO_MENU_BAIXO);
@@ -224,7 +226,8 @@ static Comandos lerControle(const ConfigEntrada *cfg)
     c.disparar = gatilhoPressionado(GAMEPAD_AXIS_RIGHT_TRIGGER);
     c.proximoAlvo = botaoPressionado(ACAO_PROXIMO_ALVO);
     c.alvoAnterior = botaoPressionado(ACAO_ALVO_ANTERIOR);
-    c.alvoMaisProximo = borda(gatilhoPressionado(GAMEPAD_AXIS_LEFT_TRIGGER), &bordas.gatilhoEsquerdo);
+    c.alvoNaMira = borda(gatilhoPressionado(GAMEPAD_AXIS_LEFT_TRIGGER), &bordas.gatilhoEsquerdo);
+    c.reparar = botaoPressionado(ACAO_REPARAR);
     c.pausa = botaoPressionado(ACAO_PAUSA);
     c.menuCima = botaoPressionado(ACAO_MENU_CIMA) | borda(by < -LIMIAR_DIGITAL, &bordas.menuCima);
     c.menuBaixo = botaoPressionado(ACAO_MENU_BAIXO) | borda(by > LIMIAR_DIGITAL, &bordas.menuBaixo);
@@ -238,7 +241,7 @@ static Comandos lerControle(const ConfigEntrada *cfg)
 static int temEntrada(const Comandos *c)
 {
     return c->arfagem != 0.0f || c->guinada != 0.0f || c->rolagem != 0.0f || c->aceleracao != 0.0f
-        || c->disparar || c->proximoAlvo || c->alvoAnterior || c->alvoMaisProximo || c->pausa
+        || c->disparar || c->proximoAlvo || c->alvoAnterior || c->alvoNaMira || c->reparar || c->pausa
         || c->menuCima || c->menuBaixo || c->menuEsquerda || c->menuDireita || c->confirmar || c->voltar;
 }
 
@@ -271,7 +274,8 @@ Comandos lerComandos(const ConfigEntrada *cfg)
     c.disparar = t.disparar | g.disparar;
     c.proximoAlvo = t.proximoAlvo | g.proximoAlvo;
     c.alvoAnterior = t.alvoAnterior | g.alvoAnterior;
-    c.alvoMaisProximo = t.alvoMaisProximo | g.alvoMaisProximo;
+    c.alvoNaMira = t.alvoNaMira | g.alvoNaMira;
+    c.reparar = t.reparar | g.reparar;
     c.pausa = t.pausa | g.pausa;
     c.menuCima = t.menuCima | g.menuCima;
     c.menuBaixo = t.menuBaixo | g.menuBaixo;

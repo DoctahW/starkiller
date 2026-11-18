@@ -3,6 +3,41 @@
 #include <math.h>
 
 #include "raymath.h"
+#include "jogo.h"
+
+void iniciarDestroier(Jogo *g)
+{
+    g->cascoDestroier = CASCO_MAX_DESTROIER;
+    g->escudoDestroier = ESCUDO_MAX_DESTROIER;
+    g->esperaEscudoDestroier = 0.0f;
+}
+
+void danificarDestroier(Jogo *g, float dano)
+{
+    if (dano <= 0.0f || g->cascoDestroier <= 0.0f)
+        return;
+    if (dano <= g->escudoDestroier) {
+        g->escudoDestroier -= dano;
+    } else {
+        g->cascoDestroier = fmaxf(0.0f, g->cascoDestroier - (dano - g->escudoDestroier));
+        g->escudoDestroier = 0.0f;
+    }
+    g->esperaEscudoDestroier = ATRASO_ESCUDO_DESTROIER;
+}
+
+void atualizarEscudoDestroier(Jogo *g, float dt)
+{
+    if (dt <= 0.0f || g->cascoDestroier <= 0.0f)
+        return;
+    if (g->esperaEscudoDestroier > 0.0f) {
+        float espera = fminf(dt, g->esperaEscudoDestroier);
+
+        g->esperaEscudoDestroier -= espera;
+        dt -= espera;
+    }
+    g->escudoDestroier = fminf(ESCUDO_MAX_DESTROIER,
+                              g->escudoDestroier + RECARGA_ESCUDO_DESTROIER * dt);
+}
 
 #define MAX_FAIXAS_CASCO 4        /* intervalos sólidos por coluna (o vão da ponte separa dois) */
 

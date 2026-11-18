@@ -24,7 +24,10 @@ static void testarSemDispositivo(void)
     audioTiroInimigo(XWING, (Vector3){ 0.0f, 0.0f, 100.0f });
     audioDanoJogador();
     audioColisaoJogador();
+    audioRepararJogador();
     audioTrocaAlvo();
+    audioTiroAliado((Vector3){ 0.0f, 0.0f, 100.0f });
+    audioBoomAliado((Vector3){ 0.0f, 0.0f, 100.0f });
     audioSpinJogador();
     audioBoomJogador((Vector3){ 0.0f, 0.0f, 0.0f });
     audioPararSpins();

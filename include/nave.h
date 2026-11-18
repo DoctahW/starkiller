@@ -5,25 +5,25 @@
 
 #define FOV_JOGADOR 70.0f   /* graus */
 
-/* Casco do TIE no início da partida (o HUD usa como máximo da barra). */
-#define CASCO_JOGADOR 100.0f
+/* Casco do TIE: não regenera. O reparo de campo devolve REPARO_JOGADOR a cada uso. */
+#define CASCO_JOGADOR 125.0f
+#define REPARO_JOGADOR 25.0f
+#define COOLDOWN_REPARO 15.0f
+
+/* O jogador começa com uma vida e pode voltar mais RESPAWNS_JOGADOR vezes. */
+#define RESPAWNS_JOGADOR 3
+#define TEMPO_RESPAWN_JOGADOR 5.0f
+#define PENALIDADE_MORTE_JOGADOR 500  /* cinco abates base de X-Wing */
 
 /*
- * Escudo do TIE: absorve o dano antes do casco, que não regenera. Depois de ATRASO_ESCUDO s sem
- * levar dano nem disparar, recarrega RECARGA_ESCUDO por segundo até ESCUDO_JOGADOR; um dano ou um
- * disparo interrompe a recarga e reinicia a espera.
- */
-#define ESCUDO_JOGADOR  50.0f
-#define ATRASO_ESCUDO   2.5f    /* s fora de combate até começar a recarregar */
-#define RECARGA_ESCUDO  12.5f   /* por segundo: de 0 a cheio em 4 s */
-
-/*
- * Tira `dano` do jogador: o escudo absorve primeiro e o resto vai para o casco (nenhum fica negativo).
- * Reinicia a espera da recarga e chama registrarDanoJogador. Dano <= 0 não faz nada.
+ * Tira `dano` direto do casco (o TIE não tem escudo), sem deixar negativo.
+ * Reinicia a sequência sem dano e chama registrarDanoJogador. Dano <= 0 não faz nada.
  */
 void danificarJogador(Jogo *g, float dano);
-/* Conta a espera da recarga e, depois dela, recarrega o escudo. Roda uma vez por passo. */
-void atualizarEscudo(Jogador *j, float dt);
+/* Consome o reparo se o casco não está cheio e o cooldown zerou. Devolve 1 se reparou. */
+int repararJogador(Jogo *g);
+/* Volta o jogador ao ponto de nascimento abaixo do Destróier, gastando um respawn. */
+int respawnJogador(Jogo *g);
 
 /* Velocidades angulares máximas (rad/s), atingidas com o eixo em ±1. */
 #define VEL_ARFAGEM 1.5f
@@ -32,6 +32,9 @@ void atualizarEscudo(Jogador *j, float dt);
 
 /* Jogador perto do Destróier (na origem), olhando para fora da arena. Zera a velocidade angular. */
 void iniciarJogador(Jogador *j);
+/* Ponto de nascimento comum ao jogador e aos TIEs aliados, abaixo do casco do Destróier. */
+#define SPAWN_ALA_Y -1200.0f
+#define SPAWN_ALA_RAIO 180.0f
 /* Constante de tempo (s) da suavização da rotação: ~63% da velocidade angular alvo em TAU_GIRO. */
 #define TAU_GIRO    0.1f
 
@@ -68,8 +71,8 @@ int faseQuedaJogador(void);
  */
 int atualizarJogador(Jogador *j, const Comandos *cmd, float dt);
 
-/* Esfera de colisão do TIE (chute; ajustar com o modelo) e dano de um contato com o casco do Destróier. */
-#define RAIO_JOGADOR            6.0f
+/* Esfera de colisão do TIE (low_poly_tie_fighter.glb a 3,6×: 1,5× a escala anterior). */
+#define RAIO_JOGADOR            9.0f
 #define DANO_COLISAO_DESTROIER  10.0f
 /* Depois de um dano, os contatos seguintes só empurram a nave durante este tempo (s), sem novo dano. */
 #define RECARGA_COLISAO         0.5f

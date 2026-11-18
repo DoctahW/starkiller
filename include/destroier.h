@@ -3,6 +3,21 @@
 
 #include "tipos.h"
 
+/* Escudo do Destróier: absorve o dano antes do casco, que nunca regenera. */
+#define ESCUDO_MAX_DESTROIER    600.0f
+#define ATRASO_ESCUDO_DESTROIER   5.0f  /* s sem receber dano até começar a recarregar */
+#define RECARGA_ESCUDO_DESTROIER 120.0f /* pontos/s: de 0 a 600 em 5 s */
+
+/* Inicia casco e escudo cheios e zera a espera da recarga. */
+void iniciarDestroier(Jogo *g);
+/* Consome o escudo primeiro e desconta o excedente do casco, sem deixá-los negativos.
+ * Qualquer dano positivo reinicia a espera, mesmo se todo absorvido pelo escudo.
+ * Dano <= 0 e Destróier já destruído não alteram o estado. */
+void danificarDestroier(Jogo *g, float dano);
+/* Conta a espera e regenera só o escudo, até o máximo; não regenera um Destróier destruído.
+ * Usa apenas o tempo que sobra após a espera. Roda antes dos danos de cada passo de combate. */
+void atualizarEscudoDestroier(Jogo *g, float dt);
+
 /*
  * Escala do Destróier no jogo. O modelo e o mapa de colisão continuam no tamanho canônico
  * (1600 u); o jogo desenha e testa a colisão com este fator. Aumentar aqui aumenta os dois

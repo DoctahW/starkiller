@@ -134,7 +134,7 @@ static void testarYWing(void){
 
     VERIFICA(in.id == 8);
     VERIFICA(in.tipo == YWING);
-    VERIFICA(proximo(in.escudoMax, 80.0f));
+    VERIFICA(proximo(in.escudoMax, 75.0f));
     VERIFICA(proximo(in.cascoMax, 160.0f));
     VERIFICA(proximo(in.escudo, in.escudoMax));
     VERIFICA(proximo(in.casco, in.cascoMax));
@@ -146,7 +146,7 @@ static void testarAWing(void){
 
     VERIFICA(in.id == 9);
     VERIFICA(in.tipo == AWING);
-    VERIFICA(proximo(in.escudoMax, 30.0f));
+    VERIFICA(proximo(in.escudoMax, 0.0f));
     VERIFICA(proximo(in.cascoMax, 60.0f));
     VERIFICA(proximo(in.escudo, in.escudoMax));
     VERIFICA(proximo(in.casco, in.cascoMax));
