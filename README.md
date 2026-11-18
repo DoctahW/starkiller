@@ -93,7 +93,7 @@ src/
   jogo.c         janela, máquina de estados e loop de combate
   entrada.c      teclado e controle -> Comandos
   nave.c         voo, câmera de cabine e queda do TIE
-  combate.c      lasers, colisões, dano e explosões
+  combate.c      lasers, colisões, dano, explosões e destroços girando
   inimigos.c     lista duplamente encadeada e computador de mira
   reforcos.c     fila de reforços
   ia.c           comportamento dos caças rebeldes
@@ -119,7 +119,7 @@ Os efeitos da AUD-01 ficam em `assets/sounds/`, em OGG Vorbis (os WAV originais 
 | `rebel/` | motor de cada caça (X-Wing = idle + thrusters), armas (A-Wing tem som próprio; Y-Wing usa mísseis), SPIN e BOOM de cada tipo |
 | `tie/` | armas, motor em 5 setores de velocidade, cabine em 2 setores (Noise Scream Low/Med), ACCEL/DECCEL, troca de alvo, dano de tiro/colisão, aviso e ruídos de casco baixo, SPIN e BOOM do jogador; `telemetry_*` fica reservado para uso futuro |
 
-O X-Wing toca idle e thrusters juntos, com o thrusters um pouco mais baixo. O motor dos caças rebeldes só é audível até 1850 u e cresce ao se aproximar; as fontes móveis recebem Doppler (o pitch sobe na aproximação e desce no afastamento) por um registro genérico de vozes — inimigos hoje e aliados no futuro usam a mesma API. O motor do TIE faz crossfade linear entre setores vizinhos (transição suave) e a cabine faz o mesmo em 2 setores, com os dois Noise Scream. O alarme do Destróier entra em loop a 25% do casco; o aviso de casco baixo do TIE toca a cada 0,75 s e os ruídos aleatórios só nessa faixa. Ao zerar o casco do TIE, a cabine gira incontrolavelmente por 1,2-2,6 s (abaixo da duração do áudio de SPIN) e só então explode; o BOOM marca o fim da partida.
+O X-Wing toca idle e thrusters juntos, com o thrusters um pouco mais baixo. O motor dos caças rebeldes só é audível até 1850 u e cresce ao se aproximar; as fontes móveis recebem Doppler (o pitch sobe na aproximação e desce no afastamento) por um registro genérico de vozes — inimigos hoje e aliados no futuro usam a mesma API. O motor do TIE faz crossfade linear entre setores vizinhos (transição suave) e a cabine faz o mesmo em 2 setores, com os dois Noise Scream. O alarme do Destróier entra em loop a 25% do casco; o aviso de casco baixo do TIE toca a cada 0,75 s e os ruídos aleatórios só nessa faixa. Ao zerar o casco do TIE, a cabine gira incontrolavelmente por 1,2-2,6 s (abaixo da duração do áudio de SPIN) e só então explode; o BOOM marca o fim da partida. Nos caças rebeldes, o abatido vira um destroço que continua no mesmo vetor de velocidade e gira por 1,2-2,6 s; no fim aparece a explosão do pool (VIS-10) e toca o BOOM. O SPIN é interrompido no instante em que o BOOM começa, tanto no TIE quanto nos caças.
 
 As armas são disparadas por evento: cada tiro que realmente sai chama o som correspondente, então mudar o cooldown do jogador ou da IA muda o ritmo automaticamente. O `TELEMETRY_RANDOM` está desligado por enquanto; os arquivos continuam em `assets/sounds/tie/telemetry_*.ogg` para reutilização. Para os futuros caças aliados, basta registrar cada nave com `audioMotorRegistrar(AUDIO_MOTOR_ALIADO, id, tipo, pos, vel)` antes de `audioAtualizar`: ela entra no mesmo sistema de vozes, distância, pan e Doppler dos inimigos.
 

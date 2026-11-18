@@ -22,6 +22,7 @@ static void encerrarPartida(Jogo *g)
 {
     liberarListaInimigos(&g->inimigos);
     liberarFila(&g->reforcos);
+    limparQuedasInimigas();
 }
 
 /* Zera o Jogo preservando o placar, gera os reforços e posiciona o jogador. */
@@ -119,6 +120,7 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
             audioTrocaAlvo();
     }
     colidirLasersInimigos(g, PASSO_FIXO);
+    atualizarQuedasInimigas(g, PASSO_FIXO);
     atualizarExplosoes(g, PASSO_FIXO);
 }
 

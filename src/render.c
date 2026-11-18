@@ -450,24 +450,11 @@ static void desenharAWing(void)
     }
 }
 
-static void desenharInimigo(const Inimigo *inimigo)
+static void desenharCorpoInimigo(TipoNave tipo)
 {
-    Vector3 frente = {0, 0, 1};
-    if (Vector3LengthSqr(inimigo->vel) > 0.000001f)
-        frente = Vector3Normalize(inimigo->vel);
+    float raio = raioInimigo(tipo);
 
-    /* Rotação de +Z para a velocidade. O eixo Y resolve também a direção -Z;
-     * parado, o caça conserva a orientação padrão, sem normalizar vetor zero. */
-    Vector3 eixo = {-frente.y, frente.x, 0};
-    if (Vector3LengthSqr(eixo) < 0.000001f)
-        eixo = (Vector3){0, 1, 0};
-    float angulo = acosf(Clamp(frente.z, -1.0f, 1.0f)) * RAD2DEG;
-    float raio = raioInimigo(inimigo->tipo);
-
-    rlPushMatrix();
-    rlTranslatef(inimigo->pos.x, inimigo->pos.y, inimigo->pos.z);
-    rlRotatef(angulo, eixo.x, eixo.y, eixo.z);
-    switch (inimigo->tipo) {
+    switch (tipo) {
         case XWING:
             if (temModeloXwing) {
                 DrawModel(modeloXwing, (Vector3){0}, 1.0f, WHITE);
@@ -493,6 +480,37 @@ static void desenharInimigo(const Inimigo *inimigo)
             }
             break;
     }
+}
+
+static void desenharInimigo(const Inimigo *inimigo)
+{
+    Vector3 frente = {0, 0, 1};
+    if (Vector3LengthSqr(inimigo->vel) > 0.000001f)
+        frente = Vector3Normalize(inimigo->vel);
+
+    /* Rotação de +Z para a velocidade. O eixo Y resolve também a direção -Z;
+     * parado, o caça conserva a orientação padrão, sem normalizar vetor zero. */
+    Vector3 eixo = {-frente.y, frente.x, 0};
+    if (Vector3LengthSqr(eixo) < 0.000001f)
+        eixo = (Vector3){0, 1, 0};
+    float angulo = acosf(Clamp(frente.z, -1.0f, 1.0f)) * RAD2DEG;
+
+    rlPushMatrix();
+    rlTranslatef(inimigo->pos.x, inimigo->pos.y, inimigo->pos.z);
+    rlRotatef(angulo, eixo.x, eixo.y, eixo.z);
+    desenharCorpoInimigo(inimigo->tipo);
+    rlPopMatrix();
+}
+
+/* Destroço do caça abatido: mesma nave, agora com a rotação livre da queda. */
+static void desenharQuedaInimiga(const QuedaInimigo *queda)
+{
+    Matrix rot = QuaternionToMatrix(queda->rot);
+
+    rlPushMatrix();
+    rlTranslatef(queda->pos.x, queda->pos.y, queda->pos.z);
+    rlMultMatrixf(MatrixToFloat(rot));
+    desenharCorpoInimigo(queda->tipo);
     rlPopMatrix();
 }
 
@@ -624,6 +642,13 @@ void render_cena(const Jogo *g, Camera3D cam)
     desenharDestroier(&cam);
     for (const NoInimigo *no = g->inimigos.inicio; no != NULL; no = no->prox)
         desenharInimigo(&no->dado);
+    {
+        const QuedaInimigo *quedas = quedasInimigas();
+
+        for (int i = 0; i < MAX_QUEDAS_INIMIGO; i++)
+            if (quedas[i].ativo)
+                desenharQuedaInimiga(&quedas[i]);
+    }
     desenharLasers(g);
     desenharExplosoes(g, &cam);
     /* A poeira não grava profundidade: vem depois dos objetos opacos da arena. */

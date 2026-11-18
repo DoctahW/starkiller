@@ -127,4 +127,35 @@ void atualizarExplosoes(Jogo *g, float dt);
 float progressoExplosao(const Explosao *e);
 float raioExplosao(const Explosao *e);
 
+#define MAX_QUEDAS_INIMIGO 32
+#define QUEDA_INIMIGO_MIN  1.2f   /* s; abaixo da duração dos áudios de SPIN */
+#define QUEDA_INIMIGO_MAX  2.6f
+
+/*
+ * Destroço visível de um caça abatido. Ele sai da lista de inimigos (não é mais alvo nem
+ * colide), continua na mesma velocidade que tinha e gira em torno de um eixo aleatório até
+ * explodir. O render desenha a partir de `rot`; o áudio toca o SPIN no início e o BOOM no fim.
+ * `vozSpin` é a voz de áudio reservada para parar o SPIN quando o BOOM começar.
+ */
+typedef struct {
+    int ativo;
+    TipoNave tipo;
+    Vector3 pos, vel;
+    Quaternion rot;
+    Vector3 eixo;
+    float giro;
+    float tempo, duracao;
+    int vozSpin;
+} QuedaInimigo;
+
+/* Pool de quedas para o render (iterar até MAX_QUEDAS_INIMIGO checando `ativo`). */
+const QuedaInimigo *quedasInimigas(void);
+/* Zera as quedas; chamar ao iniciar/encerrar a partida. */
+void limparQuedasInimigas(void);
+/*
+ * Avança posição/rotação de cada queda; ao fim da duração cria a explosão na posição atual,
+ * para a voz de SPIN e toca o BOOM. Roda uma vez por passo fixo.
+ */
+void atualizarQuedasInimigas(Jogo *g, float dt);
+
 #endif
