@@ -94,12 +94,14 @@ void gerarReforcos(FilaReforcos *f, float duracao)
         y = qtdYBase * MULT_YWING;
         a = qtdABase * MULT_AWING;
 
-        /* Da 12ª onda em diante não entram A-Wings: a cota deles é dividida entre X e Y
-         * (em quantidade ímpar, o extra vai para o X-Wing). */
+        /* Da 12ª onda em diante: a cota de A-Wings é dividida entre X e Y, depois
+         * saem 1 X-Wing e 2 Y-Wings, e ficam fixos 2 A-Wings por onda. */
         if (onda >= 11) {
             x += (a + 1) / 2;
             y += a / 2;
-            a = 0;
+            x -= 1;
+            y -= 2;
+            a = 2;
         }
         enfileirarReforco(f, t, x, y, a);
     }

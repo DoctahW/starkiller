@@ -129,7 +129,9 @@ static void testarGerarReforcos(void)
         if (onda >= 11) {
             x += (a + 1) / 2;
             y += a / 2;
-            a = 0;
+            x -= 1;
+            y -= 2;
+            a = 2;
         }
 
         VERIFICA(grupo.tempoChegada == t);
@@ -150,7 +152,7 @@ static void testarGerarReforcos(void)
             if (onda < 11)
                 VERIFICA(grupo.qtdA >= qtdAAnterior);
             else
-                VERIFICA(grupo.qtdA == 0);
+                VERIFICA(grupo.qtdA == 2);
             VERIFICA(grupo.qtdY >= qtdYAnterior);
         }
 
