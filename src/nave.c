@@ -25,6 +25,37 @@ void iniciarJogador(Jogador *j)
     j->velocidade = VELOCIDADE_INICIAL;
     j->casco = CASCO_JOGADOR;
     j->cooldownLaser = 0.0f;
+    j->escudo = ESCUDO_JOGADOR;
+    j->esperaEscudo = 0.0f;
+}
+
+void danificarJogador(Jogo *g, float dano)
+{
+    Jogador *j = &g->jogador;
+
+    if (dano <= 0.0f)
+        return;
+    if (dano <= j->escudo) {
+        j->escudo -= dano;
+    } else {
+        j->casco -= dano - j->escudo;
+        j->escudo = 0.0f;
+        if (j->casco < 0.0f)
+            j->casco = 0.0f;
+    }
+    j->esperaEscudo = ATRASO_ESCUDO;
+    registrarDanoJogador(g);
+}
+
+void atualizarEscudo(Jogador *j, float dt)
+{
+    if (j->esperaEscudo > 0.0f) {
+        j->esperaEscudo -= dt;
+        return;
+    }
+    j->escudo += RECARGA_ESCUDO * dt;
+    if (j->escudo > ESCUDO_JOGADOR)
+        j->escudo = ESCUDO_JOGADOR;
 }
 
 /* Deriva os eixos da nave a partir de rot (frente +Z, cima +Y, direita -X no espaço local). */
@@ -116,10 +147,7 @@ int colidirDestroier(Jogo *g, float dt)
     contato = afastarDoDestroier(&g->jogador.pos, RAIO_JOGADOR);
 
     if (contato && recargaColisao <= 0.0f) {
-        g->jogador.casco -= DANO_COLISAO_DESTROIER;
-        if (g->jogador.casco < 0.0f)
-            g->jogador.casco = 0.0f;
-        registrarDanoJogador(g);
+        danificarJogador(g, DANO_COLISAO_DESTROIER);
         recargaColisao = RECARGA_COLISAO;
     }
     return contato;

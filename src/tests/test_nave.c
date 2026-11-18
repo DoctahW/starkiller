@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "destroier.h"
+#include "combate.h"
 #include "nave.h"
 #include "pontuacao.h"
 #include "teste.h"
@@ -289,12 +290,76 @@ static void testarSuavizacao(void)
 
 static Jogo jogoDestroier;
 
-/* Partida zerada com o jogador em `pos` (a recarga de colisão volta a zero em iniciarJogador). */
+/*
+ * Partida zerada com o jogador em `pos` (a recarga de colisão volta a zero em iniciarJogador). Sem
+ * escudo: o dano da colisão vai direto ao casco; o escudo é testado em testarEscudo.
+ */
 static void novoJogoEm(Vector3 pos)
 {
     memset(&jogoDestroier, 0, sizeof jogoDestroier);
     iniciarJogador(&jogoDestroier.jogador);
     jogoDestroier.jogador.pos = pos;
+    jogoDestroier.jogador.escudo = 0.0f;
+}
+
+/* Roda `segundos` de atualizarEscudo em passos de 1/60 s. */
+static void esperarEscudo(Jogador *j, float segundos)
+{
+    int i;
+
+    for (i = 0; i < (int)lroundf(segundos * 60.0f); i++)
+        atualizarEscudo(j, 1.0f / 60.0f);
+}
+
+static void testarEscudo(void)
+{
+    Jogo *g = &jogoDestroier;
+    Jogador *j = &g->jogador;
+
+    memset(g, 0, sizeof *g);
+    iniciarJogador(j);
+    VERIFICA(proximo(j->escudo, ESCUDO_JOGADOR) && proximo(j->casco, CASCO_JOGADOR));
+
+    /* O escudo absorve primeiro; o que passa dele vai para o casco; nada fica negativo. */
+    g->sequenciaSemDano = 3;
+    danificarJogador(g, 30.0f);
+    VERIFICA(proximo(j->escudo, 20.0f) && proximo(j->casco, CASCO_JOGADOR));
+    VERIFICA(g->sequenciaSemDano == 0 && g->tempoDano > 0.0f);
+    danificarJogador(g, 30.0f);
+    VERIFICA(proximo(j->escudo, 0.0f) && proximo(j->casco, CASCO_JOGADOR - 10.0f));
+    danificarJogador(g, 500.0f);
+    VERIFICA(proximo(j->escudo, 0.0f) && proximo(j->casco, 0.0f));
+
+    /* Sem dano por ATRASO_ESCUDO: só então recarrega, aos poucos, até o máximo; o casco não volta. */
+    j->casco = 40.0f;
+    danificarJogador(g, 1.0f);
+    esperarEscudo(j, ATRASO_ESCUDO - 0.1f);
+    VERIFICA(proximo(j->escudo, 0.0f));
+    esperarEscudo(j, 1.1f);
+    VERIFICA(j->escudo > 0.0f && j->escudo < ESCUDO_JOGADOR);
+    esperarEscudo(j, ESCUDO_JOGADOR / RECARGA_ESCUDO);
+    VERIFICA(proximo(j->escudo, ESCUDO_JOGADOR) && proximo(j->casco, 39.0f));
+
+    /* Dano no meio da recarga: ela para na hora e a espera recomeça. */
+    danificarJogador(g, 40.0f);
+    esperarEscudo(j, ATRASO_ESCUDO + 1.0f);
+    {
+        float recarregado = j->escudo;
+
+        danificarJogador(g, 1.0f);
+        esperarEscudo(j, ATRASO_ESCUDO - 0.1f);
+        VERIFICA(proximo(j->escudo, recarregado - 1.0f));
+    }
+
+    /* Disparar também conta como combate: a recarga espera de novo. */
+    j->escudo = 0.0f;
+    j->esperaEscudo = 0.0f;
+    j->cooldownLaser = 0.0f;
+    VERIFICA(dispararLaser(g) == 1);
+    esperarEscudo(j, ATRASO_ESCUDO - 0.1f);
+    VERIFICA(proximo(j->escudo, 0.0f));
+    esperarEscudo(j, 1.0f);
+    VERIFICA(j->escudo > 0.0f);
 }
 
 /* Primeira altura, descendo de cima em passos de 0,5 u, em que a nave em (x, ?, z) encosta no casco. */
@@ -477,6 +542,7 @@ int main(void)
     testarArena();
     testarSuavizacao();
     testarColisaoDestroier();
+    testarEscudo();
 
     return RESULTADO_TESTES();
 }
