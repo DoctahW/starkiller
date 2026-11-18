@@ -131,7 +131,7 @@ O `assets/models/destroier.glb` versionado é o modelo detalhado do Imperial-cla
 
 No jogo, o modelo e o mapa de colisão continuam canônicos (1600 u), mas são desenhados e testados na escala `ESCALA_DESTROIER` (`include/destroier.h`, atualmente **4×**, 6400 u). Mudar essa constante muda o tamanho visual e a colisão juntos, sem regenerar o modelo nem o casco.
 
-Modelos locais de teste: o X-Wing usa `assets/models/xwing.glb` ("Low Poly X-Wing", de felipelunardelli, CC BY 4.0; ajustado para 12,5 m e centrado; **25.873 triângulos**, acima do orçamento de 2–5k por decisão temporária do time). O Y-Wing e o A-Wing usam modelos locais do Battlefront II (2005) em `assets/models/bf2/` (`ywing.glb`, `awing.glb`), com o trem de pouso removido; essa pasta é ignorada pelo Git — os assets do BF2 são de terceiros e não são redistribuídos no repositório.
+Modelos de teste: o X-Wing usa `assets/models/xwing.glb` ("Low Poly X-Wing", de felipelunardelli, CC BY 4.0; ajustado para 12,5 m e centrado; **25.873 triângulos**, acima do orçamento de 2–5k por decisão temporária do time). O Y-Wing e o A-Wing usam modelos do Battlefront II (2005) em `assets/models/bf2/` (`ywing.glb`, `awing.glb`), com o trem de pouso removido. Eles estão versionados **temporariamente** para o grupo testar e devem ser removidos antes de uma distribuição pública — são assets de terceiros (LucasArts/EA).
 
 ## Estruturas de dados
 
@@ -148,6 +148,7 @@ Modelos locais de teste: o X-Wing usa `assets/models/xwing.glb` ("Low Poly X-Win
 - `assets/models/fontes/destroier.py`: pipeline antigo do ["Star Wars: Imperial II Star Destroyer"](https://sketchfab.com/3d-models/star-wars-imperial-ii-star-destroyer-b8bd2d35f7604670ab85242c06c6d280), de [Daniel](https://sketchfab.com/DanielAndersson), licença [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Mantido como referência do modelo reduzido anterior.
 - `assets/models/death_star.glb`: adaptado de ["Death Star - Star Wars"](https://sketchfab.com/3d-models/death-star-star-wars-423fb92f677f4448aef407112a1fc032), de [Quiznos323](https://sketchfab.com/quiznos323), licença [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0/). Alterações: superlaser e esqueleto removidos, mapas de normal e emissivo removidos, casco com metade dos polígonos e texturas com metade da resolução. A versão adaptada é distribuída sob a mesma licença.
 - `assets/models/xwing.glb`: ["Low Poly X-Wing"](https://skfb.ly/6W8Rs), de [felipelunardelli](https://sketchfab.com/felipelunardelli), licença [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Alterações: escala para 12,5 m de comprimento, origem no centro e exportação em GLB único (sem decimate).
+- `assets/models/bf2/ywing.glb` e `assets/models/bf2/awing.glb`: adaptados do Battlefront II (2005), © LucasArts/EA. Uso **temporário** para os testes do grupo; remover antes de qualquer distribuição pública.
 
 ## Pipeline de modelos - VIS-01 (#55)
 
