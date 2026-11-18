@@ -8,6 +8,23 @@
 /* Casco do TIE no início da partida (o HUD usa como máximo da barra). */
 #define CASCO_JOGADOR 100.0f
 
+/*
+ * Escudo do TIE: absorve o dano antes do casco, que não regenera. Depois de ATRASO_ESCUDO s sem
+ * levar dano nem disparar, recarrega RECARGA_ESCUDO por segundo até ESCUDO_JOGADOR; um dano ou um
+ * disparo interrompe a recarga e reinicia a espera.
+ */
+#define ESCUDO_JOGADOR  50.0f
+#define ATRASO_ESCUDO   2.5f    /* s fora de combate até começar a recarregar */
+#define RECARGA_ESCUDO  12.5f   /* por segundo: de 0 a cheio em 4 s */
+
+/*
+ * Tira `dano` do jogador: o escudo absorve primeiro e o resto vai para o casco (nenhum fica negativo).
+ * Reinicia a espera da recarga e chama registrarDanoJogador. Dano <= 0 não faz nada.
+ */
+void danificarJogador(Jogo *g, float dano);
+/* Conta a espera da recarga e, depois dela, recarrega o escudo. Roda uma vez por passo. */
+void atualizarEscudo(Jogador *j, float dt);
+
 /* Velocidades angulares máximas (rad/s), atingidas com o eixo em ±1. */
 #define VEL_ARFAGEM 1.5f
 #define VEL_GUINADA 1.0f
@@ -49,9 +66,9 @@ int atualizarJogador(Jogador *j, const Comandos *cmd, float dt);
 
 /*
  * Colisão do TIE com o Destróier (casco de destroier.h). Encostar no casco empurra a nave para
- * fora pelo caminho mais curto (afastarDoDestroier) e tira DANO_COLISAO_DESTROIER do casco
- * do jogador chamando registrarDanoJogador (zera a sequência sem dano). Durante RECARGA_COLISAO
- * depois de um dano só empurra, para a nave encostada não perder casco a cada passo.
+ * fora pelo caminho mais curto (afastarDoDestroier) e causa DANO_COLISAO_DESTROIER ao jogador
+ * (danificarJogador: escudo, depois casco; zera a sequência sem dano). Durante RECARGA_COLISAO
+ * depois de um dano só empurra, para a nave encostada não perder vida a cada passo.
  * Roda depois de atualizarJogador. Devolve 1 se houve contato neste passo; 0 caso contrário.
  */
 int colidirDestroier(Jogo *g, float dt);

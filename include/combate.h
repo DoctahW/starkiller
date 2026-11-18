@@ -20,6 +20,7 @@
  * Dispara os dois lasers do TIE (canhões esquerdo e direito) na direção da frente.
  * Respeita o cooldown de 0,15 s (jogador.cooldownLaser). Devolve 1 se disparou; 0 se
  * estava em cooldown ou o pool não tem 2 slots livres (nesse caso o cooldown não é gasto).
+ * Disparar reinicia a espera da recarga do escudo (ATRASO_ESCUDO).
  */
 int dispararLaser(Jogo *g);
 /*
@@ -102,7 +103,7 @@ int dispararLaserInimigo(Jogo *g, const Inimigo *in);
  * Colisão dos lasers inimigos × TIE (esfera RAIO_JOGADOR) e × Destróier (casco de destroier.h,
  * amostrando o segmento). Roda logo depois de atualizarLasers, com o mesmo segmento
  * (pos - vel * dt → pos). Cada laser atinge só o primeiro alvo que atravessa e é desativado.
- * No TIE: casco -= dano e registrarDanoJogador. No Destróier: cascoDestroier -= dano * FRACAO_DANO_DESTROIER.
+ * No TIE: danificarJogador (escudo, depois casco). No Destróier: cascoDestroier -= dano * FRACAO_DANO_DESTROIER.
  * Devolve quantos acertos no TIE houve neste passo (quem chama vibra o controle).
  */
 int colidirLasersInimigos(Jogo *g, float dt);

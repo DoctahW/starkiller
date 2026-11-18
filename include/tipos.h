@@ -65,6 +65,7 @@ typedef struct {
     Vector3 pos, frente, cima, direita;
     Quaternion rot;
     float velocidade, casco, cooldownLaser;
+    float escudo, esperaEscudo;   /* escudo do TIE e s até ele voltar a recarregar (nave.h) */
 } Jogador;
 
 typedef struct {

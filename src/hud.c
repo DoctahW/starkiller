@@ -66,6 +66,7 @@
 #define COR_HUD       (Color){ 120, 230, 140, 255 }
 #define COR_TIE       (Color){ 60, 220, 90, 255 }
 #define COR_DESTROIER (Color){ 70, 170, 255, 255 }
+#define COR_ESCUDO    (Color){ 120, 225, 255, 255 }
 #define COR_ALERTA    (Color){ 240, 200, 40, 255 }
 #define COR_CRITICA   (Color){ 235, 50, 40, 255 }
 #define COR_ALVO      (Color){ 255, 120, 60, 255 }
@@ -453,14 +454,16 @@ static void desenharTabletPartida(const Jogo *g)
     texto(textoMultiplicador(mult), dir, y + 154, 26, 1.0f, corMultiplicador(mult));
 }
 
-/* Tablet direito: casco do TIE e do Destróier, distância à borda da arena. */
+/* Tablet direito: escudo e casco do TIE, casco do Destróier, distância à borda da arena. */
 static void desenharTabletNave(const Jogo *g)
 {
     float cx = LARGURA_TELA - TABLET_X;
     int esq = (int)(cx - TABLET_MEIA) + 22;
     int dir = (int)(cx + TABLET_MEIA) - 22;
     int y = (int)TABLET_Y;
+    float escudo = fracao(g->jogador.escudo, ESCUDO_JOGADOR);
     float casco = fracao(g->jogador.casco, CASCO_JOGADOR);
+    int recarregando = g->jogador.esperaEscudo <= 0.0f && escudo < 1.0f;
     float destroier = fracao(g->cascoDestroier, CASCO_MAX_DESTROIER);
     float borda = RAIO_ARENA - Vector3Length(g->jogador.pos);
     Color corCasco = corDoNivel(casco, COR_TIE);
@@ -471,15 +474,19 @@ static void desenharTabletNave(const Jogo *g)
 
     /* As linhas começam abaixo do topo inclinado do tablet. */
     tablet(cx, 1);
-    texto("CASCO", esq, y + 46, 14, 0.0f, COR_ROTULO);
-    texto(TextFormat("%d%%", (int)ceilf(casco * 100.0f)), dir, y + 40, 22, 1.0f, corCasco);
-    barra((Rectangle){ (float)esq, y + 68.0f, (float)(dir - esq), 14.0f }, casco, corCasco);
+    texto(recarregando ? "ESCUDO  RECARGA" : "ESCUDO", esq, y + 46, 14, 0.0f, recarregando ? COR_HUD : COR_ROTULO);
+    texto(TextFormat("%d%%", (int)ceilf(escudo * 100.0f)), dir, y + 42, 18, 1.0f, COR_ESCUDO);
+    barraContinua((Rectangle){ (float)esq, y + 64.0f, (float)(dir - esq), 8.0f }, escudo, COR_ESCUDO);
 
-    texto("DESTRÓIER", esq, y + 98, 14, 0.0f, COR_ROTULO);
-    texto(TextFormat("%d%%", (int)ceilf(destroier * 100.0f)), dir, y + 92, 22, 1.0f, corDestroier);
-    barraContinua((Rectangle){ (float)esq, y + 120.0f, (float)(dir - esq), 14.0f }, destroier, corDestroier);
+    texto("CASCO", esq, y + 80, 14, 0.0f, COR_ROTULO);
+    texto(TextFormat("%d%%", (int)ceilf(casco * 100.0f)), dir, y + 76, 18, 1.0f, corCasco);
+    barra((Rectangle){ (float)esq, y + 98.0f, (float)(dir - esq), 8.0f }, casco, corCasco);
 
-    DrawLineEx((Vector2){ (float)esq, y + 148.0f }, (Vector2){ (float)dir, y + 148.0f }, 1.0f, Fade(COR_NEON, 0.6f));
+    texto("DESTRÓIER", esq, y + 114, 14, 0.0f, COR_ROTULO);
+    texto(TextFormat("%d%%", (int)ceilf(destroier * 100.0f)), dir, y + 110, 18, 1.0f, corDestroier);
+    barraContinua((Rectangle){ (float)esq, y + 132.0f, (float)(dir - esq), 8.0f }, destroier, corDestroier);
+
+    DrawLineEx((Vector2){ (float)esq, y + 150.0f }, (Vector2){ (float)dir, y + 150.0f }, 1.0f, Fade(COR_NEON, 0.6f));
     texto("BORDA", esq, y + 164, 14, 0.0f, COR_ROTULO);
     texto(TextFormat("%d u", (int)lroundf(borda)), dir, y + 158, 22, 1.0f,
           borda < RAIO_ARENA * BORDA_PERTO ? COR_CRITICA : COR_VALOR);

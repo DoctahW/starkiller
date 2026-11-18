@@ -72,6 +72,7 @@ static void passoCombate(Jogo *g, RelogioCombate *r, const Comandos *cmd)
         if (g->tempoDano < 0.0f)
             g->tempoDano = 0.0f;
     }
+    atualizarEscudo(&g->jogador, PASSO_FIXO);   /* antes do dano e do disparo do passo, que reiniciam a espera */
 
     avisoArena = atualizarJogador(&g->jogador, cmd, PASSO_FIXO);
     colidirDestroier(g, PASSO_FIXO);
@@ -135,12 +136,12 @@ static EstadoJogo combate(Jogo *g, const ConfigEntrada *cfg, const Comandos *cmd
     EstadoJogo proximo = EST_PAUSA;
 
     if (!cmd->pausa && !controleCaiu) {
-        float cascoAntes = g->jogador.casco;
+        float vidaAntes = g->jogador.casco + g->jogador.escudo;
         int abatesAntes = g->abates;
 
         proximo = simularCombate(g, &relogio, cmd, GetFrameTime());
         /* Dano ao jogador pesa mais que o abate; o abate só vibra se não houve dano no frame. */
-        if (g->jogador.casco < cascoAntes)
+        if (g->jogador.casco + g->jogador.escudo < vidaAntes)
             vibrar(cfg, 0.8f, 0.4f);
         else if (g->abates > abatesAntes)
             vibrar(cfg, 0.6f, 0.3f);

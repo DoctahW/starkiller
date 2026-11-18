@@ -50,6 +50,7 @@ int dispararLaser(Jogo *g)
     ativarLaser(&g->lasers[a], Vector3Subtract(base, deslocamento), vel);   /* canhão esquerdo */
     ativarLaser(&g->lasers[b], Vector3Add(base, deslocamento), vel);        /* canhão direito */
     j->cooldownLaser = COOLDOWN_LASER;
+    j->esperaEscudo = ATRASO_ESCUDO;   /* disparar é estar em combate: o escudo não recarrega */
     return 1;
 }
 
@@ -370,10 +371,7 @@ int colidirLasersInimigos(Jogo *g, float dt)
 
         l->ativo = 0;
         if (tTie <= tCasco) {
-            g->jogador.casco -= l->dano;
-            if (g->jogador.casco < 0.0f)
-                g->jogador.casco = 0.0f;
-            registrarDanoJogador(g);
+            danificarJogador(g, l->dano);
             acertosTie++;
         } else {
             g->cascoDestroier -= l->dano * FRACAO_DANO_DESTROIER;
