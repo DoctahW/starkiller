@@ -1,1 +1,2 @@
 assets/models/destroier.glb filter=lfs diff=lfs merge=lfs -text
+src/casco_destroier.inc linguist-language=C
